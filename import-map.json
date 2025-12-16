@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@/*": "./src/*",
+    "@/types/*": "./src/types/*",
+    "@/lib/*": "./src/lib/*",
+    "@/hooks/*": "./src/hooks/*",
+    "@/components/*": "./src/components/*"
+  }
+}

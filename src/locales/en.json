@@ -1,0 +1,556 @@
+{
+  "WeeklyThemesPage": {
+    "description": "Description",
+    "saveAllThemes": "Save All Themes",
+    "savingAllThemes": "Saving All Themes...",
+    "section": "Section",
+    "themeName": "Theme Name",
+    "title": "Manage Weekly Themes",
+    "validation": {
+      "requiredDescription": "Theme description is required",
+      "requiredName": "Theme name is required"
+    },
+    "week": "Week"
+  },
+  "ageGroups": {
+    "subtitle": "Find the perfect story for every reading level.",
+    "title": "Age Groups"
+  },
+  "ages": {
+    "10-12": "10-12 years",
+    "13-15": "13-15 years",
+    "16-18": "16-18 years",
+    "2-3": "2-3 years",
+    "4-6": "4-6 years",
+    "7-9": "7-9 years"
+  },
+  "app": {
+    "description": "Create and manage illustrated children's stories",
+    "title": "Romistoire"
+  },
+  "calendar": {
+    "title": "Historical Calendar"
+  },
+  "common": {
+    "adding": "Adding...",
+    "back": "Back",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "deleteConfirmDesc": "Are you sure you want to delete this item? This action cannot be undone.",
+    "deleteConfirmTitle": "Confirm Deletion",
+    "edit": "Edit",
+    "error": "Error",
+    "errors": {
+      "failedToLoadThemes": "Failed to load themes",
+      "failedToLoadVersions": "Failed to load versions"
+    },
+    "loading": "Loading...",
+    "next": "Next",
+    "noTheme": "No theme",
+    "operationFailed": "Operation failed",
+    "previous": "Previous",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving...",
+    "search": "Search",
+    "success": "Success"
+  },
+  "create": {
+    "ageGroup": "Age Group",
+    "content": "Story Content",
+    "dayOfWeek": "Day of Week",
+    "error": {
+      "failedToCreate": "Failed to create story",
+      "failedToSave": "Failed to save story",
+      "failedToUploadImage": "Failed to upload image",
+      "requiredFields": "Please fill in all required fields",
+      "requiredFieldsMessage": "Please fill in all required fields (title, content and theme)"
+    },
+    "generate": {
+      "age": "Age Group",
+      "button": "Generate Story",
+      "charNames": "Character Names (optional)",
+      "charNamesPlaceholder": "Ex: Leo, Mia",
+      "day": "Day of Week",
+      "loading": "Generating...",
+      "numCharacters": "Number of Characters (optional)",
+      "numCharactersPlaceholder": "Ex: 2",
+      "subtitle": "Use AI to create an educational story base.",
+      "theme": "Weekly Theme",
+      "title": "AI Story Generator",
+      "weekNumber": "Week Number"
+    },
+    "illustrate": {
+      "aiDisclaimer": "Powered by Google Gemini. Images are generated based on your prompt.",
+      "aiGeneration": "AI Generation (Gemini)",
+      "aiPromptPlaceholder": "Describe the magical scene you want to create...",
+      "createIllustration": "Create an Illustration",
+      "error": {
+        "failedToRead": "Failed to read image file",
+        "imageTooLarge": "Image is too large. Maximum size is 5MB"
+      },
+      "generateButton": "Generate",
+      "savedIllustrations": "Saved Illustrations ({{count}})",
+      "smartSuggestions": "Smart Suggestions",
+      "success": {
+        "imageUploaded": "Image uploaded successfully"
+      },
+      "uploadButton": "Upload",
+      "uploadImage": "Upload an Image"
+    },
+    "language": "Language",
+    "preview": {
+      "illustrationAlt": "Illustration {{number}}",
+      "storyContentPlaceholder": "Story content will appear here...",
+      "untitledStory": "Untitled Story"
+    },
+    "save": "Save Story",
+    "selectDayOfWeek": "Select Day of Week",
+    "selectTheme": "Theme",
+    "selectWeekNumber": "Select Week Number",
+    "storyDetails": "Story Details",
+    "success": {
+      "drawingSaved": "Drawing saved as illustration",
+      "generatedAndSaved": "Stories generated and saved!",
+      "storyCreated": "Story created successfully!"
+    },
+    "tabs": {
+      "generate": "Generate",
+      "illustrate": "Illustrate",
+      "preview": "Preview",
+      "write": "Write"
+    },
+    "theme": {
+      "creating": "Creating...",
+      "enterNew": "Enter new theme",
+      "new": "+ Create New Theme"
+    },
+    "title": "Create a new story",
+    "weekNumber": "Week Number"
+  },
+  "database": {
+    "error": "Database connection error"
+  },
+  "days": {
+    "friday": "Friday",
+    "monday": "Monday",
+    "saturday": "Saturday",
+    "sunday": "Sunday",
+    "thursday": "Thursday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday"
+  },
+  "daysShort": {
+    "friday": "Fri",
+    "monday": "Mon",
+    "saturday": "Sat",
+    "sunday": "Sun",
+    "thursday": "Thu",
+    "tuesday": "Tue",
+    "wednesday": "Wed"
+  },
+  "edit": {
+    "save": "Save Changes",
+    "title": "Edit Story"
+  },
+  "features": {
+    "create": {
+      "description": "Write magical stories that captivate children's imagination with our easy-to-use editor.",
+      "title": "Create"
+    },
+    "illustrate": {
+      "description": "Add colorful illustrations and drawings to bring your stories to life.",
+      "title": "Illustrate"
+    },
+    "share": {
+      "description": "Organize stories by themes and age groups, perfect for educational settings.",
+      "title": "Share"
+    },
+    "subtitle": "Create, illustrate and share your stories in three simple steps.",
+    "title": "How it works"
+  },
+  "footer": {
+    "rights": "All rights reserved"
+  },
+  "home": {
+    "badge": "Unlock your imagination",
+    "browse": "Browse Library",
+    "cta": "Create your first story",
+    "subtitle": "An educational platform for creating illustrated stories",
+    "welcome": "Welcome to Romistoire"
+  },
+  "illustration": {
+    "add": "Add Illustration",
+    "delete": "Delete Illustration",
+    "position": "Position",
+    "save": "Save Illustration"
+  },
+  "languages": {
+    "en": "English",
+    "fr": "French"
+  },
+  "months": {
+    "1": "January",
+    "2": "February",
+    "3": "March",
+    "4": "April",
+    "5": "May",
+    "6": "June",
+    "7": "July",
+    "8": "August",
+    "9": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December"
+  },
+  "nav": {
+    "calendar": "Calendar",
+    "create": "Create",
+    "home": "Home",
+    "series": "Series",
+    "settings": "Settings",
+    "stories": "My Stories",
+    "themes": "Themes",
+    "timeline": "Timeline",
+    "weeklyThemes": "Weekly Themes"
+  },
+  "notFound": {
+    "message": "Oops! Page not found",
+    "returnHome": "Return to Home",
+    "title": "404"
+  },
+  "pdf": {
+    "coverPage": "Include Cover Page",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "defaultCoverTitle": "Story Export",
+    "deselectAll": "Deselect All",
+    "download": "Download PDF",
+    "downloading": "Preparing your PDF...",
+    "error": "Error Generating PDF",
+    "export": "Export to PDF",
+    "filterByAge": "Filter by Age Group",
+    "filterByDate": "Filter by Date",
+    "filterByTheme": "Filter by Theme",
+    "filterByWeek": "Filter by Week",
+    "filters": "Filters",
+    "fontFamily": "Font Family",
+    "fontSize": "Font Size",
+    "fontSizeLarge": "Large",
+    "fontSizeMedium": "Medium",
+    "fontSizeSmall": "Small",
+    "generatePdf": "Generate PDF",
+    "includeIllustrations": "Include Illustrations",
+    "landscape": "Landscape",
+    "options": "Export Options",
+    "orientation": "Orientation",
+    "pageSize": "Page Size",
+    "portrait": "Portrait",
+    "selectAll": "Select All",
+    "selectStories": "Select Stories",
+    "success": "PDF Generated Successfully",
+    "tableOfContents": "Include Table of Contents",
+    "themeBook": "A collection of stories on theme {{theme}}",
+    "title": "Export Stories to PDF",
+    "tocTitle": "Table of Contents"
+  },
+  "series": {
+    "createSuccess": "Series created successfully",
+    "deleteSuccess": "Series deleted successfully",
+    "management": {
+      "create": {
+        "action": "Create Series",
+        "placeholder": "Ex: The Adventures of...",
+        "title": "Create New Series"
+      },
+      "createButton": "+ New Series",
+      "createError": "Error creating series",
+      "delete": {
+        "cancel": "Cancel",
+        "confirm": "Delete",
+        "description": "Are you sure you want to delete <strong>{{name}}</strong>?<br />The stories will not be deleted, but will be unlinked from this series.",
+        "title": "Delete Series?"
+      },
+      "deleteError": "Error deleting series",
+      "kpi": {
+        "ages": "Ages",
+        "day": "Day",
+        "noStories": "No stories linked yet.",
+        "timelineCoverage": "Timeline Coverage",
+        "totalStories": "Total Stories",
+        "viewStats": "View Stats",
+        "week": "Week",
+        "weeksCovered": "Weeks Covered"
+      },
+      "noSeries": "No series found.",
+      "rename": {
+        "save": "Save",
+        "title": "Rename Series"
+      },
+      "searchPlaceholder": "Search series...",
+      "table": {
+        "actions": "Actions",
+        "createdAt": "Created At",
+        "name": "Name",
+        "stories": "Stories"
+      },
+      "title": "Series Management",
+      "updateError": "Error updating series"
+    },
+    "updateSuccess": "Series updated successfully"
+  },
+  "settings": {
+    "appearanceChanged": "Appearance changed successfully.",
+    "autoSave": "Auto Save",
+    "autoSaveChanged": "Auto save changed successfully.",
+    "autoSaveDescription": "Automatically save changes to your stories.",
+    "cleanup": "Cleanup",
+    "cleanupImagesDesc": "Delete image files that are no longer linked to any story.",
+    "cleanupImagesTitle": "Cleanup Unused Images",
+    "clearButton": "Clear All Data",
+    "clearConfirm": "Clear Data",
+    "clearError": "Error clearing data.",
+    "clearWarning": "Are you sure you want to clear all data? This action cannot be undone.",
+    "confirmCleanup": "Yes, Cleanup",
+    "confirmCleanupDesc": "This will scan your uploads folder and permanently delete any image file not referenced in the database. This action is irreversible.",
+    "confirmCleanupTitle": "Cleanup unused images?",
+    "confirmClear": "Clear Data Confirmation",
+    "confirmReset": "Reset Settings Confirmation",
+    "dangerDescription": "Permanently delete all application data.",
+    "dangerZone": "Danger Zone",
+    "darkMode": "Dark Mode",
+    "darkModeDescription": "Enable dark mode for a more comfortable user experience.",
+    "data": "Data",
+    "dataCleared": "Data cleared successfully.",
+    "dataDescription": "Export, import, or clear your application data.",
+    "dataExported": "Data exported successfully.",
+    "dataImported": "Data imported successfully",
+    "description": "Configure your application settings",
+    "developerMode": "Developer Mode",
+    "developerModeDescription": "Enable advanced technical features (Logs, Network).",
+    "exportButton": "Export",
+    "exportData": "Export Data",
+    "exportDescription": "Download a backup of your stories and settings.",
+    "exportError": "Error exporting data.",
+    "exportFullZip": "Full Backup (ZIP)",
+    "exportJsonOnly": "Data Only (JSON)",
+    "factoryReset": "Factory Reset",
+    "factoryResetDesc": "Wipe all data and start fresh.",
+    "general": "General",
+    "generalDescription": "Manage general application settings.",
+    "importButton": "Import",
+    "importData": "Import Data",
+    "importDescription": "Upload stories and settings from a backup file.",
+    "importError": "Error importing data",
+    "importNoFile": "Please select a file to import",
+    "importOverwrite": "Overwrite existing",
+    "importSkip": "Skip existing (Default)",
+    "language": "Language",
+    "languageChanged": "Language changed successfully.",
+    "languageDescription": "Choose the application language.",
+    "languageNote": "Changes will take effect immediately.",
+    "network": "Network",
+    "reset": "Reset",
+    "resetError": "Error resetting settings.",
+    "resetSettings": "Reset Settings",
+    "resetWarning": "Are you sure you want to reset all settings to default? This action cannot be undone.",
+    "selectLanguage": "Select Language",
+    "settingsReset": "Settings have been reset to default.",
+    "title": "Settings"
+  },
+  "stories": {
+    "allAges": "All Ages",
+    "allDays": "All Days",
+    "allImages": "All Illustrations",
+    "allThemes": "All Themes",
+    "allWeeks": "All Weeks",
+    "create": "Create Story",
+    "empty": "No stories available. Create one now!",
+    "noResults": "No stories found",
+    "noStoriesMatchSearch": "No stories match your search.",
+    "searchPlaceholder": "Search stories...",
+    "searchStories": "Search Stories",
+    "title": "Stories",
+    "withImage": "With Illustration",
+    "withoutImage": "Without Illustration"
+  },
+  "story": {
+    "ageGroup": "Age Group",
+    "characterCount": "{{count}} characters",
+    "createIllustration": "Create an Illustration",
+    "creationDate": "Creation Date",
+    "dayOfWeek": "Day of Week",
+    "dayOfWeekPlaceholder": "Enter day",
+    "deleteError": "Error deleting story",
+    "deleteSuccess": "Story deleted successfully",
+    "details": "Story Details",
+    "edit": "Edit",
+    "editor": "Editor",
+    "illustrations": "Illustrations",
+    "illustrationsComingSoon": "Illustrations coming soon!",
+    "language": "Language",
+    "languagePlaceholder": "Enter language",
+    "lastModified": "Last modified",
+    "metadata": "Metadata",
+    "modified": "Last modified",
+    "next": "Next Story",
+    "noThemesFound": "No themes found",
+    "previous": "Previous Story",
+    "primaryTheme": "Primary Theme",
+    "restore": "Restore",
+    "restoreError": "Error restoring version",
+    "restoreSuccess": "Version restored successfully",
+    "restoreVersion": "Restore Version",
+    "savedIllustrations": "Saved Illustrations",
+    "searchPlaceholder": "Search story...",
+    "searchStories": "Search Stories",
+    "searchThemes": "Search themes...",
+    "secondaryThemes": "Secondary Themes",
+    "selectAgeGroup": "Select Age Group",
+    "selectVersion": "Select Version",
+    "settings": "Settings",
+    "theme": "Theme",
+    "themes": "Themes",
+    "themesPlaceholder": "Select one or more themes",
+    "title": "Title",
+    "titlePlaceholder": "Enter title",
+    "updateError": "Error updating story",
+    "updateSuccess": "Story updated successfully",
+    "uploadImage": "Upload Image",
+    "version": "Version",
+    "week": "Week",
+    "weekNumber": "Week {{number}}",
+    "weekNumberPlaceholder": "Enter week number",
+    "weeklyTheme": "Weekly Theme"
+  },
+  "success": {
+    "create": "Story created successfully",
+    "delete": "Story deleted successfully",
+    "restore": "Version restored successfully",
+    "update": "Story updated successfully"
+  },
+  "themes": {
+    "addNewTheme": "Add New Theme",
+    "addTheme": "Add Theme",
+    "ageGroups": "Age Groups",
+    "allAges": "All Ages",
+    "allWeeks": "All Weeks",
+    "animals": "Animals",
+    "cancel": "Cancel",
+    "clearSearch": "Clear search",
+    "colorPlaceholder": "Theme color",
+    "confirmDeleteThemeDescription": "Are you sure you want to delete this theme? This action cannot be undone.",
+    "createFirstTheme": "Create your first theme to get started.",
+    "createFirstThemeDescription": "Create your first theme to start organizing your stories.",
+    "createIllustration": "Create Illustration",
+    "createdAt": "Created At",
+    "creationDate": "Creation Date",
+    "dataImported": "Data imported successfully",
+    "deleteButton": "Delete",
+    "deleteTheme": "Delete Theme",
+    "descriptionPlaceholder": "Describe this theme...",
+    "dinosaurs": "Dinosaurs",
+    "duplicatesMerged": "Duplicate themes merged successfully",
+    "editTheme": "Edit Theme",
+    "editThemeDescription": "Edit the details of the selected theme.",
+    "error": {
+      "failedToDelete": "Failed to delete theme",
+      "invalidData": "Invalid data encountered.",
+      "nullData": "Data is null or undefined. Please check source."
+    },
+    "filterNamePlaceholder": "Filter by name",
+    "filterSelectTheme": "Filter by selected theme",
+    "found": "found",
+    "friendship": "Friendship",
+    "grid": {
+      "clearFilter": "Clear search",
+      "found": "found",
+      "theme_one": "theme",
+      "theme_other": "themes",
+      "total": "total"
+    },
+    "iconPlaceholder": "Theme Icon",
+    "illustrationAlt": "Illustration Alt Text",
+    "imageNumber": "Image Number",
+    "importError": "Error importing data",
+    "importNoFile": "Please select a file to import",
+    "manageThemes": "Manage Themes",
+    "manageThemesDescription": "Create, edit, and manage story themes to enhance your narratives",
+    "matchedNoResults": "didn't match any themes",
+    "merge": "Merge",
+    "mergeFailed": "Failed to merge",
+    "namePlaceholder": "e.g. Magic Forest",
+    "nature": "Nature",
+    "newTheme": "New Theme",
+    "newThemePlaceholder": "Theme name",
+    "nextTheme": "Next Theme",
+    "noDescription": "No description",
+    "noResults": "No results",
+    "noThemesFound": "No themes found.",
+    "ocean": "Ocean",
+    "precaching": {
+      "missingResource": "Resource not found in precache: {{url}}",
+      "noRoute": "No route found for: {{url}}"
+    },
+    "previousTheme": "Previous Theme",
+    "removeTheme": "Remove Theme",
+    "save": "Save",
+    "saveTheme": "Save Theme",
+    "search": "Search",
+    "searchThemes": "Search themes...",
+    "selectAgeGroup": "Select Age Group",
+    "selectWeek": "Select Week",
+    "sort": "Sort",
+    "space": "Space",
+    "success": {
+      "imageDeleted": "Theme deleted successfully"
+    },
+    "themeAddedSuccess": "Theme added successfully",
+    "themeDeletedSuccess": "Theme deleted successfully!",
+    "themeUpdatedSuccess": "Theme updated successfully",
+    "themesCount": "Total themes",
+    "timeline": "Timeline",
+    "total": "Total themes",
+    "tryAdjustingFilter": "Try adjusting your search filters",
+    "updatedAt": "Updated At",
+    "validation": {
+      "colorRequired": "Valid color required",
+      "descriptionRequired": "Description is required",
+      "descriptionTooLong": "Description too long",
+      "nameRequired": "Name is required",
+      "nameTooLong": "Name too long"
+    }
+  },
+  "timeline": {
+    "allAges": "All Ages",
+    "allWeeks": "All Weeks",
+    "exploreStories": "Explore stories in a timeline view",
+    "filterAllThemes": "All Themes",
+    "filterSelectTheme": "Select a theme",
+    "manageWeeklyThemes": "Chronological Stories",
+    "selectAgeGroup": "Select Age Group",
+    "selectWeek": "Select Week Number",
+    "weekNumber": "Week {{number}}"
+  },
+  "version": {
+    "current": "Current Version",
+    "history": "Version History",
+    "restore": "Restore this version"
+  },
+  "week": {
+    "day": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "title": "Week"
+  },
+  "weeklyThemes": {
+    "week": "Week"
+  }
+}
