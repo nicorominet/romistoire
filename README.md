@@ -28,6 +28,19 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 - **⚙️ Paramètres Avancés** : Gérez les données, les journaux (Système & Réseau) et le mode développeur.
 - **🌍 Bilingue** : Entièrement traduit en Anglais et Français.
 
+## 📸 Screenshots / Captures d'écran
+
+<div align="center">
+  <img src="assets/screenshots/home.png" alt="Home Page" width="800"/>
+  <p><i>Home Page / Page d'Accueil</i></p>
+  
+  <img src="assets/screenshots/create.png" alt="Create Story" width="800"/>
+  <p><i>Create Story / Créer une Histoire</i></p>
+
+  <img src="assets/screenshots/library.png" alt="Library" width="800"/>
+  <p><i>Library / Bibliothèque</i></p>
+</div>
+
 ---
 
 ## 🛠️ Tech Stack / Stack Technique
@@ -109,10 +122,11 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 ## 🤝 Contributing / Contribuer
 
 **[English]**  
-Contributions are welcome! Please fork the repository and submit a pull request for any enhancements or bug fixes.
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to report bugs, suggest features, or submit pull requests.
 
 **[Français]**  
-Les contributions sont les bienvenues ! Merci de forker le dépôt et de soumettre une pull request pour toute amélioration ou correction de bug.
+Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](./CONTRIBUTING.md) pour savoir comment signaler des bugs, suggérer des fonctionnalités ou soumettre des pull requests.
+
 
 ---
 
