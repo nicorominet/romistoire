@@ -1,114 +1,118 @@
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { themeService } from './theme.service.js';
 
 class StoryService {
   async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, seriesId }) {
     const offset = (page - 1) * limit;
-    
-    let queryStr = `
-      SELECT s.*, ss.name as series_name, GROUP_CONCAT(t.name) as theme_names,
-             GROUP_CONCAT(t.description) as theme_descriptions,
-             GROUP_CONCAT(t.id) as theme_ids,
-             GROUP_CONCAT(st.is_primary) as theme_primaries
-      FROM stories s
-      LEFT JOIN story_themes st ON s.id = st.story_id
-      LEFT JOIN themes t ON st.theme_id = t.id
-      LEFT JOIN story_series ss ON s.series_id = ss.id
-      WHERE s.locale = ?
-    `;
 
-    const params = [locale];
+    // Helper to build WHERE clause and params
+    const buildWhere = () => {
+        let whereClauses = ['s.locale = ?'];
+        let params = [locale];
 
-    if (seriesId && seriesId !== 'all') {
-      queryStr += ' AND s.series_id = ?';
-      params.push(seriesId);
-    }
-
-    if (theme && theme !== 'all') {
-      queryStr += ' AND EXISTS (SELECT 1 FROM story_themes WHERE story_id = s.id AND theme_id = ?)';
-      params.push(theme);
-    }
-
-    if (ageGroup && ageGroup !== 'all') {
-      queryStr += ' AND s.age_group = ?';
-      params.push(ageGroup);
-    }
-
-    if (weekNumber) {
-      queryStr += ' AND s.week_number = ?';
-      params.push(weekNumber);
-    }
-
-    if (dayOfWeek && dayOfWeek !== 'all') {
-      queryStr += ' AND s.day_order = ?';
-      params.push(parseInt(dayOfWeek, 10));
-    }
-
-    if (search) {
-      queryStr += ' AND (s.title LIKE ? OR s.content LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (hasImage && hasImage !== 'all') {
-        if (hasImage === 'yes') {
-            queryStr += ' AND EXISTS (SELECT 1 FROM illustrations WHERE story_id = s.id)';
-        } else if (hasImage === 'no') {
-            queryStr += ' AND NOT EXISTS (SELECT 1 FROM illustrations WHERE story_id = s.id)';
+        if (seriesId && seriesId !== 'all') {
+            whereClauses.push('s.series_id = ?');
+            params.push(seriesId);
         }
-    }
 
-    queryStr += ' GROUP BY s.id ORDER BY s.day_order ASC, s.created_at ASC LIMIT ? OFFSET ?';
-    params.push(String(limit), String(offset)); // API expects limit/offset
+        if (theme && theme !== 'all') {
+            whereClauses.push('EXISTS (SELECT 1 FROM story_themes WHERE story_id = s.id AND theme_id = ?)');
+            params.push(theme);
+        }
 
-    const stories = await query(queryStr, params);
+        if (ageGroup && ageGroup !== 'all') {
+            whereClauses.push('s.age_group = ?');
+            params.push(ageGroup);
+        }
 
-    // Get illustrations for each story (avoid N+1 query if possible, but for 12 items it's okay-ish to parallelize)
-    // Actually, can we JOIN illustrations? No, it's 1:N.
-    // Let's do a second query for illustrations of these story IDs?
-    // Optimization: WHERE story_id IN (...)
-    
-    // For now, keep the logic similar to original but parallelized map
-    const mappedStories = await Promise.all(stories.map(async (story) => {
-      const themes = story.theme_ids?.split(',').map((id, index) => ({
-        id,
-        name: story.theme_names?.split(',')[index],
-        description: story.theme_descriptions?.split(',')[index],
-        isPrimary: story.theme_primaries?.split(',')[index] === '1'
-      })) || [];
-      
-      delete story.theme_names;
-      delete story.theme_descriptions;
-      delete story.theme_ids;
-      delete story.theme_primaries;
+        if (weekNumber) {
+            whereClauses.push('s.week_number = ?');
+            params.push(weekNumber);
+        }
 
-      const illustrations = await query(
-        'SELECT id, story_id, image_path, filename, file_type, position FROM illustrations WHERE story_id = ? ORDER BY position ASC',
-        [story.id]
-      );
+        if (dayOfWeek && dayOfWeek !== 'all') {
+            whereClauses.push('s.day_order = ?');
+            params.push(parseInt(dayOfWeek, 10));
+        }
 
-      return { ...story, themes, illustrations };
-    }));
+        if (search) {
+            whereClauses.push('(s.title LIKE ? OR s.content LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`);
+        }
 
-    // Total Count for Pagination
-    let countQueryStr = 'SELECT COUNT(*) as total FROM stories WHERE locale = ?';
-    const countParams = [locale];
-    // Re-apply filters (DRY violation but SQL construction is finicky)
-    if (seriesId && seriesId !== 'all') { countQueryStr += ' AND series_id = ?'; countParams.push(seriesId); }
-    if (theme && theme !== 'all') { countQueryStr += ' AND EXISTS (SELECT 1 FROM story_themes WHERE story_id = stories.id AND theme_id = ?)'; countParams.push(theme); }
-    if (ageGroup && ageGroup !== 'all') { countQueryStr += ' AND age_group = ?'; countParams.push(ageGroup); }
-    if (weekNumber) { countQueryStr += ' AND week_number = ?'; countParams.push(weekNumber); }
-    if (dayOfWeek && dayOfWeek !== 'all') { countQueryStr += ' AND day_order = ?'; countParams.push(dayOfWeek); }
-    if (search) { countQueryStr += ' AND (title LIKE ? OR content LIKE ?)'; countParams.push(`%${search}%`, `%${search}%`); }
-    if (hasImage && hasImage !== 'all') {
-        if (hasImage === 'yes') countQueryStr += ' AND EXISTS (SELECT 1 FROM illustrations WHERE story_id = stories.id)';
-        else if (hasImage === 'no') countQueryStr += ' AND NOT EXISTS (SELECT 1 FROM illustrations WHERE story_id = stories.id)';
-    }
+        if (hasImage && hasImage !== 'all') {
+            if (hasImage === 'yes') {
+                whereClauses.push('EXISTS (SELECT 1 FROM illustrations WHERE story_id = s.id)');
+            } else if (hasImage === 'no') {
+                whereClauses.push('NOT EXISTS (SELECT 1 FROM illustrations WHERE story_id = s.id)');
+            }
+        }
+        
+        return { whereClause: whereClauses.join(' AND '), params };
+    };
 
-    const countResult = await query(countQueryStr, countParams);
+    const { whereClause, params } = buildWhere();
+
+    const dataQueryPromise = (async () => {
+        const queryStr = `
+            SELECT s.*, ss.name as series_name, GROUP_CONCAT(t.name) as theme_names,
+                   GROUP_CONCAT(t.description) as theme_descriptions,
+                   GROUP_CONCAT(t.id) as theme_ids,
+                   GROUP_CONCAT(st.is_primary) as theme_primaries
+            FROM stories s
+            LEFT JOIN story_themes st ON s.id = st.story_id
+            LEFT JOIN themes t ON st.theme_id = t.id
+            LEFT JOIN story_series ss ON s.series_id = ss.id
+            WHERE ${whereClause}
+            GROUP BY s.id ORDER BY s.day_order ASC, s.created_at ASC LIMIT ? OFFSET ?
+        `;
+        const stories = await query(queryStr, [...params, String(limit), String(offset)]);
+        
+        // Optimize N+1 illustration queries
+        const storyIds = stories.map(s => s.id);
+        let allIllustrations = [];
+        if (storyIds.length > 0) {
+            const placeholders = storyIds.map(() => '?').join(',');
+            allIllustrations = await query(
+                `SELECT id, story_id, image_path, filename, file_type, position 
+                 FROM illustrations 
+                 WHERE story_id IN (${placeholders}) 
+                 ORDER BY story_id, position ASC`,
+                storyIds
+            );
+        }
+
+        // Map content
+        return stories.map((story) => {
+            const themes = story.theme_ids?.split(',').map((id, index) => ({
+                id,
+                name: story.theme_names?.split(',')[index],
+                description: story.theme_descriptions?.split(',')[index],
+                isPrimary: story.theme_primaries?.split(',')[index] === '1'
+            })) || [];
+              
+            delete story.theme_names;
+            delete story.theme_descriptions;
+            delete story.theme_ids;
+            delete story.theme_primaries;
+
+            const illustrations = allIllustrations.filter(img => img.story_id === story.id);
+            return { ...story, themes, illustrations };
+        });
+    })();
+
+    const countQueryPromise = (async () => {
+        const countQueryStr = `SELECT COUNT(*) as total FROM stories s WHERE ${whereClause}`;
+        const result = await query(countQueryStr, params);
+        return result[0].total;
+    })();
+
+    const [mappedStories, total] = await Promise.all([dataQueryPromise, countQueryPromise]);
     
     return {
       data: mappedStories,
-      total: countResult[0].total,
+      total,
       page,
       limit
     };
@@ -152,7 +156,7 @@ class StoryService {
     );
 
     // Enrich stories with themes and illustrations
-    // We do this in parallel for performance, similar to findAll
+    // We optimization here as well could be done but usually findByIds is for small sets
     return await Promise.all(stories.map(async (story) => {
       // Themes
       const themes = await query(`
@@ -218,50 +222,35 @@ class StoryService {
     return story;
   }
 
-  async getNext(id) {
+  async getNeighbors(id) {
      const story = await query(`SELECT week_number, day_order, age_group, series_id, created_at FROM stories WHERE id = ?`, [id]);
-     if (story.length === 0) return null;
+     if (story.length === 0) return { next: null, prev: null };
      const { week_number, day_order, age_group, series_id, created_at } = story[0];
 
-     let nextStory = [];
-     /*
-     if (series_id) {
-         nextStory = await query(
-             `SELECT id FROM stories WHERE series_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) ORDER BY created_at ASC LIMIT 1`,
-             [series_id, created_at, created_at, id]
-         );
-     }
-     */
-     if (nextStory.length === 0) {
-         nextStory = await query(
-             `SELECT id, title FROM stories WHERE week_number = ? AND day_order > ? AND age_group = ? ORDER BY day_order ASC LIMIT 1`,
-             [week_number, day_order, age_group]
-         );
-     }
-     return nextStory.length > 0 ? nextStory[0] : null;
+     const nextResult = await query(
+         `SELECT id, title FROM stories WHERE week_number = ? AND day_order > ? AND age_group = ? ORDER BY day_order ASC LIMIT 1`,
+         [week_number, day_order, age_group]
+     );
+
+     const prevResult = await query(
+         `SELECT id, title FROM stories WHERE week_number = ? AND day_order < ? AND age_group = ? ORDER BY day_order DESC LIMIT 1`,
+         [week_number, day_order, age_group]
+     );
+     
+     return {
+        next: nextResult[0] || null,
+        prev: prevResult[0] || null
+     };
+  }
+
+  async getNext(id) {
+     const neighbors = await this.getNeighbors(id);
+     return neighbors.next;
   }
 
   async getPrevious(id) {
-    const story = await query(`SELECT week_number, day_order, age_group, series_id, created_at FROM stories WHERE id = ?`, [id]);
-    if (story.length === 0) return null;
-    const { week_number, day_order, age_group, series_id, created_at } = story[0];
-
-    let prevStory = [];
-    /*
-    if (series_id) {
-        prevStory = await query(
-            `SELECT id FROM stories WHERE series_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC LIMIT 1`,
-            [series_id, created_at, created_at, id]
-        );
-    }
-    */
-    if (prevStory.length === 0) {
-        prevStory = await query(
-            `SELECT id, title FROM stories WHERE week_number = ? AND day_order < ? AND age_group = ? ORDER BY day_order DESC LIMIT 1`,
-            [week_number, day_order, age_group]
-        );
-    }
-    return prevStory.length > 0 ? prevStory[0] : null;
+     const neighbors = await this.getNeighbors(id);
+     return neighbors.prev;
   }
 
   async getVersions(id) {
@@ -328,9 +317,10 @@ class StoryService {
     } catch (error) {
       await connection.rollback();
       throw error;
-    } finally {
+      } finally {
       connection.release();
     }
+      themeService.invalidateCache();
   }
 
   async restoreVersion(id, versionId) {
@@ -405,6 +395,7 @@ class StoryService {
       } finally {
         connection.release();
       }
+      themeService.invalidateCache();
   }
 
   async delete(id) {
@@ -412,6 +403,7 @@ class StoryService {
     // Delete logic (Cascading usually handles some, but let's be safe if manual delete needed)
     // Using simple delete query assuming FK constraints on DELETE CASCADE or SET NULL
     await query('DELETE FROM stories WHERE id = ?', [id]);
+    themeService.invalidateCache();
     return true;
   }
 

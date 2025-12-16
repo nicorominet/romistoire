@@ -28,6 +28,16 @@ dist-ssr
 .env.local
 .env.*.local
 
-# User uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Server Logs & Debug
+server/debug/
+server/logs/
+coverage/
+
+# Root Uploads
+uploads/
+
+# Temporary Files
+temp_import_*/

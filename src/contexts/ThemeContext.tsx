@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { themeApi } from '@/api/themes.api';
 import { Theme } from '@/types/Theme';
 import { Story } from '@/types/Story';
+import { useThemes, useThemeMutations } from '@/hooks/useThemes';
 
 export interface ThemeContextType {
   // State
@@ -45,17 +46,19 @@ export interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
-  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
-  const [expandedThemeId, setExpandedThemeId] = useState<string | null>(null);
-  const [storiesUsingTheme, setStoriesUsingTheme] = useState<Story[]>([]);
+  // Filter States
   const [filterName, setFilterName] = useState('');
   const [filterAge, setFilterAge] = useState<string>('all');
   const [filterSeries, setFilterSeries] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // UI States
+  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [expandedThemeId, setExpandedThemeId] = useState<string | null>(null);
+  const [storiesUsingTheme, setStoriesUsingTheme] = useState<Story[]>([]);
+  const [manualError, setManualError] = useState<string | null>(null);
+
   const [newTheme, setNewTheme] = useState<Theme>({
     id: '',
     name: '',
@@ -64,28 +67,33 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     created_at: '',
   });
 
-  const fetchThemes = useCallback(async () => {
-    try {
-      setLoading(true);
-      const filters: any = {};
-      if (filterName) filters.search = filterName;
-      if (filterAge && filterAge !== 'all') filters.age_group = filterAge;
-      if (filterSeries && filterSeries !== 'all') filters.series_id = filterSeries;
+  // React Query Integration
+  const { 
+    data: fetchedThemes = [], 
+    isLoading: isThemesLoading, 
+    error: themesError, 
+    refetch 
+  } = useThemes({
+    search: filterName,
+    age_group: filterAge !== 'all' ? filterAge : undefined,
+    series_id: filterSeries !== 'all' ? filterSeries : undefined
+  });
 
-      const data = await themeApi.getAll(filters);
-      setThemes(data);
-      setError(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch themes';
-      setError(errorMessage);
-      console.error('Error fetching themes:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filterName, filterAge, filterSeries]);
+  const { createTheme, updateTheme, deleteTheme } = useThemeMutations();
+
+  // Derived State
+  const loading = isThemesLoading;
+  const error = manualError || (themesError ? (themesError as Error).message : null);
+  const themes = fetchedThemes as Theme[];
+
+  // wrapper for compatibility
+  const fetchThemes = useCallback(async () => {
+     await refetch();
+  }, [refetch]);
 
   const fetchStoriesUsingTheme = useCallback(async (themeId: string) => {
     try {
+      setStoriesUsingTheme([]); // Clear previous stories immediately
       const data = (await themeApi.getStories(themeId)) as any;
       setStoriesUsingTheme(data);
     } catch (err) {
@@ -95,79 +103,50 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, []);
 
-  const addTheme = useCallback(async (theme: Theme) => {
+  const addThemeAction = useCallback(async (theme: Theme) => {
     try {
-      setLoading(true);
-      const data = (await themeApi.create(theme)) as any;
-      setThemes((prevThemes) => [...prevThemes, data]);
+      await createTheme.mutateAsync(theme);
       resetNewTheme();
-      setError(null);
+      setManualError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add theme';
-      setError(errorMessage);
+      setManualError(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [createTheme]);
 
-  const editTheme = useCallback(async (theme: Theme) => {
+  const editThemeAction = useCallback(async (theme: Theme) => {
     try {
-      setLoading(true);
-      const data = (await themeApi.update(theme.id, theme)) as any;
-      setThemes((prevThemes) =>
-        prevThemes.map((t) => (t.id === theme.id ? data : t))
-      );
+      await updateTheme.mutateAsync({ id: theme.id, data: theme });
       setEditingTheme(null);
       setSelectedThemeId(null);
-      setError(null);
+      setManualError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to edit theme';
-      setError(errorMessage);
+      setManualError(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [updateTheme]);
 
-  const removeTheme = useCallback(async (id: string) => {
+  const removeThemeAction = useCallback(async (id: string) => {
     try {
-      setLoading(true);
       setSelectedThemeId(id);
-      await fetchStoriesUsingTheme(id);
-
-      // Note: validation logic (storiesUsingTheme check) might be race-prone if state not updated immediately.
-      // Ideally, the backend should prevent deletion if used.
-      // But keeping logic as is:
-      
-      // We need to wait for state update? No, state update is async.
-      // The original code waited for fetchStoriesUsingTheme which updates state.
-      // But we can't read state immediately after.
-      // However, the original code DID attempt to read state. CHECK THIS.
-      // Original: await fetchStoriesUsingTheme(id); if (storiesUsingTheme.length > 0) ...
-      // This is a BUG in original code because React state updates are scheduled, not immediate.
-      // I will fix this by checking the RETURN VALUE of fetchStoriesUsingTheme instead of state.
-      // But my new fetchStoriesUsingTheme doesn't return data. I should modify it to return data.
-      
-      // Actually, let's just make the API call to check.
+      // Check for usage
       const stories = (await themeApi.getStories(id)) as any;
       if (stories.length > 0) {
            throw new Error('Theme has stories using it');
       }
 
-      await themeApi.delete(id);
-
-      setThemes((prevThemes) => prevThemes.filter((theme) => theme.id !== id));
-      setError(null);
+      await deleteTheme.mutateAsync(id);
+      setManualError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to remove theme';
-      setError(errorMessage);
+      setManualError(errorMessage);
       throw err;
     } finally {
-      setLoading(false);
       resetForm();
     }
-  }, []);
+  }, [deleteTheme]);
 
   const resetNewTheme = useCallback(() => {
     setNewTheme({
@@ -199,9 +178,9 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     filterSeries,
     sortOrder,
     newTheme,
-    setThemes,
-    setLoading,
-    setError,
+    setThemes: () => {}, // No-op, managed by Query
+    setLoading: () => {}, // No-op
+    setError: setManualError,
     setEditingTheme,
     setSelectedThemeId,
     setExpandedThemeId,
@@ -213,9 +192,9 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setNewTheme,
     fetchThemes,
     fetchStoriesUsingTheme,
-    addTheme,
-    editTheme,
-    removeTheme,
+    addTheme: addThemeAction,
+    editTheme: editThemeAction,
+    removeTheme: removeThemeAction,
     resetNewTheme,
     resetForm,
   };

@@ -12,7 +12,9 @@
     "lint": "eslint . --ext js,jsx,ts,tsx",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "test": "npm run test:client && npm run test:server",
+    "test:client": "vitest run",
+    "test:server": "vitest run -c server/vitest.config.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -98,6 +100,7 @@
     "@vitejs/plugin-react-swc": "^3.6.0",
     "eslint": "^8.57.0",
     "jsdom": "^27.3.0",
+    "supertest": "^7.1.4",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^6.2.5",

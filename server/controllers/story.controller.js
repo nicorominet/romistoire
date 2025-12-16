@@ -57,6 +57,15 @@ export const getPreviousStory = async (req, res) => {
     }
 };
 
+export const getStoryNeighbors = async (req, res) => {
+    try {
+        const neighbors = await storyService.getNeighbors(req.params.id);
+        res.json(neighbors);
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 
 export const createStory = async (req, res) => {
   try {

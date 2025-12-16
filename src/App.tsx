@@ -19,6 +19,7 @@ const WeeklyThemesPage = lazy(() => import("./pages/WeeklyThemesPage"));
 const TimelinePage = lazy(() => import("@/pages/TimelinePage"));
 const Themepage = lazy(() => import("@/pages/Themepage"));
 const SeriesManagementPage = lazy(() => import("@/pages/SeriesManagementPage"));
+const DebugConsole = lazy(() => import("@/components/Debug/DebugConsole"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,12 +50,69 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   }
 }
 
+import { logger } from "@/lib/logger";
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
+
+const GlobalLogger = () => {
+    const location = useLocation();
+    const lastClickRef = useRef<{ time: number, target: EventTarget | null }>({ time: 0, target: null });
+    const clickCountRef = useRef(0);
+
+    // Track Route Changes
+    useEffect(() => {
+        logger.info('ROUTE_CHANGE', `Navigated to ${location.pathname}`, {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash
+        });
+    }, [location]);
+
+    // Track Global Clicks & Rage Clicks
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const now = Date.now();
+            
+            // Basic Interaction Log
+            const elementInfo = target.tagName + (target.id ? `#${target.id}` : '') + (target.className ? `.${target.className.split(' ').join('.')}` : '');
+            logger.info('UI_INTERACTION', `Click on ${elementInfo}`, {
+                x: e.clientX,
+                y: e.clientY,
+                text: target.innerText?.substring(0, 20)
+            });
+
+            // Rage Click Detection (< 300ms between clicks on same target)
+            if (lastClickRef.current.target === target && (now - lastClickRef.current.time) < 300) {
+                clickCountRef.current++;
+                if (clickCountRef.current >= 3) {
+                     logger.warn('UI_INTERACTION', 'Rage Click Detected', {
+                        element: elementInfo,
+                        count: clickCountRef.current
+                    });
+                    clickCountRef.current = 0; // Reset after logging
+                }
+            } else {
+                clickCountRef.current = 1;
+            }
+
+            lastClickRef.current = { time: now, target };
+        };
+
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, []);
+
+    return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <GlobalLogger />
         <ErrorBoundary>
           <Suspense fallback={
             <div className="flex h-screen w-full items-center justify-center">
@@ -77,6 +135,7 @@ const App = () => (
           </Suspense>
         </ErrorBoundary>
       </BrowserRouter>
+      {process.env.NODE_ENV === 'development' && <Suspense fallback={null}><DebugConsole /></Suspense>}
     </TooltipProvider>
   </QueryClientProvider>
 );

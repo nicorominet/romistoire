@@ -59,9 +59,7 @@ const ThemepageContent: React.FC = () => {
   const [themeToDelete, setThemeToDelete] = React.useState<string | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  useEffect(() => {
-    fetchThemes();
-  }, [fetchThemes]); // fetchThemes now depends on filters, so it re-runs when they change
+
 
   const openAddDialog = useCallback(() => {
     setCurrentTheme(null);

@@ -228,11 +228,13 @@ class SystemService {
       const uploadsIndex = filePath.lastIndexOf('uploads');
       const relativePath = uploadsIndex !== -1 ? filePath.substring(uploadsIndex) : filename;
       
-      const id = uuidv4();
-      await query(
-        'INSERT INTO illustrations (id, story_id, filename, file_type, image_path, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, storyId || null, filename, mimetype, relativePath, new Date().toISOString().slice(0,19).replace('T',' '), position]
-      );
+      if (storyId && storyId !== 'null' && storyId !== 'undefined') {
+        const id = uuidv4();
+        await query(
+          'INSERT INTO illustrations (id, story_id, filename, file_type, image_path, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [id, storyId, filename, mimetype, relativePath, new Date().toISOString().slice(0,19).replace('T',' '), position]
+        );
+      }
       
       return { filename, imagePath: relativePath };
   }

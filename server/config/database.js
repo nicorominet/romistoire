@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './logger.js';
 
 dotenv.config();
 
@@ -65,10 +66,31 @@ function dbLogger(operation, details, duration) {
 }
 
 export async function query(sql, params = []) {
+  const start = Date.now();
   try {
     const [results] = await pool.execute(sql, params);
+    const duration = Date.now() - start;
+    
+    // Log successful query
+    logger.info('DB', 'Query Executed', {
+        sql: sql.substring(0, 1000), // Truncate very long queries
+        params: JSON.stringify(params), 
+        duration: `${duration}ms`,
+        rows: Array.isArray(results) ? results.length : 0
+    });
+
     return results;
   } catch (error) {
+    const duration = Date.now() - start;
+    
+    // Log error
+    logger.error('DB', 'Query Failed', {
+        sql,
+        params,
+        error: error.message,
+        duration: `${duration}ms`
+    });
+
     console.error('Database query error:', {
       message: error.message,
       sql: error.sql,

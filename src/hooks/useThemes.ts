@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { themeApi, weeklyThemeApi } from '../api/themes.api';
 import { Theme } from '@/types/Theme';
 
-export const useThemes = () => {
+export const useThemes = (params?: any) => {
   return useQuery({
-    queryKey: ['themes'],
-    queryFn: async () => await themeApi.getAll(),
+    queryKey: ['themes', params],
+    queryFn: async () => await themeApi.getAll(params),
   });
 };
 

@@ -10,6 +10,9 @@ import weeklyThemeRoutes from './routes/weeklyTheme.routes.js';
 import generationRoutes from './routes/generation.routes.js';
 import systemRoutes from './routes/system.routes.js';
 import pdfRoutes from './routes/pdf.routes.js';
+import configRoutes from './routes/config.routes.js';
+
+import logsRoutes from './routes/logs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +38,9 @@ app.use('/api/series', seriesRoutes);
 app.use('/api/weekly-themes', weeklyThemeRoutes);
 app.use('/api/generate', generationRoutes);
 app.use('/api/export', pdfRoutes);
-app.use('/api', systemRoutes); // Mounts /import-data, /upload, /cleanup-images at /api/...
+app.use('/api/logs', logsRoutes);
+app.use('/api', systemRoutes);
+app.use('/api', configRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

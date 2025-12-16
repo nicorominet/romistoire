@@ -24,15 +24,15 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
     <div className="flex flex-col items-center gap-6 mt-8 p-6 bg-secondary/10 rounded-xl border border-secondary/20 max-w-3xl mx-auto">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6 text-sm w-full">
         <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.ageGroup', 'Age')}</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.ageGroup')}</span>
             <div className="flex items-center gap-2 font-medium">
                 <User className="h-4 w-4 text-primary" />
-                {ageGroup} {t('story.years', 'ans')}
+                {ageGroup} {t('story.years')}
             </div>
         </div>
 
         <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.readingTime', 'Lecture')}</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.readingTime')}</span>
             <div className="flex items-center gap-2 font-medium">
                 <Clock className="h-4 w-4 text-primary" />
                 {readingTime} min
@@ -41,7 +41,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
 
         {createdAt && (
             <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.created', 'Créée le')}</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.created')}</span>
                 <div className="flex items-center gap-2 font-medium">
                     <Calendar className="h-4 w-4 text-primary" />
                     {formatDate(createdAt)}
@@ -51,7 +51,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
 
         {weekNumber && (
              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.week', 'Semaine')}</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.week')}</span>
                 <div className="flex items-center gap-2 font-medium">
                     <Calendar className="h-4 w-4 text-primary" />
                     #{weekNumber}
@@ -61,7 +61,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
         
         {dayOrder && (
              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.day', 'Jour')}</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.day')}</span>
                 <div className="flex items-center gap-2 font-medium">
                     <Calendar className="h-4 w-4 text-primary" />
                     {days[dayOrder - 1] || dayOrder}
@@ -71,7 +71,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
 
         {version && (
              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Version</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.version', 'Version')}</span>
                 <div className="flex items-center gap-2 font-medium">
                     v{version}
                 </div>
@@ -80,7 +80,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
         
          {locale && (
              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Langue</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.language', 'Langue')}</span>
                 <div className="flex items-center gap-2 font-medium uppercase">
                     {locale}
                 </div>

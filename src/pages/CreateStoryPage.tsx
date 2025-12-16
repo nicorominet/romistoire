@@ -25,22 +25,21 @@ import StoryPreviewTab from "@/components/Story/CreateStory/StoryPreviewTab";
 import { themeApi, weeklyThemeApi } from "@/api/themes.api";
 import { storyApi, seriesApi } from "@/api/stories.api";
 import { systemApi } from "@/api/system.api";
+import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
+import { useSeries } from "@/hooks/useSeries";
+import { Theme } from "@/types/Theme";
 
-interface Theme {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  created_at: string;
-}
+
 
 const CreateStoryPage = () => {
   const { t } = i18n;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("write");
-  const [availableThemes, setAvailableThemes] = useState<Theme[]>([]);
-  const [weeklyThemes, setWeeklyThemes] = useState<{ week_number: number; theme_name: string }[]>([]);
-  const [availableSeries, setAvailableSeries] = useState<Series[]>([]);
+  const { data: availableThemes = [] } = useThemes();
+  const { data: weeklyThemesQuery = [] } = useWeeklyThemes();
+  const weeklyThemes = weeklyThemesQuery as { week_number: number; theme_name: string }[];
+  const { data: availableSeries = [] } = useSeries();
+
   const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(document.documentElement.classList.contains("dark"));
   
@@ -71,25 +70,6 @@ const CreateStoryPage = () => {
     window.addEventListener("darkModeChanged", handleDarkModeChange);
     return () => window.removeEventListener("darkModeChanged", handleDarkModeChange);
   }, []);
-
-  useEffect(() => {
-    const loadData = async () => {
-        try {
-            const [themes, weekly, series] = await Promise.all([
-                themeApi.getAll(),
-                weeklyThemeApi.getAll(),
-                seriesApi.getAll()
-            ]);
-            setAvailableThemes(themes as any);
-            setWeeklyThemes(weekly as any);
-            setAvailableSeries(series as any);
-        } catch (e) {
-            console.error("Failed to load initial data", e);
-            toast.error(t("create.error.failedToLoadThemes"));
-        }
-    };
-    loadData();
-  }, [t]);
 
 
   const onSubmit = async (data: FormValues) => {
@@ -290,7 +270,7 @@ const CreateStoryPage = () => {
                 </h2>
                 <StorySettings
                   availableThemes={memoizedAvailableThemes}
-                  setAvailableThemes={setAvailableThemes}
+                  setAvailableThemes={() => {}}
                   weeklyThemes={weeklyThemes}
                   sortedDayOfWeekOptions={sortedDayOfWeekOptions}
                   story={defaultStoryForSetting}

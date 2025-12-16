@@ -3,10 +3,10 @@
 ![Version](https://img.shields.io/badge/version-0.1.0-blue) ![License](https://img.shields.io/badge/license-CC_BY--NC--SA_4.0-lightgrey)
 
 **[English]**  
-Romistoire is an interactive educational platform designed to help children and educators create, illustrate, and manage magical stories. Powered by AI (Google Gemini), it allows users to generate text and illustrations, organize content by themes and age groups, and export stories as beautifully formatted PDFs.
+Romistoire is an interactive educational platform designed to help children and educators create, illustrate, and manage magical stories. Powered by AI (Google Gemini), it allows users to generate text and illustration prompts, organize content by themes and age groups, and export stories as beautifully formatted PDFs.
 
 **[Français]**  
-Romistoire est une plateforme éducative interactive conçue pour aider les enfants et les éducateurs à créer, illustrer et gérer des histoires magiques. Propulsée par l'IA (Google Gemini), elle permet de générer des textes et des illustrations, d'organiser le contenu par thèmes et tranches d'âge, et d'exporter les histoires sous forme de PDF magnifiquement formatés.
+Romistoire est une plateforme éducative interactive conçue pour aider les enfants et les éducateurs à créer, illustrer et gérer des histoires magiques. Propulsée par l'IA (Google Gemini), elle permet de générer des textes et des prompts pour illustrations, d'organiser le contenu par thèmes et tranches d'âge, et d'exporter les histoires sous forme de PDF magnifiquement formatés.
 
 ---
 
@@ -14,7 +14,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 
 ### 🇬🇧 English
 - **📖 AI Story Generation**: Generate creative stories based on themes, age groups, and characters using Google Gemini.
-- **🎨 AI Illustration**: Create custom illustrations for your stories with a simple prompt.
+- **🎨 AI Illustration Prompts**: Generate detailed prompts for illustrations to guide your creative process.
 - **📂 Theme Management**: Organize stories into customizable weekly themes.
 - **🖨️ PDF Export**: Export single stories or entire collections (Theme Books) to PDF with cover pages and table of contents.
 - **⚙️ Advanced Settings**: Manage data, logs (System & Network), and developer modes.
@@ -22,7 +22,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 
 ### 🇫🇷 Français
 - **📖 Génération d'Histoires par IA** : Générez des histoires créatives basées sur des thèmes, tranches d'âge et personnages via Google Gemini.
-- **🎨 Illustration par IA** : Créez des illustrations personnalisées pour vos histoires avec une simple description.
+- **🎨 Prompts d'Illustration par IA** : Générez des descriptions détaillées pour guider la création de vos illustrations.
 - **📂 Gestion des Thèmes** : Organisez les histoires dans des thèmes hebdomadaires personnalisables.
 - **🖨️ Export PDF** : Exportez des histoires individuelles ou des collections entières (Livres Thématiques) en PDF avec couvertures et table des matières.
 - **⚙️ Paramètres Avancés** : Gérez les données, les journaux (Système & Réseau) et le mode développeur.

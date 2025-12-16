@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
@@ -41,5 +41,12 @@ export default defineConfig({
       ]
     }
   },
-  assetsInclude: ['**/*.json']
+  assetsInclude: ['**/*.json'],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.ts',
+    css: false,
+    include: ['src/**/*.{test,spec}.{ts,tsx}']
+  }
 });

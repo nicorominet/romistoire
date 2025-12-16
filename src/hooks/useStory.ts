@@ -10,10 +10,13 @@ export const useStory = (id: string) => {
 };
 
 export const useStoryNeighbors = (id: string) => {
-    // Parallel queries
-    const next = useQuery({ queryKey: ['story', id, 'next'], queryFn: async () => (await storyApi.getNext(id)) as any, enabled: !!id });
-    const prev = useQuery({ queryKey: ['story', id, 'prev'], queryFn: async () => (await storyApi.getPrevious(id)) as any, enabled: !!id });
-    return { next, prev };
+    const { data, isLoading, error } = useQuery({ 
+        queryKey: ['story', id, 'neighbors'], 
+        queryFn: async () => (await storyApi.getNeighbors(id)) as any, 
+        enabled: !!id 
+    });
+    
+    return { data, isLoading, error };
 };
 
 

@@ -8,6 +8,7 @@ router.get('/available-weeks', storyController.getAvailableWeeks);
 router.get('/:id', storyController.getStoryById);
 router.get('/:id/next', storyController.getNextStory);
 router.get('/:id/previous', storyController.getPreviousStory);
+router.get('/:id/neighbors', storyController.getStoryNeighbors);
 router.post('/', storyController.createStory); // JSON Body
 router.put('/:id', storyController.updateStory);
 router.delete('/:id', storyController.deleteStory);

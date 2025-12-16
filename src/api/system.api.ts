@@ -16,4 +16,11 @@ export const systemApi = {
   
   getLogs: () => client.get<any[]>('/api/logs'),
   getLogDetails: (filename: string) => client.get<any[]>(`/api/logs/${filename}`),
+  
+  // New Endpoints
+  getAccessLogFiles: () => client.get<any[]>('/api/logs/access/files'),
+  getAccessLogContent: (filename: string) => client.get<any[]>(`/api/logs/access/${filename}`),
+  
+  getLogConfig: () => client.get<any>('/api/config/logs'),
+  updateLogConfig: (config: any) => client.put('/api/config/logs', config),
 };

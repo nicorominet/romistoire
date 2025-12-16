@@ -2,6 +2,10 @@ import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 class ThemeService {
+  constructor() {
+    this.cache = null;
+  }
+
   async findAll(locale = 'fr', filters = {}) {
     const { age_group, series_id, search } = filters;
     let params = [];
@@ -42,16 +46,26 @@ class ThemeService {
     }
 
     sql += ` GROUP BY t.id `;
-    
-    // If filtering by content (age/series), exclude themes with count 0 (which means no match)
-    // Actually, due to LEFT JOIN structure, if we filter on 's' (right table) in WHERE clause, 
-    // it implicitly becomes an INNER JOIN unless we handle NULLs.
-    // So themes without matching stories will naturally be excluded because s.age_group won't match.
-    // However, we should be careful about the GROUP BY.
-
     sql += ` ORDER BY t.name ASC`;
 
-    return await query(sql, params);
+    // Cache strategy: only cache if no filters (except default locale)
+    const isCacheable = !search && !age_group && !series_id;
+    
+    if (isCacheable && this.cache && this.cache.locale === locale) {
+        return this.cache.data;
+    }
+
+    const results = await query(sql, params);
+
+    if (isCacheable) {
+        this.cache = {
+            locale,
+            data: results,
+            timestamp: Date.now()
+        };
+    }
+
+    return results;
   }
 
   async getStories(themeId) {
@@ -77,15 +91,21 @@ class ThemeService {
         'INSERT INTO themes (id, name, description, color, icon, created_at) VALUES (?, ?, ?, ?, ?, ?)',
         [id, name, description, color, icon || null, now]
       );
+      this.invalidateCache();
       return { id, name, description, color, icon, created_at: now };
+  }
+
+  invalidateCache() {
+      this.cache = null;
   }
 
   async update(id, { name, description, color }) {
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
       await query(
-          'UPDATE themes SET name = ?, description = ?, color = ?, created_at = ? WHERE id = ?',
+           'UPDATE themes SET name = ?, description = ?, color = ?, created_at = ? WHERE id = ?',
           [name, description, color, now, id]
       );
+      this.invalidateCache();
       return { id, name, description, color, created_at: now };
   }
 
@@ -95,6 +115,7 @@ class ThemeService {
         throw new Error('Cannot delete theme. It is used by one or more stories.');
     }
     await query('DELETE FROM themes WHERE id = ?', [id]);
+    this.invalidateCache();
     return true;
   }
 
@@ -114,6 +135,7 @@ class ThemeService {
               mergedCount++;
           }
       }
+      if (mergedCount > 0) this.invalidateCache();
       return { message: `Merged ${mergedCount} duplicate groups` };
   }
 

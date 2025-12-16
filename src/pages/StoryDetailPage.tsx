@@ -36,7 +36,7 @@ const StoryDetailPage = (): JSX.Element => {
   const { toast } = useToast();
 
   const { data: story, isLoading, error } = useStory(id || '');
-  const { next: nextStory, prev: prevStory } = useStoryNeighbors(id || '');
+  const { data: neighbors } = useStoryNeighbors(id || '');
   const { deleteStory } = useStoryMutations();
   const { data: weeklyThemes } = useWeeklyThemes();
 
@@ -190,10 +190,10 @@ const StoryDetailPage = (): JSX.Element => {
 
         {/* Navigation Footer */}
         <StoryNavigation 
-            prevId={prevStory.data?.data?.id}
-            nextId={nextStory.data?.data?.id}
-            prevTitle={prevStory.data?.data?.title}
-            nextTitle={nextStory.data?.data?.title}
+            prevId={neighbors?.prev?.id}
+            nextId={neighbors?.next?.id}
+            prevTitle={neighbors?.prev?.title}
+            nextTitle={neighbors?.next?.title}
         />
       </div>
     </PageLayout>

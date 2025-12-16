@@ -8,8 +8,13 @@ export const storyApi = {
   getAll: (params: PaginationParams) => client.get<PaginatedResponse<Story>>('/api/stories', { params }),
   getById: (id: string) => client.get<StoryWithIllustrations>(`/api/stories/${id}`),
   getNext: (id: string) => client.get<Story | null>(`/api/stories/${id}/next`),
-  getPrevious: (id: string) => client.get<Story | null>(`/api/stories/${id}/previous`),
-  create: (data: Partial<Story>) => client.post<Story>('/api/stories', data),
+  getPrevious: async (id: string) => {
+    return client.get(`/api/stories/${id}/previous`);
+  },
+  getNeighbors: async (id: string) => {
+    return client.get(`/api/stories/${id}/neighbors`);
+  },
+  create: async (data: Partial<Story>) => client.post<Story>('/api/stories', data),
   update: (id: string, data: Partial<Story>) => client.put<Story>(`/api/stories/${id}`, data),
   delete: (id: string) => client.delete<ApiResponse<boolean>>(`/api/stories/${id}`),
   getVersions: (id: string) => client.get<StoryVersion[]>(`/api/stories/${id}/versions`),
