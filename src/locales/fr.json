@@ -1,6 +1,7 @@
 {
   "WeeklyThemesPage": {
     "description": "Description",
+    "outOfCalendar": "(Hors calendrier)",
     "saveAllThemes": "Enregistrer tous les thèmes",
     "savingAllThemes": "Enregistrement de tous les thèmes...",
     "section": "Section",
