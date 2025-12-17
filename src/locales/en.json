@@ -295,7 +295,8 @@
         "totalStories": "Total Stories",
         "viewStats": "View Stats",
         "week": "Week",
-        "weeksCovered": "Weeks Covered"
+        "weeksCovered": "Weeks Covered",
+        "stories": "Stories"
       },
       "manager": {
         "title": "Manage Stories",

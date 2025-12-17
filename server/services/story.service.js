@@ -2,7 +2,26 @@ import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { themeService } from './theme.service.js';
 
+/**
+ * Service for managing stories and related data.
+ */
 class StoryService {
+  /**
+   * Find all stories with pagination and filtering.
+   * @param {Object} params - Query parameters.
+   * @param {number} [params.page=1] - Page number.
+   * @param {number} [params.limit=12] - Items per page.
+   * @param {string} [params.locale='fr'] - Locale filter.
+   * @param {string} [params.theme] - Filter by theme ID.
+   * @param {string} [params.ageGroup] - Filter by age group.
+   * @param {number|string} [params.weekNumber] - Filter by week number.
+   * @param {number|string} [params.dayOfWeek] - Filter by day of week (1-7).
+   * @param {string} [params.search] - Search term for title/content.
+   * @param {string} [params.hasImage] - Filter by image presence ('yes'|'no').
+   * @param {string} [params.seriesId] - Filter by series ID.
+   * @param {string} [params.excludeSeriesId] - Exclude stories from a series.
+   * @returns {Promise<{data: Array, total: number, page: number, limit: number}>} Paginated results.
+   */
   async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, seriesId, excludeSeriesId }) {
     const offset = (page - 1) * limit;
 
@@ -123,6 +142,16 @@ class StoryService {
     };
   }
 
+  /**
+   * Get list of week numbers that have available stories.
+   * @param {Object} params - Filter parameters.
+   * @param {string} [params.locale='fr'] - Locale filter.
+   * @param {string} [params.theme] - Theme ID filter.
+   * @param {string} [params.ageGroup] - Age group filter.
+   * @param {string} [params.seriesId] - Series ID filter.
+   * @param {number|string} [params.weekNumber] - Specific week number filter.
+   * @returns {Promise<Array<number>>} List of week numbers.
+   */
   async getAvailableWeeks({ locale = 'fr', theme, ageGroup, seriesId, weekNumber }) {
     let queryStr = `SELECT DISTINCT week_number FROM stories WHERE locale = ?`;
     const params = [locale];
@@ -153,6 +182,11 @@ class StoryService {
     return result.map(row => row.week_number);
   }
 
+  /**
+   * Find multiple stories by their IDs.
+   * @param {Array<string>} ids - List of story IDs.
+   * @returns {Promise<Array>} List of hydrated story objects.
+   */
   async findByIds(ids) {
     if (!ids || ids.length === 0) return [];
     
@@ -187,6 +221,11 @@ class StoryService {
     }));
   }
 
+  /**
+   * Get illustrations for a story.
+   * @param {string} storyId - Story ID.
+   * @returns {Promise<Array>} List of illustrations.
+   */
   async getIllustrations(storyId) {
       return await query(
           'SELECT id, story_id as storyId, image_path, filename, file_type as fileType, position, created_at as createdAt FROM illustrations WHERE story_id = ? ORDER BY position ASC',
@@ -194,6 +233,11 @@ class StoryService {
       );
   }
 
+  /**
+   * Find a single story by ID.
+   * @param {string} id - Story ID.
+   * @returns {Promise<Object|null>} Story object or null if not found.
+   */
   async findById(id) {
     const storyResult = await query(`
       SELECT s.*, ss.name as series_name
@@ -232,6 +276,11 @@ class StoryService {
     return story;
   }
 
+  /**
+   * Get adjacent stories (next and previous) based on chronological order.
+   * @param {string} id - Current story ID.
+   * @returns {Promise<{next: Object|null, prev: Object|null}>} Neighbors.
+   */
   async getNeighbors(id) {
      const story = await query(`SELECT week_number, day_order, age_group, series_id, created_at FROM stories WHERE id = ?`, [id]);
      if (story.length === 0) return { next: null, prev: null };
@@ -253,16 +302,31 @@ class StoryService {
      };
   }
 
+  /**
+   * Get next story.
+   * @param {string} id - Current story ID.
+   * @returns {Promise<Object|null>} Next story.
+   */
   async getNext(id) {
      const neighbors = await this.getNeighbors(id);
      return neighbors.next;
   }
 
+  /**
+   * Get previous story.
+   * @param {string} id - Current story ID.
+   * @returns {Promise<Object|null>} Previous story.
+   */
   async getPrevious(id) {
      const neighbors = await this.getNeighbors(id);
      return neighbors.prev;
   }
 
+  /**
+   * Get version history for a story.
+   * @param {string} id - Story ID.
+   * @returns {Promise<Array>} List of story versions.
+   */
   async getVersions(id) {
       return await query(
         'SELECT id, story_id as storyId, title, content, age_group as ageGroup, created_at as createdAt, version FROM story_versions WHERE story_id = ? ORDER BY version DESC',
@@ -270,6 +334,13 @@ class StoryService {
       );
   }
 
+  /**
+   * Create a new story.
+   * Handles story creation, series association, theme linking, and illustration metadata.
+   * @param {Object} storyData - Story data.
+   * @returns {Promise<Object>} Created story object.
+   * @throws {Error} If creation fails.
+   */
   async create(storyData) {
     const connection = await getConnection();
     try {
@@ -333,6 +404,13 @@ class StoryService {
       themeService.invalidateCache();
   }
 
+  /**
+   * Restore a previous version of a story.
+   * @param {string} id - Story ID.
+   * @param {string} versionId - Version ID to restore.
+   * @returns {Promise<boolean>} True on success.
+   * @throws {Error} If version not found.
+   */
   async restoreVersion(id, versionId) {
       const versionResult = await query('SELECT * FROM story_versions WHERE id = ? AND story_id = ?', [versionId, id]);
       if (versionResult.length === 0) throw new Error('Version not found');
@@ -347,6 +425,14 @@ class StoryService {
       return true;
   }
   
+  /**
+   * Update an existing story.
+   * Creates a new version before updating.
+   * @param {string} id - Story ID.
+   * @param {Object} storyData - Updated data.
+   * @returns {Promise<Object>} Updated story object.
+   * @throws {Error} If story not found or update fails.
+   */
   async update(id, storyData) {
       const connection = await getConnection();
       try {
@@ -408,6 +494,11 @@ class StoryService {
       themeService.invalidateCache();
   }
 
+  /**
+   * Delete a story and related data.
+   * @param {string} id - Story ID.
+   * @returns {Promise<boolean>} True on success.
+   */
   async delete(id) {
     // Check if exists?
     // Delete logic (Cascading usually handles some, but let's be safe if manual delete needed)
@@ -417,6 +508,12 @@ class StoryService {
     return true;
   }
 
+  /**
+   * Delete an illustration from a story.
+   * @param {string} storyId - Story ID.
+   * @param {string} illustrationId - Illustration ID.
+   * @returns {Promise<string|null>} Path of the deleted image file, or null if not found.
+   */
   async deleteIllustration(storyId, illustrationId) {
       // Find valid file path first to return it? Or separate job?
       // deleteRoutes cleaned up file.

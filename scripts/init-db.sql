@@ -26,7 +26,7 @@ CREATE TABLE stories (
   id VARCHAR(36) PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  age_group ENUM('2-3', '4-6', '7-9', '10-12') NOT NULL,
+  age_group ENUM('2-3', '4-6', '7-9', '10-12', '13-15', '16-18') NOT NULL,
   week_number INT NOT NULL DEFAULT 0,
   day_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE story_versions (
   story_id VARCHAR(36) NOT NULL,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  age_group ENUM('2-3', '4-6', '7-9', '10-12') NOT NULL,
+  age_group ENUM('2-3', '4-6', '7-9', '10-12', '13-15', '16-18') NOT NULL,
   created_at DATETIME NOT NULL,
   version INT NOT NULL,
   FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE

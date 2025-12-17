@@ -6,8 +6,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Loader2, Settings2 } from "lucide-react";
+import { Loader2, Settings2, CheckCircle, AlertTriangle } from "lucide-react";
 import { Series } from "@/types/Series";
 import { useSeriesStats } from "@/hooks/useSeries";
 import { SeriesStoryManagerDialog } from "./SeriesStoryManagerDialog";
@@ -130,7 +137,7 @@ export const SeriesDetailsDialog: React.FC<SeriesDetailsDialogProps> = ({
                 </div>
               </div>
   
-              {/* Timeline Breakdown - Grid Layout */}
+              {/* Timeline Breakdown - Accordion Layout */}
               <div>
                   <div className="flex items-center gap-2 mb-4">
                       <h3 className="text-lg font-bold text-slate-800 dark:text-white font-handwriting">
@@ -145,43 +152,99 @@ export const SeriesDetailsDialog: React.FC<SeriesDetailsDialogProps> = ({
                       </div>
                   )}
   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {uniqueWeeks.map((week: any) => (
-                          <div key={week} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 p-3 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full">
-                              <div className="flex items-center justify-between mb-3 border-b border-gray-50 dark:border-gray-700 pb-2">
-                                  <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                      {t("series.management.kpi.week")} <span className="text-story-purple text-lg ml-1">{week}</span>
-                                  </span>
-                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 px-2 py-0.5 rounded-full">
-                                    {storiesByWeek[week].length}
-                                  </span>
-                              </div>
-                              
-                              <div className="space-y-2 flex-1">
-                                  {storiesByWeek[week]
-                                      .sort((a, b) => a.day_order - b.day_order)
-                                      .map((story) => (
-                                      <div key={story.id} className="flex items-center gap-2 group/item">
-                                          <div className="flex items-center justify-center w-5 h-5 rounded bg-gray-50 dark:bg-slate-700 text-[10px] font-bold text-slate-400 border border-gray-100 dark:border-slate-600">
-                                              {story.day_order}
+                  <Accordion type="single" collapsible className="w-full space-y-3">
+                      {uniqueWeeks.map((week: any) => {
+                          const weekStories = storiesByWeek[week].sort((a, b) => a.day_order - b.day_order);
+                          // Get unique age groups for this week
+                          const weekAgeGroups = Array.from(new Set(weekStories.map(s => s.age_group || 'Unknown'))).sort();
+                          
+                          return (
+                          <AccordionItem key={week} value={`week-${week}`} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden px-1">
+                              <AccordionTrigger className="px-4 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                  <div className="flex items-center justify-between w-full pr-4">
+                                      <span className="text-sm font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                                          {t("series.management.kpi.week")} <span className="text-story-purple text-lg ml-1">{week}</span>
+                                      </span>
+                                      <div className="flex items-center gap-3">
+                                          <div className="flex -space-x-1.5">
+                                              {weekAgeGroups.map(age => {
+                                                  const colorClass = {
+                                                      "2-3": "bg-green-400 dark:bg-green-500",
+                                                      "4-6": "bg-blue-400 dark:bg-blue-500",
+                                                      "7-9": "bg-yellow-400 dark:bg-yellow-500",
+                                                      "10-12": "bg-pink-400 dark:bg-pink-500",
+                                                      "13-15": "bg-purple-400 dark:bg-purple-500",
+                                                      "16-18": "bg-orange-400 dark:bg-orange-500"
+                                                  }[age as string] || "bg-slate-400";
+                                                  
+                                                  return (
+                                                      <div key={age} className={cn(
+                                                          "w-3 h-3 rounded-full ring-2 ring-white dark:ring-slate-800",
+                                                          colorClass
+                                                      )} />
+                                                  );
+                                              })}
                                           </div>
-                                          <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate flex-1 group-hover/item:text-story-purple transition-colors" title={story.title}>
-                                              {story.title}
-                                          </span>
-                                          <span 
-                                            className={cn(
-                                                "text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 border bg-opacity-10 dark:bg-opacity-20",
-                                                getAgeGroupColor(story.age_group)
-                                            )}
-                                          >
-                                              {story.age_group}
+                                          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">
+                                            {weekStories.length} {t("series.management.kpi.stories")}
                                           </span>
                                       </div>
-                                  ))}
-                              </div>
-                          </div>
-                      ))}
-                  </div>
+                                  </div>
+                              </AccordionTrigger>
+                              <AccordionContent className="px-4 pb-4 pt-2">
+                                  <Tabs defaultValue={weekAgeGroups[0] as string} className="w-full">
+                                          <TabsList className="mb-4 flex flex-wrap h-auto bg-slate-50 dark:bg-slate-900/50 p-1">
+                                              {weekAgeGroups.map((age) => {
+                                                  const count = weekStories.filter(s => (s.age_group || 'Unknown') === age).length;
+                                                  const isComplete = count >= 7;
+                                                  
+                                                  return (
+                                                  <TabsTrigger 
+                                                      key={age} 
+                                                      value={age as string}
+                                                      className="text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-story-purple data-[state=active]:shadow-sm flex items-center gap-1.5"
+                                                  >
+                                                      {isComplete ? (
+                                                          <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                                      ) : (
+                                                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                                      )}
+                                                      {age} 
+                                                      <span className="opacity-60 text-[10px]">({count})</span>
+                                                  </TabsTrigger>
+                                              )})}
+                                          </TabsList>
+
+                                      {/* If only one age group, don't strictly need tabs but structure helps consistency */}
+                                      {weekAgeGroups.map((age) => (
+                                          <TabsContent key={age} value={age as string} className="space-y-2 mt-0">
+                                              {weekStories
+                                                  .filter(s => (s.age_group || 'Unknown') === age)
+                                                  .map((story) => (
+                                                  <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700 group/story">
+                                                      <div className="flex items-center justify-center w-6 h-6 rounded bg-white dark:bg-slate-800 text-xs font-bold text-slate-400 border border-slate-100 dark:border-slate-600 shadow-sm">
+                                                          {story.day_order}
+                                                      </div>
+                                                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1 group-hover/story:text-story-purple transition-colors">
+                                                          {story.title}
+                                                      </span>
+                                                      <span 
+                                                        className={cn(
+                                                            "text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 border bg-opacity-10 dark:bg-opacity-20",
+                                                            getAgeGroupColor(story.age_group)
+                                                        )}
+                                                      >
+                                                          {story.age_group}
+                                                      </span>
+                                                  </div>
+                                              ))}
+                                          </TabsContent>
+                                      ))}
+                                  </Tabs>
+                              </AccordionContent>
+                          </AccordionItem>
+                      )})}
+                  </Accordion>
               </div>
   
             </div>

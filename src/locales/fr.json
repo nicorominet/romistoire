@@ -295,7 +295,8 @@
         "totalStories": "Total Histoires",
         "viewStats": "Voir les statistiques",
         "week": "Semaine",
-        "weeksCovered": "Semaines Couvertes"
+        "weeksCovered": "Semaines Couvertes",
+        "stories": "Histoires"
       },
       "manager": {
         "title": "Gérer les histoires",

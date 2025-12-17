@@ -2,17 +2,27 @@ import dotenv from 'dotenv';
 import { logger } from './logger.service.js';
 dotenv.config();
 
+// Models configuration with fallback priority
+const MODELS = [
+  'gemma-3-27b-it',
+  'gemma-3-12b',
+  'gemma-3-4b',
+  'gemma-3-2b',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite'
+];
+
 /**
  * Service for interacting with Google Gemini API to generate content.
  */
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
-    this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+    this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models`;
   }
 
   /**
-   * Generates a story based on provided parameters using Gemini.
+   * Generates a story based on provided parameters using Gemini/Gemma.
    * @param {Object} params - Generation parameters.
    * @param {string} params.theme - The weekly theme.
    * @param {string} params.age - The target age group (e.g., "4-6 ans").
@@ -95,7 +105,6 @@ class GeminiService {
         L'histoire du vendredi doit inclure une mention claire d'une activité pour le week-end en lien direct avec le thème de la semaine (ex: "Et si ce week-end, nous allions observer les papillons dans le jardin ?"). Cette activité doit encourager l'exploration pratique.
         Spécificité pour les Histoires du Samedi et Dimanche :
         Les histoires du samedi et du dimanche doivent conclure le thème de la semaine et peuvent inclure des récapitulatifs ou des idées d'activités supplémentaires liées au thème. Elles ne nécessitent pas de cliffhanger.
-
         Critères de Sortie (Format) :
         Pour chaque histoire, la sortie doit être formatée de la manière suivante, et toutes les histoires doivent être concaténées dans la réponse :
         **Titre de l'Histoire :** [Titre de l'histoire]
@@ -151,9 +160,16 @@ class GeminiService {
         `;
     }
 
-    const makeRequestWithRetry = async (retries = 5, delay = 2000) => {
+    const makeRequestWithRetry = async (retries = 3, delay = 2000, modelIndex = 0) => {
+        const currentModel = MODELS[modelIndex];
+        // If we ran out of models, throw final error
+        if (!currentModel) {
+             throw new Error("All Gemini/Gemma models are overloaded or unavailable.");
+        }
+
         try {
-            const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+            console.log(`Using AI Model: ${currentModel}`);
+            const response = await fetch(`${this.baseUrl}/${currentModel}:generateContent?key=${this.apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -162,25 +178,18 @@ class GeminiService {
             });
 
             if (!response.ok) {
-                if (response.status === 503 && retries > 0) {
-                    console.warn(`Gemini API 503 Overloaded. Retrying in ${delay / 1000}s... (${retries} attempts left)`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return makeRequestWithRetry(retries - 1, delay * 2);
-                }
-                const errorData = await response.json();
-                throw new Error(`Gemini Error: ${response.status} - ${errorData.error.message}`);
+                 console.warn(`AI Model Error ${response.status} on model ${currentModel}.`);
+                 
+                 // If error, try next model immediately (fallback strategy)
+                 console.warn(`Switching to next model...`);
+                 return makeRequestWithRetry(3, 2000, modelIndex + 1);
             }
 
             return response;
         } catch (error) {
-            if (retries > 0 && error.message.includes('503')) {
-                 // In case fetch throws a network error that might be related to overload (though usually status is returned)
-                 // But sticking to the status check above is safer for 503 specifically. 
-                 // If the error was thrown by the recursive call, we just propagate it up unless handled.
-                 // Actually, the recursion handles the retry. This catch block is for non-503 or final errors.
-                 throw error;
-            }
-            throw error;
+             // Catch network errors and try next model
+             console.error(`Network error on model ${currentModel}: ${error.message}`);
+             return makeRequestWithRetry(3, 2000, modelIndex + 1);
         }
     };
 
