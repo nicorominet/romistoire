@@ -2,12 +2,27 @@ import dotenv from 'dotenv';
 import { logger } from './logger.service.js';
 dotenv.config();
 
+/**
+ * Service for interacting with Google Gemini API to generate content.
+ */
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
   }
 
+  /**
+   * Generates a story based on provided parameters using Gemini.
+   * @param {Object} params - Generation parameters.
+   * @param {string} params.theme - The weekly theme.
+   * @param {string} params.age - The target age group (e.g., "4-6 ans").
+   * @param {string} [params.day] - The day of the week or "Toute la semaine".
+   * @param {number} [params.numCharacters] - Number of main characters.
+   * @param {string} [params.charNames] - Names of main characters.
+   * @param {string} [params.seriesName] - Name of the series if part of one.
+   * @returns {Promise<{text: string}>} The generated story text and metadata.
+   * @throws {Error} If API key is missing or generation fails.
+   */
   async generateStory({ theme, age, day, numCharacters, charNames, seriesName }) {
     if (!this.apiKey) {
       throw new Error("Gemini API Key not configured.");

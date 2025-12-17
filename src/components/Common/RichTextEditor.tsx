@@ -101,7 +101,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
   }
 
   return (
-    <div className={cn("border rounded-md bg-white dark:bg-gray-950", className)}>
+    <div className={cn("border rounded-md bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm border-white/20 dark:border-white/10", className)}>
       <div className="flex items-center gap-1 border-b p-2 bg-gray-50 dark:bg-gray-900 rounded-t-md flex-wrap">
         <Toggle
           size="sm"

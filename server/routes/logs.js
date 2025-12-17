@@ -13,7 +13,9 @@ const LOG_FILE = path.join(__dirname, '../debug/logs.jsonl');
 
 /**
  * POST /api/logs
- * Ingest logs from the client
+ * Ingest logs from the client.
+ * @param {Object} req.body - Log entry (category, message, data, level).
+ * @returns {Object} Success status.
  */
 router.post('/', (req, res) => {
     const { category, message, data, level } = req.body;
@@ -32,7 +34,9 @@ router.post('/', (req, res) => {
 
 /**
  * GET /api/logs
- * Retrieve recent logs. Optional query param ?limit=100
+ * Retrieve recent server logs.
+ * @param {number} [req.query.limit=500] - Number of logs to return.
+ * @returns {Array} List of log entries.
  */
 router.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 500; // Limit logs specifically for debug console
@@ -72,7 +76,8 @@ router.get('/', async (req, res) => {
 
 /**
  * DELETE /api/logs
- * Clear the log file
+ * Clear the current server log file.
+ * @returns {Object} Success status.
  */
 router.delete('/', (req, res) => {
     fs.writeFile(LOG_FILE, '', (err) => {
@@ -80,13 +85,13 @@ router.delete('/', (req, res) => {
             return res.status(500).json({ error: 'Failed to clear logs' });
         }
         res.json({ success: true });
-        res.json({ success: true });
     });
 });
 
 /**
  * GET /api/logs/access/files
- * List available access log files
+ * List available access log files.
+ * @returns {Array} List of access log file objects with metadata.
  */
 router.get('/access/files', (req, res) => {
     const logsDir = path.join(__dirname, '../logs');
@@ -116,7 +121,9 @@ router.get('/access/files', (req, res) => {
 
 /**
  * GET /api/logs/access/:filename
- * Read content of specific access log
+ * Read content of a specific access log file.
+ * @param {string} req.params.filename - The filename of the log to read.
+ * @returns {Array} parsed log entries.
  */
 router.get('/access/:filename', (req, res) => {
     const filename = req.params.filename;

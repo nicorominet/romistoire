@@ -1,5 +1,7 @@
 {
   "WeeklyThemesPage": {
+    "allThemesSaved": "Tous les thèmes ont été enregistrés avec succès",
+    "failedToSaveAllThemes": "Échec de l'enregistrement de tous les thèmes : {{message}}",
     "description": "Description",
     "outOfCalendar": "(Hors calendrier)",
     "saveAllThemes": "Enregistrer tous les thèmes",
@@ -55,7 +57,8 @@
     "save": "Enregistrer",
     "saving": "Enregistrement...",
     "search": "Rechercher",
-    "success": "Succès"
+    "success": "Succès",
+    "noDaysAvailable": "Aucun jour disponible"
   },
   "create": {
     "ageGroup": "Tranche d'âge",
@@ -216,6 +219,11 @@
     "timeline": "Chronologie",
     "weeklyThemes": "Thèmes hebdomadaires"
   },
+  "pagination": {
+    "next": "Suivant",
+    "page": "Page {{page}}",
+    "previous": "Précédent"
+  },
   "notFound": {
     "message": "Oups ! Page non trouvée",
     "returnHome": "Retour à l'accueil",
@@ -248,8 +256,13 @@
     "orientation": "Orientation",
     "pageSize": "Taille de page",
     "portrait": "Portrait",
+    "selectAgeGroup": "Sélectionner une tranche d'âge",
     "selectAll": "Tout sélectionner",
+    "selectFont": "Sélectionner la police",
+    "selectPageSize": "Sélectionner la taille de page",
     "selectStories": "Sélectionner les histoires",
+    "selectTheme": "Sélectionner un thème",
+    "selectWeeks": "Sélectionner les semaines",
     "success": "PDF généré avec succès",
     "tableOfContents": "Inclure une table des matières",
     "themeBook": "Une collection d'histoires sur le thème {{theme}}",
@@ -284,6 +297,20 @@
         "week": "Semaine",
         "weeksCovered": "Semaines Couvertes"
       },
+      "manager": {
+        "title": "Gérer les histoires",
+        "description": "Ajouter ou supprimer des histoires de la série",
+        "availableStories": "Histoires disponibles",
+        "inSeries": "Dans la série",
+        "searchAvailable": "Rechercher des histoires...",
+        "searchInSeries": "Rechercher dans la série...",
+        "addSelected": "Ajouter sélection",
+        "removeSelected": "Retirer sélection",
+        "noStoriesAvailable": "Aucune histoire disponible.",
+        "noStoriesInSeries": "Aucune histoire dans cette série.",
+        "successAdd": "{{count}} histoires ajoutées",
+        "successRemove": "{{count}} histoires retirées"
+      },
       "noSeries": "Aucune série trouvée.",
       "rename": {
         "save": "Enregistrer",
@@ -298,6 +325,12 @@
       },
       "title": "Gestion des Séries",
       "updateError": "Erreur lors de la mise à jour de la série"
+    },
+    "selector": {
+      "create": "Créer",
+      "existingSeries": "Séries existantes",
+      "noSeriesFound": "Aucune série trouvée",
+      "placeholder": "Sélectionner ou créer une série..."
     },
     "updateSuccess": "Série mise à jour avec succès"
   },
@@ -381,6 +414,7 @@
     "allSeries": "Toutes les séries",
     "series": "Séries",
     "characterCount": "{{count}} caractères",
+    "content": "Contenu de l'histoire",
     "created": "Créée le",
     "createIllustration": "Créer une illustration",
     "creationDate": "Date de création",
@@ -432,6 +466,7 @@
     "weeklyTheme": "Thème de la semaine"
   },
   "success": {
+    "title": "Succès",
     "create": "Histoire créée avec succès",
     "delete": "Histoire supprimée avec succès",
     "restore": "Version restaurée avec succès",
@@ -464,7 +499,8 @@
     "error": {
       "failedToDelete": "Échec de la suppression du thème",
       "invalidData": "Données invalides rencontrées.",
-      "nullData": "Les données sont nulles ou non définies. Veuillez vérifier la source."
+      "nullData": "Les données sont nulles ou non définies. Veuillez vérifier la source.",
+      "loadingError": "Erreur lors du chargement des thèmes"
     },
     "filterNamePlaceholder": "Filtrer par nom de thème",
     "filterSelectTheme": "Filtrer par thème sélectionné",

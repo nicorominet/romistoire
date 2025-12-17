@@ -23,7 +23,7 @@ const StoryContent = () => {
               <Input
                 placeholder={t("story.titlePlaceholder")}
                 {...field}
-                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-white/20 dark:border-white/10 text-gray-900 dark:text-gray-100"
               />
             </FormControl>
             <FormMessage />

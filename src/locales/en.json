@@ -1,5 +1,7 @@
 {
   "WeeklyThemesPage": {
+    "allThemesSaved": "All themes saved successfully",
+    "failedToSaveAllThemes": "Failed to save all themes: {{message}}",
     "description": "Description",
     "outOfCalendar": "(Out of calendar)",
     "saveAllThemes": "Save All Themes",
@@ -55,7 +57,8 @@
     "save": "Save",
     "saving": "Saving...",
     "search": "Search",
-    "success": "Success"
+    "success": "Success",
+    "noDaysAvailable": "No days available"
   },
   "create": {
     "ageGroup": "Age Group",
@@ -216,6 +219,11 @@
     "timeline": "Timeline",
     "weeklyThemes": "Weekly Themes"
   },
+  "pagination": {
+    "next": "Next",
+    "page": "Page {{page}}",
+    "previous": "Previous"
+  },
   "notFound": {
     "message": "Oops! Page not found",
     "returnHome": "Return to Home",
@@ -248,8 +256,13 @@
     "orientation": "Orientation",
     "pageSize": "Page Size",
     "portrait": "Portrait",
+    "selectAgeGroup": "Select age group",
     "selectAll": "Select All",
+    "selectFont": "Select font",
+    "selectPageSize": "Select page size",
     "selectStories": "Select Stories",
+    "selectTheme": "Select theme",
+    "selectWeeks": "Select Weeks",
     "success": "PDF Generated Successfully",
     "tableOfContents": "Include Table of Contents",
     "themeBook": "A collection of stories on theme {{theme}}",
@@ -284,6 +297,20 @@
         "week": "Week",
         "weeksCovered": "Weeks Covered"
       },
+      "manager": {
+        "title": "Manage Stories",
+        "description": "Add or remove stories from the series",
+        "availableStories": "Available Stories",
+        "inSeries": "In Series",
+        "searchAvailable": "Search available stories...",
+        "searchInSeries": "Search in series...",
+        "addSelected": "Add Selected",
+        "removeSelected": "Remove Selected",
+        "noStoriesAvailable": "No stories available.",
+        "noStoriesInSeries": "No stories in this series.",
+        "successAdd": "{{count}} stories added",
+        "successRemove": "{{count}} stories removed"
+      },
       "noSeries": "No series found.",
       "rename": {
         "save": "Save",
@@ -298,6 +325,12 @@
       },
       "title": "Series Management",
       "updateError": "Error updating series"
+    },
+    "selector": {
+      "create": "Create",
+      "existingSeries": "Existing Series",
+      "noSeriesFound": "No series found.",
+      "placeholder": "Select or create a series..."
     },
     "updateSuccess": "Series updated successfully"
   },
@@ -381,6 +414,7 @@
     "allSeries": "All Series",
     "series": "Series",
     "characterCount": "{{count}} characters",
+    "content": "Story content",
     "created": "Created on",
     "createIllustration": "Create an Illustration",
     "creationDate": "Creation Date",
@@ -432,6 +466,7 @@
     "weeklyTheme": "Weekly Theme"
   },
   "success": {
+    "title": "Success",
     "create": "Story created successfully",
     "delete": "Story deleted successfully",
     "restore": "Version restored successfully",
@@ -464,7 +499,8 @@
     "error": {
       "failedToDelete": "Failed to delete theme",
       "invalidData": "Invalid data encountered.",
-      "nullData": "Data is null or undefined. Please check source."
+      "nullData": "Data is null or undefined. Please check source.",
+      "loadingError": "Error loading themes"
     },
     "filterNamePlaceholder": "Filter by name",
     "filterSelectTheme": "Filter by selected theme",

@@ -43,46 +43,48 @@ const SettingsPage = (): JSX.Element => {
             </Badge>
           </div>
 
-          <Tabs defaultValue="general">
-            <TabsList className="mb-6">
-              <TabsTrigger value="general" className="flex items-center gap-1">
-                <Settings className="h-4 w-4" />
-                {t("settings.general")}
-              </TabsTrigger>
-              <TabsTrigger value="language" className="flex items-center gap-1">
-                <Languages className="h-4 w-4" />
-                {t("settings.language")}
-              </TabsTrigger>
-              <TabsTrigger value="data" className="flex items-center gap-1">
-                <Database className="h-4 w-4" />
-                {t("settings.data")}
-              </TabsTrigger>
-              {devMode && (
-                <TabsTrigger value="network" className="flex items-center gap-1">
-                  <Database className="h-4 w-4" />
-                  {t("settings.network")}
+          <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/10 shadow-lg p-6">
+            <Tabs defaultValue="general">
+              <TabsList className="mb-6 bg-white/50 dark:bg-slate-800/50">
+                <TabsTrigger value="general" className="flex items-center gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                  <Settings className="h-4 w-4" />
+                  {t("settings.general")}
                 </TabsTrigger>
-              )}
-            </TabsList>
+                <TabsTrigger value="language" className="flex items-center gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                  <Languages className="h-4 w-4" />
+                  {t("settings.language")}
+                </TabsTrigger>
+                <TabsTrigger value="data" className="flex items-center gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                  <Database className="h-4 w-4" />
+                  {t("settings.data")}
+                </TabsTrigger>
+                {devMode && (
+                  <TabsTrigger value="network" className="flex items-center gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <Database className="h-4 w-4" />
+                    {t("settings.network")}
+                  </TabsTrigger>
+                )}
+              </TabsList>
 
-            <TabsContent value="general">
-              <GeneralSettings devMode={devMode} onToggleDevMode={handleDevModeToggle} />
-            </TabsContent>
-            
-            <TabsContent value="language">
-              <LanguageSettings />
-            </TabsContent>
-
-            <TabsContent value="data">
-              <DataSettings />
-            </TabsContent>
-
-            {devMode && (
-              <TabsContent value="network">
-                <NetworkSettings />
+              <TabsContent value="general">
+                <GeneralSettings devMode={devMode} onToggleDevMode={handleDevModeToggle} />
               </TabsContent>
-            )}
-          </Tabs>
+              
+              <TabsContent value="language">
+                <LanguageSettings />
+              </TabsContent>
+
+              <TabsContent value="data">
+                <DataSettings />
+              </TabsContent>
+
+              {devMode && (
+                <TabsContent value="network">
+                  <NetworkSettings />
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
         </div>
     </PageLayout>
   );

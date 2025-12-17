@@ -18,6 +18,8 @@ vi.mock('../services/series.service.js', () => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    getStats: vi.fn(),
+    batchUpdateStories: vi.fn(),
   }
 }));
 
@@ -27,6 +29,43 @@ import app from '../app.js';
 describe('Series API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('GET /api/series/:id/stats', () => {
+    it('should return series stats', async () => {
+      const mockStats = { stories: [{ id: '1', title: 'Story 1' }] };
+      seriesService.getStats.mockResolvedValue(mockStats);
+
+      const res = await request(app).get('/api/series/1/stats');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(mockStats);
+      expect(seriesService.getStats).toHaveBeenCalledWith('1');
+    });
+  });
+
+  describe('POST /api/series/:id/stories/batch', () => {
+    it('should batch add stories', async () => {
+      const payload = { storyIds: ['s1', 's2'], action: 'add' };
+      seriesService.batchUpdateStories.mockResolvedValue({ updated: 2 });
+
+      const res = await request(app).post('/api/series/1/stories/batch').send(payload);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: 2 });
+      expect(seriesService.batchUpdateStories).toHaveBeenCalledWith('1', payload);
+    });
+
+    it('should batch remove stories', async () => {
+      const payload = { storyIds: ['s1'], action: 'remove' };
+      seriesService.batchUpdateStories.mockResolvedValue({ updated: 1 });
+
+      const res = await request(app).post('/api/series/1/stories/batch').send(payload);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: 1 });
+      expect(seriesService.batchUpdateStories).toHaveBeenCalledWith('1', payload);
+    });
   });
 
   describe('GET /api/series', () => {

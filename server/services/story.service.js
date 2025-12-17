@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { themeService } from './theme.service.js';
 
 class StoryService {
-  async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, seriesId }) {
+  async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, seriesId, excludeSeriesId }) {
     const offset = (page - 1) * limit;
 
     // Helper to build WHERE clause and params
@@ -14,6 +14,11 @@ class StoryService {
         if (seriesId && seriesId !== 'all') {
             whereClauses.push('s.series_id = ?');
             params.push(seriesId);
+        }
+
+        if (excludeSeriesId) {
+            whereClauses.push('(s.series_id != ? OR s.series_id IS NULL)');
+            params.push(excludeSeriesId);
         }
 
         if (theme && theme !== 'all') {
@@ -118,7 +123,7 @@ class StoryService {
     };
   }
 
-  async getAvailableWeeks({ locale = 'fr', theme, ageGroup, seriesId }) {
+  async getAvailableWeeks({ locale = 'fr', theme, ageGroup, seriesId, weekNumber }) {
     let queryStr = `SELECT DISTINCT week_number FROM stories WHERE locale = ?`;
     const params = [locale];
 
@@ -135,6 +140,11 @@ class StoryService {
     if (ageGroup && ageGroup !== 'all') {
       queryStr += ' AND age_group = ?';
       params.push(ageGroup);
+    }
+
+    if (weekNumber) {
+      queryStr += ' AND week_number = ?';
+      params.push(weekNumber);
     }
     
     queryStr += ' ORDER BY week_number ASC';

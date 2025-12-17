@@ -201,27 +201,27 @@ const CreateStoryPage = () => {
         <FormProvider {...methods}>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/10 shadow-lg p-6">
                 <Tabs
                   defaultValue="write"
                   value={activeTab}
                   onValueChange={setActiveTab}
                   className="w-full"
                 >
-                  <TabsList className="mb-4">
-                  <TabsTrigger value="generate" className="flex items-center">
+                  <TabsList className="mb-6 bg-white/50 dark:bg-slate-800/50 w-full justify-start">
+                  <TabsTrigger value="generate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Wand2 className="h-4 w-4 mr-1" />
                       {t("create.tabs.generate")}
                     </TabsTrigger>
-                    <TabsTrigger value="write" className="flex items-center">
+                    <TabsTrigger value="write" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <PenLine className="h-4 w-4 mr-1" />
                       {t("create.tabs.write")}
                     </TabsTrigger>
-                    <TabsTrigger value="illustrate" className="flex items-center">
+                    <TabsTrigger value="illustrate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Paintbrush className="h-4 w-4 mr-1"  />
                       {t("create.tabs.illustrate")}
                     </TabsTrigger>
-                    <TabsTrigger value="preview" className="flex items-center">
+                    <TabsTrigger value="preview" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Book className="h-4 w-4 mr-1"  />
                       {t("create.tabs.preview")}
                     </TabsTrigger>
@@ -259,10 +259,10 @@ const CreateStoryPage = () => {
               </div>
 
               <div
-                className={`rounded-xl shadow-sm p-6 h-fit ${
+                className={`rounded-xl shadow-lg p-6 h-fit transition-all duration-300 ${
                   darkMode
-                    ? "dark:bg-gray-800 dark:text-gray-100 bg-white text-gray-900"
-                    : "bg-white text-gray-900"
+                    ? "bg-slate-900/40 border border-white/10 backdrop-blur-md text-gray-100"
+                    : "bg-white/40 border border-white/20 backdrop-blur-md text-gray-900"
                 }`}
               >
                 <h2 className="text-xl font-bold text-story-purple-800 mb-4">

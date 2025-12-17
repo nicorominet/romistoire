@@ -38,7 +38,7 @@ const StoryList: React.FC = () => {
         setPage(prevPage => Math.max(prevPage - 1, 1));
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div>{i18n.t("common.loading")}</div>;
     if (error) return <div>{error instanceof Error ? error.message : 'An error occurred'}</div>;
 
     return (

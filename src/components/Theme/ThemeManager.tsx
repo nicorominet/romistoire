@@ -70,7 +70,7 @@ const ThemeManager: React.FC = () => {
   };
 
   if (isLoading) return <div>{i18n.t("common.loading")}</div>;
-  if (error) return <div>Error loading themes</div>;
+  if (error) return <div>{i18n.t("themes.error.loadingError")}</div>;
 
   return (
     <div className={`container mx-auto px-4 py-8 ${darkMode ? 'dark' : ''}`}>

@@ -6,7 +6,7 @@ import AgeGroupSection from "@/components/Home/AgeGroupSection";
 const Index = () => {
   return (
     <PageLayout>
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen relative">
         <HeroSection />
         <FeatureSection />
         <AgeGroupSection />

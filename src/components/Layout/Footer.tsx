@@ -12,40 +12,24 @@ const Footer = () => {
 
 
   return (
-    <footer className={`bg-white dark:bg-gray-800 border-t border-story-purple-100 dark:border-gray-700 mt-12 py-6`}>
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-center sm:text-left mb-4 sm:mb-0">
-            <h3 className="text-xl font-bold text-story-purple dark:text-white">
+    <footer className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-t border-white/20 dark:border-white/5 py-3">
+      <div className="container mx-auto px-4 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+            <h3 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-700 to-gray-500 dark:from-gray-200 dark:to-gray-400">
               {t("app.title")}
             </h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm">
+            <span className="text-xs text-gray-400 dark:text-gray-500">|</span>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               &copy; {currentYear} {t("footer.rights")}
             </p>
-          </div>
+        </div>
 
-          <div className="flex space-x-4">
-            <div className="bg-story-blue-50 dark:bg-story-blue-900 p-2 rounded-full">
-              <div className="w-8 h-8 flex items-center justify-center text-story-purple dark:text-story-blue-100">
-                <span role="img" aria-label="Book" className="text-xl">📚</span>
-              </div>
-            </div>
-            <div className="bg-story-green-50 dark:bg-story-green-900 p-2 rounded-full">
-              <div className="w-8 h-8 flex items-center justify-center text-story-purple dark:text-story-green-100">
-                <span role="img" aria-label="Pencil" className="text-xl">✏️</span>
-              </div>
-            </div>
-            <div className="bg-story-yellow-50 dark:bg-story-yellow-900 p-2 rounded-full">
-              <div className="w-8 h-8 flex items-center justify-center text-story-purple dark:text-story-yellow-100">
-                <span role="img" aria-label="Palette" className="text-xl">🎨</span>
-              </div>
-            </div>
-            <div className="bg-story-pink-50 dark:bg-story-pink-900 p-2 rounded-full">
-              <div className="w-8 h-8 flex items-center justify-center text-story-purple dark:text-story-pink-100">
-                <span role="img" aria-label="Star" className="text-xl">⭐</span>
-              </div>
-            </div>
-          </div>
+        <div className="flex gap-2">
+           {['📚', '✏️', '🎨', '⭐'].map((emoji, idx) => (
+               <div key={idx} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100/50 dark:bg-slate-800/50 text-xs shadow-sm hover:scale-110 transition-transform cursor-default">
+                  {emoji}
+               </div>
+           ))}
         </div>
       </div>
     </footer>

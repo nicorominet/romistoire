@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { ENV_CONFIG } from '../config/env.config.js';
 
+/**
+ * Service for handling application logging.
+ * Logs to console and writes to daily access log files.
+ */
 class LoggerService {
   constructor() {
     this.levels = {
@@ -20,12 +24,27 @@ class LoggerService {
     }
   }
 
+  /**
+   * Formats a log message.
+   * @private
+   * @param {string} level - Log level.
+   * @param {string} message - Log message.
+   * @param {Object} meta - Additional metadata.
+   * @returns {string} Formatted log string.
+   */
   _formatMessage(level, message, meta = {}) {
     const timestamp = new Date().toISOString();
     const metaString = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
     return `[${timestamp}] [${level}] ${message}${metaString}`;
   }
 
+  /**
+   * Writes log entry to file.
+   * @private
+   * @param {string} level - Log level.
+   * @param {string} message - Log message.
+   * @param {Object} meta - Additional metadata.
+   */
   _writeToFile(level, message, meta = {}) {
     try {
       const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -49,16 +68,32 @@ class LoggerService {
     }
   }
 
+  /**
+   * Log info level message.
+   * @param {string} message - Message to log.
+   * @param {Object} [meta] - Additional metadata.
+   */
   info(message, meta = {}) {
     console.log(this._formatMessage(this.levels.INFO, message, meta));
     this._writeToFile(this.levels.INFO, message, meta);
   }
 
+  /**
+   * Log warning level message.
+   * @param {string} message - Message to log.
+   * @param {Object} [meta] - Additional metadata.
+   */
   warn(message, meta = {}) {
     console.warn(this._formatMessage(this.levels.WARN, message, meta));
     this._writeToFile(this.levels.WARN, message, meta);
   }
 
+  /**
+   * Log error level message.
+   * @param {string} message - Message to log.
+   * @param {Object} [meta] - Additional metadata.
+   * @param {Error} [error] - Error object.
+   */
   error(message, meta = {}, error = null) {
     let errorMessage = this._formatMessage(this.levels.ERROR, message, meta);
     if (error) {
@@ -70,6 +105,12 @@ class LoggerService {
     this._writeToFile(this.levels.ERROR, message, meta);
   }
 
+  /**
+   * Log debug level message.
+   * Only logs in non-production environments.
+   * @param {string} message - Message to log.
+   * @param {Object} [meta] - Additional metadata.
+   */
   debug(message, meta = {}) {
     if (process.env.NODE_ENV !== 'production') {
       console.debug(this._formatMessage(this.levels.DEBUG, message, meta));

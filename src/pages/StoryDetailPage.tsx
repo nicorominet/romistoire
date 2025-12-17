@@ -184,7 +184,7 @@ const StoryDetailPage = (): JSX.Element => {
         }
 
         {/* Main Content */}
-        <div className="w-full">
+        <div className="w-full bg-white/70 dark:bg-slate-900/60 backdrop-blur-md rounded-xl border border-white/50 dark:border-white/10 shadow-lg p-6 md:p-10">
              <StoryContent story={story} />
         </div>
 

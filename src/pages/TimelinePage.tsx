@@ -239,7 +239,7 @@ const TimelinePage: React.FC = () => {
 
   const StoryCard = ({ storyForDay }: { storyForDay: any }) => (
       <Link to={`/stories/${storyForDay.id}`} className="story-card-link w-full h-full block">
-        <Card className="story-card hover-scale h-full bg-white dark:bg-gray-700 flex flex-col">
+        <Card className="story-card hover-scale h-full flex flex-col transition-all duration-300 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-white/50 dark:border-white/10 hover:bg-white/90 dark:hover:bg-slate-800/80 hover:shadow-lg shadow-sm">
           <CardHeader className="p-2 space-y-1">
             {storyForDay.series_name && (
               <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide truncate pr-2">
@@ -290,7 +290,7 @@ const TimelinePage: React.FC = () => {
              </div>
           </div>
 
-          <Card className="w-full">
+          <Card className="w-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
             <CardContent className="pt-6">
                <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
                   <FilterSelect
@@ -336,7 +336,7 @@ const TimelinePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className={`min-h-screen flex flex-col ${darkMode ? 'dark' : ''}`}>
+          <Card className={`min-h-screen flex flex-col bg-white/30 dark:bg-slate-900/30 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg ${darkMode ? 'dark' : ''}`}>
             <CardContent>
               <div className="timeline-container">
                 {loadedWeeks.map(weekNumber => {

@@ -47,6 +47,7 @@ export const useWeeklyThemes = () => {
     return useQuery({
         queryKey: ['weeklyThemes'],
         queryFn: async () => (await weeklyThemeApi.getAll()) as any,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 };
 

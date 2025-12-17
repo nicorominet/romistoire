@@ -221,8 +221,8 @@ const ThemepageContent: React.FC = () => {
 
         {/* Content */}
         {!loading && themes.length === 0 ? (
-           <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+           <div className="flex flex-col items-center justify-center py-20 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/10 shadow-lg">
+               <div className="w-16 h-16 bg-white/50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-white/20">
                    <FolderSearch className="w-8 h-8 text-gray-400" />
                </div>
                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
@@ -231,7 +231,7 @@ const ThemepageContent: React.FC = () => {
                <p className="text-gray-500 dark:text-gray-400 max-w-sm mb-6">
                    {t('themes.createFirstThemeDescription')}
                </p>
-               <Button onClick={openAddDialog} variant="outline" className="gap-2">
+               <Button onClick={openAddDialog} variant="outline" className="gap-2 bg-white/50 hover:bg-white/80">
                    <Plus className="w-4 h-4" />
                    {t('themes.addTheme')}
                </Button>

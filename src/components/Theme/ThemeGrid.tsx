@@ -113,8 +113,8 @@ const ThemeGrid: React.FC<ThemeGridProps> = React.memo(
 
     if (filteredAndSortedThemes.length === 0) {
       return (
-        <div className="text-center py-16 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center py-16 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-lg border border-white/20 dark:border-white/10">
+          <svg className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
@@ -135,7 +135,7 @@ const ThemeGrid: React.FC<ThemeGridProps> = React.memo(
     return (
       <div className="space-y-4">
         {/* Results Summary */}
-        <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="flex items-center justify-between px-4 py-2 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-lg border border-white/20 dark:border-white/10">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             <span className="font-semibold text-gray-900 dark:text-white">{filteredAndSortedThemes.length}</span>{' '}
             {filteredAndSortedThemes.length === 1 ? t('themes.grid.theme_one') : t('themes.grid.theme_other')} {filterName ? t('themes.grid.found') : t('themes.grid.total')}

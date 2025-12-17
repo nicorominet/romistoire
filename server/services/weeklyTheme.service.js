@@ -1,10 +1,23 @@
 import { query, getConnection } from '../config/database.js';
 
+/**
+ * Service for managing weekly themes configuration.
+ */
 class WeeklyThemeService {
+  /**
+   * Fetch all weekly themes.
+   * @returns {Promise<Array>} List of weekly themes.
+   */
   async findAll() {
       return await query('SELECT * FROM weekly_themes ORDER BY week_number ASC');
   }
 
+  /**
+   * Update weekly themes configuration.
+   * Creates new entries or updates existing ones.
+   * @param {Array} themes - List of weekly theme objects.
+   * @returns {Promise<boolean>} True on success.
+   */
   async update(themes) {
       const connection = await getConnection();
       try {

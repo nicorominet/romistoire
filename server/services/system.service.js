@@ -5,7 +5,17 @@ import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ENV_CONFIG } from '../config/env.config.js';
 
+/**
+ * Service for system-level operations like data import/export, file management, and logs.
+ */
 class SystemService {
+  /**
+   * Import data from a JSON or ZIP file.
+   * @param {Object} file - The uploaded file object from multer.
+   * @param {'skip'|'overwrite'} [mode='skip'] - Import mode.
+   * @returns {Promise<{success: boolean}>} Result of import.
+   * @throws {Error} If file format is invalid or import fails.
+   */
   async importData(file, mode = 'skip') {
       const { filename, path: filePath, mimetype } = file;
       const isZip = mimetype === 'application/zip' || filename.endsWith('.zip');
@@ -132,6 +142,11 @@ class SystemService {
       return { success: true };
   }
 
+  /**
+   * Export all data.
+   * @param {boolean} [full=false] - If true, exports ZIP with images; otherwise JSON only.
+   * @returns {Promise<{buffer: Buffer, filename: string, type: string}>} Export file data.
+   */
   async exportData(full = false) {
     const stories = await query('SELECT * FROM stories');
     const versions = await query('SELECT * FROM story_versions');
@@ -168,6 +183,10 @@ class SystemService {
     }
   }
 
+  /**
+   * Scan for and remove unused illustration files.
+   * @returns {Promise<{deletedCount: number, reclaimedSpace: number}>} Cleanup stats.
+   */
   async cleanupImages() {
     const illustrations = await query('SELECT image_path FROM illustrations');
     const usedPaths = new Set(illustrations.map(i => i.image_path).filter(p => p).map(p => path.normalize(p)));
@@ -203,6 +222,10 @@ class SystemService {
     return { deletedCount, reclaimedSpace };
   }
 
+  /**
+   * Reset all application data (stories, themes, etc.).
+   * @returns {Promise<void>}
+   */
   async resetData() {
       const connection = await getConnection();
       try {
@@ -222,6 +245,14 @@ class SystemService {
       }
   }
 
+  /**
+   * Process an uploaded image file.
+   * @param {Object} file - Uploaded file object.
+   * @param {Object} params - Additional parameters.
+   * @param {string} [params.storyId] - Associate image with story.
+   * @param {number} [params.position=0] - Position in story.
+   * @returns {Promise<{filename: string, imagePath: string}>} File info.
+   */
   async uploadImage(file, { storyId, position = 0 }) {
       const { filename, path: filePath, mimetype } = file;
       // path relative to root
@@ -239,6 +270,10 @@ class SystemService {
       return { filename, imagePath: relativePath };
   }
 
+  /**
+   * List available log files.
+   * @returns {Promise<Array<{filename: string, date: string, size: number}>>} List of logs.
+   */
   async getLogsList() {
       const logsDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
       if (!fs.existsSync(logsDir)) return [];
@@ -254,6 +289,12 @@ class SystemService {
           .sort((a, b) => b.date.localeCompare(a.date));
   }
 
+  /**
+   * Get content of a specific log file.
+   * @param {string} filename - Log filename.
+   * @returns {Promise<Array<Object>>} Parsed log entries.
+   * @throws {Error} If file not found.
+   */
   async getLogContent(filename) {
       const logsDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
       // Security check: prevent directory traversal

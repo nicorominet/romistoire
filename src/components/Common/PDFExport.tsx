@@ -403,7 +403,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                   }
                 >
                   <SelectTrigger id="fontFamily">
-                    <SelectValue placeholder="Select font" />
+                    <SelectValue placeholder={t("pdf.selectFont")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="helvetica">Helvetica</SelectItem>
@@ -422,7 +422,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                   }
                 >
                   <SelectTrigger id="pageSize">
-                    <SelectValue placeholder="Select page size" />
+                    <SelectValue placeholder={t("pdf.selectPageSize")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a4">A4</SelectItem>
@@ -475,10 +475,10 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                     onValueChange={setSelectedTheme}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select theme" />
+                      <SelectValue placeholder={t("pdf.selectTheme")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">All Themes</SelectItem>
+                      <SelectItem value="default">{t("stories.allThemes")}</SelectItem>
                       {themes.map((theme) => (
                         <SelectItem key={theme.id} value={theme.id}>
                           {theme.name}
@@ -497,10 +497,10 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                     onValueChange={(value: any) => setSelectedAgeGroup(value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select age group" />
+                      <SelectValue placeholder={t("pdf.selectAgeGroup")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">All Age Groups</SelectItem>
+                      <SelectItem value="default">{t("stories.allAges")}</SelectItem>
                       {AGE_GROUPS.map((age) => (
                         <SelectItem key={age} value={age}>{t(`ages.${age}`)}</SelectItem>
                       ))}
@@ -539,7 +539,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                 <AccordionTrigger>{t("pdf.filterByWeek")}</AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-2">
-                    <Label>Select Weeks</Label>
+                    <Label>{t("pdf.selectWeeks")}</Label>
                     <div className="flex flex-wrap gap-2">
                       {[...new Set(availableStories.map((s) => s.week_number))]
                         .sort((a, b) => a - b)

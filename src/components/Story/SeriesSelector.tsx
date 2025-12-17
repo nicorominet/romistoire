@@ -57,7 +57,7 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
         >
           {value
             ? series.find((s) => s.name === value)?.name || value
-            : "Select or create a series..."}
+            : t("series.selector.placeholder")}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -65,14 +65,14 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
         <Command>
           <CommandInput 
             placeholder={t('series.management.searchPlaceholder')} 
-            className="h-9"
+            className="h-9 glass-input"
             onValueChange={setInputValue} 
             value={inputValue}
           />
           <CommandList>
             <CommandEmpty>
                 <div className="p-2">
-                    <p className="text-sm text-gray-500 mb-2">No series found.</p>
+                    <p className="text-sm text-gray-500 mb-2">{t("series.selector.noSeriesFound")}</p>
                     <Button 
                         variant="secondary" 
                         size="sm" 
@@ -80,11 +80,11 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
                         onClick={handleCreateRequest}
                     >
                         <Plus className="mr-2 h-4 w-4" />
-                        Create "{inputValue}"
+                        {t("series.selector.create")} "{inputValue}"
                     </Button>
                 </div>
             </CommandEmpty>
-            <CommandGroup heading="Existing Series">
+            <CommandGroup heading={t("series.selector.existingSeries")}>
               {series.map((s) => (
                 <CommandItem
                   key={s.id}

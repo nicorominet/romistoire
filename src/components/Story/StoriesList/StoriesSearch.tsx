@@ -54,7 +54,7 @@ const StoriesSearch = ({
   const { t } = i18n;
 
   return (
-    <Card className="w-full">
+    <Card className="w-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
       <CardContent className="pt-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">

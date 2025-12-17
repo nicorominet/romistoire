@@ -18,6 +18,11 @@ if (!fs.existsSync(CONFIG_FILE)) {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
 }
 
+/**
+ * GET /api/config/logs
+ * Retrieve the current log configuration.
+ * @returns {Object} The current configuration object.
+ */
 router.get('/config/logs', (req, res) => {
     try {
         if (!fs.existsSync(CONFIG_FILE)) {
@@ -30,6 +35,12 @@ router.get('/config/logs', (req, res) => {
     }
 });
 
+/**
+ * PUT /api/config/logs
+ * Update the log configuration.
+ * @param {Object} req.body - The new configuration object.
+ * @returns {Object} Success status and the new configuration.
+ */
 router.put('/config/logs', (req, res) => {
     try {
         const newConfig = req.body;

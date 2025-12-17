@@ -1,11 +1,24 @@
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Service for managing themes.
+ */
 class ThemeService {
   constructor() {
     this.cache = null;
   }
 
+  /**
+   * Fetch all themes with optional filters.
+   * Uses caching for non-filtered requests.
+   * @param {string} [locale='fr'] - Locale filters (not directly applied in query logic currently but used for cache key).
+   * @param {Object} [filters={}] - Filtering options.
+   * @param {string} [filters.age_group] - Filter by age group.
+   * @param {string} [filters.series_id] - Filter by series ID.
+   * @param {string} [filters.search] - Search term.
+   * @returns {Promise<Array>} List of themes with story counts.
+   */
   async findAll(locale = 'fr', filters = {}) {
     const { age_group, series_id, search } = filters;
     let params = [];
@@ -68,6 +81,11 @@ class ThemeService {
     return results;
   }
 
+  /**
+   * Get all stories associated with a theme.
+   * @param {string} themeId - Theme ID.
+   * @returns {Promise<Array>} List of stories.
+   */
   async getStories(themeId) {
       const sql = `
         SELECT s.* 
@@ -79,6 +97,11 @@ class ThemeService {
       return await query(sql, [themeId]);
   }
 
+  /**
+   * Create a new theme.
+   * @param {Object} themeData - Theme data.
+   * @returns {Promise<Object>} The created theme.
+   */
   async create(themeData) {
       const { name, description, color, icon } = themeData;
       const existing = await query('SELECT * FROM themes WHERE name = ?', [name]);
@@ -95,10 +118,19 @@ class ThemeService {
       return { id, name, description, color, icon, created_at: now };
   }
 
+  /**
+   * Invalidate the theme cache.
+   */
   invalidateCache() {
       this.cache = null;
   }
 
+  /**
+   * Update an existing theme.
+   * @param {string} id - Theme ID.
+   * @param {Object} data - Update data.
+   * @returns {Promise<Object>} The updated theme.
+   */
   async update(id, { name, description, color }) {
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
       await query(
@@ -109,6 +141,12 @@ class ThemeService {
       return { id, name, description, color, created_at: now };
   }
 
+  /**
+   * Delete a theme.
+   * @param {string} id - Theme ID.
+   * @returns {Promise<boolean>} True on success.
+   * @throws {Error} If theme is associated with stories.
+   */
   async delete(id) {
     const storiesUsingTheme = await query('SELECT COUNT(*) as count FROM story_themes WHERE theme_id = ?', [id]);
     if (storiesUsingTheme[0].count > 0) {
@@ -119,6 +157,10 @@ class ThemeService {
     return true;
   }
 
+  /**
+   * Merge duplicate themes based on name.
+   * @returns {Promise<{message: string}>} Result message.
+   */
   async mergeDuplicates() {
       const duplicates = await query(`SELECT name, COUNT(*) as count FROM themes GROUP BY name HAVING count > 1`);
       if (duplicates.length === 0) return { message: 'No duplicate themes found' };
@@ -139,6 +181,12 @@ class ThemeService {
       return { message: `Merged ${mergedCount} duplicate groups` };
   }
 
+  /**
+   * Update stories to replace an old theme ID with a new one.
+   * @param {string} oldThemeId - Old Theme ID.
+   * @param {string} newThemeId - New Theme ID.
+   * @returns {Promise<boolean>} True on success.
+   */
   async updateStoriesTheme(oldThemeId, newThemeId) {
       const connection = await getConnection();
       try {

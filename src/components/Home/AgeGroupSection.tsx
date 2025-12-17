@@ -18,29 +18,30 @@ const AgeGroupSection = () => {
     ];
 
     return (
-        <section className="py-20">
+        <section className="py-12 pb-24">
             <div className="container mx-auto px-4">
-                 <div className="text-center mb-12">
-                     <h2 className={`text-3xl md:text-4xl font-bold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t("ageGroups.title")}</h2>
-                     <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t("ageGroups.subtitle")}</p>
+                 <div className="text-center mb-10">
+                     <h2 className={`text-2xl md:text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-orange-400`}>{t("ageGroups.title")}</h2>
+                     <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t("ageGroups.subtitle")}</p>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 max-w-5xl mx-auto">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 max-w-6xl mx-auto">
                     {ageGroups.map((group) => (
-                        <Link key={group.id} to={`/stories?ageGroup=${group.id}`} className="group">
+                        <Link key={group.id} to={`/stories?ageGroup=${group.id}`} className="group relative">
                             <div className={`
-                                flex flex-col items-center justify-center p-6 rounded-2xl transition-all duration-300
-                                border-2 border-transparent hover:border-purple-300 dark:hover:border-purple-700
-                                hover:shadow-lg hover:-translate-y-1 bg-white dark:bg-gray-800
-                                group-hover:bg-purple-50 dark:group-hover:bg-purple-900/10
+                                flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-300 h-full
+                                bg-white/40 dark:bg-slate-800/40 backdrop-blur-md border border-white/20 dark:border-white/10
+                                hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-2 hover:bg-white/60 dark:hover:bg-slate-800/60
                             `}>
                                 <div className={`
-                                    w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110
-                                    ${getAgeGroupColor(group.id)} text-gray-800 font-bold shadow-sm
+                                    w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-all duration-500 group-hover:scale-110 group-hover:rotate-6
+                                    ${getAgeGroupColor(group.id)} shadow-md
                                 `}>
-                                    {group.icon}
+                                    <div className="text-gray-800 scale-90">
+                                        {group.icon}
+                                    </div>
                                 </div>
-                                <span className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                                <span className={`text-sm font-bold text-center leading-tight ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
                                     {group.label}
                                 </span>
                             </div>

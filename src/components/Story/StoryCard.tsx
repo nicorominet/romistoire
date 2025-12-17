@@ -74,7 +74,7 @@ const StoryCard = ({ story, themeColors = {} }: StoryCardProps) => {
 
   return (
     <Link to={`/stories/${story.id}`}>
-      <Card className="story-card hover-scale h-full bg-white dark:bg-gray-800">
+      <Card className="story-card hover-scale h-full transition-all duration-300 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-white/50 dark:border-white/10 hover:bg-white/90 dark:hover:bg-slate-800/80 hover:shadow-xl shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl text-story-purple-800 dark:text-story-purple-200">
             {story.title}

@@ -307,7 +307,7 @@ const EditStoryPage: React.FC = () => {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <div className="lg:col-span-3">
-                <Card className="bg-white dark:bg-gray-800">
+                <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
                   <CardHeader>
                     <CardTitle className="text-gray-900 dark:text-gray-100">
                       {t("story.content")}
@@ -349,7 +349,7 @@ const EditStoryPage: React.FC = () => {
                 </Card>
               </div>
               <div>
-                <Card className="bg-white dark:bg-gray-800">
+                <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
                   <CardHeader>
                     <CardTitle className="text-gray-900 dark:text-gray-100">
                       {t("story.settings")}

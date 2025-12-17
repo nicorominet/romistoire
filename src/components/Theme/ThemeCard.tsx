@@ -43,7 +43,7 @@ const ThemeCard: React.FC<ThemeCardProps> = React.memo(
 
     return (
       <Card
-        className={`group relative overflow-hidden transition-all duration-200 hover:shadow-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${
+        className={`group relative overflow-hidden transition-all duration-300 hover:shadow-xl shadow-sm border border-white/50 dark:border-white/10 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md ${
           isSelected ? 'ring-2 ring-story-purple' : ''
         }`}
       >
