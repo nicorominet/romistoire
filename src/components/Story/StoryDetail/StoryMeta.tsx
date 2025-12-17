@@ -5,7 +5,7 @@ import { formatDate } from '@/lib/utils';
 
 interface StoryMetaProps {
   ageGroup: string;
-  readingTime: number;
+
   weeklyTheme?: string;
   seriesName?: string;
   createdAt?: string;
@@ -15,7 +15,7 @@ interface StoryMetaProps {
   locale?: string;
 }
 
-const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale }: StoryMetaProps) => {
+const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale }: StoryMetaProps) => {
   const { t } = i18n;
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -31,13 +31,7 @@ const StoryMeta = ({ ageGroup, readingTime, weeklyTheme, seriesName, createdAt, 
             </div>
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.readingTime')}</span>
-            <div className="flex items-center gap-2 font-medium">
-                <Clock className="h-4 w-4 text-primary" />
-                {readingTime} min
-            </div>
-        </div>
+
 
         {createdAt && (
             <div className="flex flex-col items-center gap-1">

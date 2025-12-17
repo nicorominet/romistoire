@@ -34,6 +34,7 @@ export interface Story {
   modified_at: string;
   version: number;
   locale: string;
+  audio_path?: string;
   illustrations: Illustration[];
 }
 

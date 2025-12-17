@@ -14,6 +14,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 
 ### 🇬🇧 English
 - **📖 AI Story Generation**: Generate creative stories based on themes, age groups, and characters using Google Gemini.
+- **🎧 AI Audio Narrations**: Turn stories into audio using advanced Text-to-Speech (Google Gemini).
 - **🎨 AI Illustration Prompts**: Generate detailed prompts for illustrations to guide your creative process.
 - **📂 Theme Management**: Organize stories into customizable weekly themes.
 - **🖨️ PDF Export**: Export single stories or entire collections (Theme Books) to PDF with cover pages and table of contents.
@@ -22,6 +23,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 
 ### 🇫🇷 Français
 - **📖 Génération d'Histoires par IA** : Générez des histoires créatives basées sur des thèmes, tranches d'âge et personnages via Google Gemini.
+- **🎧 Narrations Audio par IA** : Transformez les histoires en audio grâce à la synthèse vocale avancée (Google Gemini).
 - **🎨 Prompts d'Illustration par IA** : Générez des descriptions détaillées pour guider la création de vos illustrations.
 - **📂 Gestion des Thèmes** : Organisez les histoires dans des thèmes hebdomadaires personnalisables.
 - **🖨️ Export PDF** : Exportez des histoires individuelles ou des collections entières (Livres Thématiques) en PDF avec couvertures et table des matières.

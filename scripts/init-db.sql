@@ -33,6 +33,7 @@ CREATE TABLE stories (
   modified_at DATETIME NOT NULL,
   version INT NOT NULL DEFAULT 1,
   locale VARCHAR(5) NOT NULL DEFAULT 'en',
+  audio_path VARCHAR(255) NULL,
   series_id VARCHAR(36) NULL,
   FOREIGN KEY (series_id) REFERENCES story_series(id) ON DELETE SET NULL
 );

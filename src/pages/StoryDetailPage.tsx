@@ -1,12 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, Calendar, BookOpen, Clock, Tag } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Calendar, BookOpen, Clock, Tag, Headphones, Volume2, Loader2 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import PageLayout from '@/components/Layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader'; // Can reuse? No, different header.
+import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader'; 
 import StoryNavigation from '@/components/Story/StoryDetail/StoryNavigation';
 import StoryContent from '@/components/Story/StoryDetail/StoryContent';
 import StoryMeta from '@/components/Story/StoryDetail/StoryMeta';
@@ -37,7 +37,7 @@ const StoryDetailPage = (): JSX.Element => {
 
   const { data: story, isLoading, error } = useStory(id || '');
   const { data: neighbors } = useStoryNeighbors(id || '');
-  const { deleteStory } = useStoryMutations();
+  const { deleteStory, generateAudio } = useStoryMutations();
   const { data: weeklyThemes } = useWeeklyThemes();
 
   // Determine weekly theme name
@@ -63,6 +63,27 @@ const StoryDetailPage = (): JSX.Element => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleGenerateAudio = async () => {
+      if (!id) return;
+      try {
+          toast({
+              title: "Génération en cours...",
+              description: "L'audio est en train d'être généré, cela peut prendre quelques secondes.",
+          });
+          await generateAudio.mutateAsync(id);
+          toast({
+              title: "Audio généré !",
+              description: "Vous pouvez maintenant écouter l'histoire.",
+          });
+      } catch (error) {
+          toast({
+              title: "Erreur",
+              description: "Impossible de générer l'audio. Vérifiez la clé API ou réessayez.",
+              variant: "destructive"
+          });
+      }
   };
 
   const handleEdit = () => {
@@ -105,6 +126,17 @@ const StoryDetailPage = (): JSX.Element => {
           </Button>
           
           <div className="flex gap-2">
+            <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                onClick={handleGenerateAudio}
+                disabled={generateAudio.isPending}
+            >
+                {generateAudio.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Headphones className="h-4 w-4" />}
+                {story.audio_path ? 'Régénérer Audio' : 'Générer Audio'}
+            </Button>
+
             <Button
                 variant="outline"
                 size="sm"
@@ -167,10 +199,24 @@ const StoryDetailPage = (): JSX.Element => {
                 ))}
             </div>
 
+            {story.audio_path && (
+                <div className="flex justify-center my-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm rounded-full p-2 pr-4 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
+                         <div className="bg-story-purple text-white p-2 rounded-full">
+                             <Volume2 className="h-4 w-4" />
+                         </div>
+                         <audio controls className="h-8 w-48 md:w-64 bg-transparent">
+                             <source src={story.audio_path} type="audio/mpeg" />
+                             Votre navigateur ne supporte pas l'élément audio.
+                         </audio>
+                    </div>
+                </div>
+            )}
+
             <div className="scale-90 origin-center">
                 <StoryMeta 
                     ageGroup={story.age_group}
-                    readingTime={Math.ceil((story.content?.split(' ').length || 0) / 150)} 
+
                     weeklyTheme={weeklyThemeName}
                     seriesName={story.series_name}
                     createdAt={story.created_at}

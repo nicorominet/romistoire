@@ -126,26 +126,59 @@ export const deleteIllustration = async (req, res) => {
         const { id, illustrationId } = req.params;
         const imagePath = await storyService.deleteIllustration(id, illustrationId);
         
-        // Clean up file if needed
-        // Since we don't have fs logic in Service, Controller does it?
-        // Ideally Service should handle file system logic too or use StorageService.
-        // But for quick fix: import fs/path.
-        // I will just ignore file deletion here for now to stay clean or add imports.
-        // Actually, let's keep it clean. System cleanup job handles orphans.
-        // Or I can add fs to StoryService. Ideally Service handles everything.
-        // For now, I'll rely on the cleanup script or just return success.
-        // The implementation in deleteRoutes did delete the file.
-        // I'll add fs logic to Service in next step if critical.
-        // But the user has a "Cleanup Images" button.
-        
         if (imagePath) {
              // Optional: delete file immediately
-             // import fs from 'fs'; import path from 'path';
-             // const absPath = path.join(process.cwd(), imagePath);
-             // if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
         }
         
         res.json({ success: true, message: 'Illustration deleted' });
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export const generateAudio = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const story = await storyService.findById(id);
+        
+        if (!story) {
+            return res.status(404).json({ error: 'Story not found' });
+        }
+
+        if (!story.content) {
+             return res.status(400).json({ error: 'Story content is empty' });
+        }
+
+        console.log(`Generating audio for story ${id}...`);
+        const { audioBuffer, mimeType } = await geminiService.generateAudio(story.content);
+        
+        // Save to public/audio
+        const audioDir = path.join(__dirname, '../../public/audio');
+        if (!fs.existsSync(audioDir)) {
+            fs.mkdirSync(audioDir, { recursive: true });
+        }
+
+        const extension = 'wav';
+        console.log(`Received audio, saving as .${extension}`);
+
+        const fileName = `${id}_v${story.version || 1}.${extension}`;
+        const filePath = path.join(audioDir, fileName);
+        
+        fs.writeFileSync(filePath, audioBuffer);
+        
+        const publicUrl = `/audio/${fileName}`;
+        
+        // Update story
+        await storyService.saveAudioPath(id, publicUrl);
+        
+        res.json({ success: true, audioPath: publicUrl });
     } catch (error) {
         handleError(res, error);
     }

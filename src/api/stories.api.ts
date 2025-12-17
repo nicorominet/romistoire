@@ -90,6 +90,16 @@ export const storyApi = {
   deleteIllustration: (id: string, illustrationId: string) => client.delete<string>(`/api/stories/${id}/illustrations/${illustrationId}`),
 
   /**
+   * Generate audio for a story.
+   * @param {string} id - The ID of the story.
+   * @returns {Promise<any>} The generated audio data or confirmation.
+   */
+  generateAudio: async (id: string) => {
+      const response = await client.post(`/api/stories/${id}/audio`);
+      return response.data;
+  },
+
+  /**
    * Generate a story using AI.
    * @param {any} data - Parameters for generation (theme, age group, etc.).
    * @returns {Promise<Story>} The generated story.

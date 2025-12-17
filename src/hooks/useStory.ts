@@ -60,7 +60,14 @@ export const useStoryMutations = () => {
         }
     });
 
-    return { createStory, updateStory, deleteStory, generateAI, restoreVersion, deleteIllustration };
+    const generateAudio = useMutation({
+        mutationFn: async (id: string) => (await storyApi.generateAudio(id)) as any,
+        onSuccess: (data, id) => {
+             queryClient.invalidateQueries({ queryKey: ['story', id] });
+        }
+    });
+
+    return { createStory, updateStory, deleteStory, generateAI, restoreVersion, deleteIllustration, generateAudio };
 };
 
 

@@ -110,4 +110,12 @@ router.delete('/:id/illustrations/:illustrationId', storyController.deleteIllust
  */
 router.get('/:id/illustrations', storyController.getStoryIllustrations);
 
+/**
+ * POST /api/stories/:id/audio
+ * Generate audio for a story.
+ * @param {string} req.params.id - Story ID.
+ * @returns {Object} Audio path.
+ */
+router.post('/:id/audio', storyController.generateAIStoryAudio || storyController.generateAudio); // Using the exported name generateAudio
+
 export default router;

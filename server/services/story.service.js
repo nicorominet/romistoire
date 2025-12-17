@@ -468,7 +468,7 @@ class StoryService {
 
         // Update Story
         await connection.query(
-             `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ? WHERE id = ?`,
+             `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, audio_path = NULL WHERE id = ?`,
              [title, content, ageGroup, weekNumber, dayOrder, now, locale, version, id]
         );
 
@@ -523,6 +523,17 @@ class StoryService {
        
        await query('DELETE FROM illustrations WHERE id = ? AND story_id = ?', [illustrationId, storyId]);
        return rows[0].image_path;
+  }
+
+  /**
+   * Save audio path for a story.
+   * @param {string} storyId - Story ID.
+   * @param {string} audioPath - Path to the audio file.
+   * @returns {Promise<void>}
+   */
+  async saveAudioPath(storyId, audioPath) {
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      await query('UPDATE stories SET audio_path = ?, modified_at = ? WHERE id = ?', [audioPath, now, storyId]);
   }
 }
 
