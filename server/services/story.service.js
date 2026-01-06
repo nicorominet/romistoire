@@ -22,7 +22,7 @@ class StoryService {
    * @param {string} [params.excludeSeriesId] - Exclude stories from a series.
    * @returns {Promise<{data: Array, total: number, page: number, limit: number}>} Paginated results.
    */
-  async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, seriesId, excludeSeriesId }) {
+  async findAll({ page = 1, limit = 12, locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, hasImage, hasAudio, seriesId, excludeSeriesId }) {
     const offset = (page - 1) * limit;
 
     // Helper to build WHERE clause and params
@@ -72,6 +72,14 @@ class StoryService {
                 whereClauses.push('NOT EXISTS (SELECT 1 FROM illustrations WHERE story_id = s.id)');
             }
         }
+
+        if (hasAudio && hasAudio !== 'all') {
+             if (hasAudio === 'yes') {
+                 whereClauses.push('(s.audio_path IS NOT NULL AND s.audio_path != "")');
+             } else if (hasAudio === 'no') {
+                 whereClauses.push('(s.audio_path IS NULL OR s.audio_path = "")');
+             }
+         }
         
         return { whereClause: whereClauses.join(' AND '), params };
     };

@@ -80,6 +80,16 @@ export interface PaginationParams {
   age_group?: string;
   week_number?: number;
   day_of_week?: string;
+  search?: string;
+  hasImage?: string;
+  hasAudio?: string;
+  seriesId?: string;
+  excludeSeriesId?: string;
+   // Add other filters as needed to match findAll params
+  theme?: string; // Align with findAll 'theme' vs 'theme_id'
+  ageGroup?: string; // Align with findAll 'ageGroup'
+  weekNumber?: string; // Align with findAll 'weekNumber'
+  dayOfWeek?: string; // Align with findAll 'dayOfWeek'
 }
 
 /**

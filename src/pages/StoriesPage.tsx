@@ -38,6 +38,7 @@ const StoriesPage = (): JSX.Element => {
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('');
   const [hasImage, setHasImage] = useState<string>('all');
+  const [hasAudio, setHasAudio] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
   
@@ -50,9 +51,10 @@ const StoriesPage = (): JSX.Element => {
       weekNumber: selectedWeekNumber?.toString() || '',
       dayOfWeek: selectedDayOfWeek,
       hasImage: hasImage !== 'all' ? hasImage : '',
+      hasAudio: hasAudio !== 'all' ? hasAudio : '',
       seriesId: selectedSeries !== 'all' ? selectedSeries : '',
       search: debouncedSearchTerm
-  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, selectedSeries, debouncedSearchTerm]);
+  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, debouncedSearchTerm]);
 
   // React Query Hooks
   const { 
@@ -155,12 +157,14 @@ const StoriesPage = (): JSX.Element => {
     const weekNumberParam = params.get('weekNumber');
     const dayOfWeekParam = params.get('dayOfWeek');
     const hasImageParam = params.get('hasImage');
+    const hasAudioParam = params.get('hasAudio');
 
     if (themeParam) setSelectedTheme(themeParam);
     if (ageGroupParam) setSelectedAgeGroup(ageGroupParam);
     if (weekNumberParam) setSelectedWeekNumber(parseInt(weekNumberParam, 10));
     if (dayOfWeekParam) setSelectedDayOfWeek(dayOfWeekParam);
     if (hasImageParam) setHasImage(hasImageParam);
+    if (hasAudioParam) setHasAudio(hasAudioParam);
   }, [location.search]);
 
   // Debounce search
@@ -176,6 +180,7 @@ const StoriesPage = (): JSX.Element => {
   const handleWeekNumberChange = (weekNumber: number | null) => setSelectedWeekNumber(weekNumber);
   const handleDayOfWeekChange = (dayOfWeek: string) => setSelectedDayOfWeek(dayOfWeek);
   const handleHasImageChange = (value: string) => setHasImage(value);
+  const handleHasAudioChange = (value: string) => setHasAudio(value);
   const handleSeriesChange = (value: string) => setSelectedSeries(value);
   const handleSearch = () => setDebouncedSearchTerm(searchTerm);
   const handleCreateStory = () => navigate('/create');
@@ -220,6 +225,8 @@ const StoriesPage = (): JSX.Element => {
             handleDayOfWeekChange={handleDayOfWeekChange}
             hasImage={hasImage}
             handleHasImageChange={handleHasImageChange}
+            hasAudio={hasAudio}
+            handleHasAudioChange={handleHasAudioChange}
             series={seriesList}
             selectedSeries={selectedSeries}
             handleSeriesChange={handleSeriesChange}

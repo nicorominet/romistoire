@@ -29,6 +29,7 @@ const StoryGenerationTab = ({ onStoryGenerated }: StoryGenerationTabProps) => {
   const [numCharacters, setNumCharacters] = useState("");
   const [characterNames, setCharacterNames] = useState("");
   const [seriesName, setSeriesName] = useState("");
+  const [aiProvider, setAiProvider] = useState("gemini");
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationLog, setGenerationLog] = useState<string[]>([]);
@@ -240,7 +241,8 @@ const StoryGenerationTab = ({ onStoryGenerated }: StoryGenerationTabProps) => {
              day: dayOfWeek,
              numCharacters: numCharacters ? parseInt(numCharacters) : undefined,
              charNames: characterNames,
-             seriesName: seriesName
+             seriesName: seriesName,
+             aiProvider: aiProvider
           }) as any;
           
           // result.text is the response from backend
@@ -323,6 +325,19 @@ const StoryGenerationTab = ({ onStoryGenerated }: StoryGenerationTabProps) => {
                   value={seriesName}
                   onChange={setSeriesName}
                 />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ai-provider">Moteur IA</Label>
+                <select 
+                    id="ai-provider"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={aiProvider}
+                    onChange={(e) => setAiProvider(e.target.value)}
+                >
+                    <option value="gemini">Cloud (Google Gemini - Rapide & Qualitatif)</option>
+                    <option value="local">Local (Gemma 3 4B - Gratuit & Privé)</option>
+                </select>
             </div>
 
             <div className="space-y-2">

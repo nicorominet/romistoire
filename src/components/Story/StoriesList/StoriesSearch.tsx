@@ -24,6 +24,8 @@ interface StoriesSearchProps {
   handleDayOfWeekChange: (day: string) => void;
   hasImage: string;
   handleHasImageChange: (value: string) => void;
+  hasAudio: string;
+  handleHasAudioChange: (value: string) => void;
   series: Series[];
   selectedSeries: string;
   handleSeriesChange: (seriesId: string) => void;
@@ -47,6 +49,8 @@ const StoriesSearch = ({
   handleDayOfWeekChange,
   hasImage,
   handleHasImageChange,
+  hasAudio,
+  handleHasAudioChange,
   series,
   selectedSeries,
   handleSeriesChange
@@ -133,10 +137,7 @@ const StoriesSearch = ({
               <SelectItem value="0">{t('days.sunday')}</SelectItem>
             </SelectContent>
           </Select>
-          <Select
-            value={hasImage}
-            onValueChange={handleHasImageChange}
-          >
+          <Select value={hasImage} onValueChange={handleHasImageChange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder={t('stories.allImages')} />
             </SelectTrigger>
@@ -144,6 +145,19 @@ const StoriesSearch = ({
               <SelectItem value="all">{t('stories.allImages')}</SelectItem>
               <SelectItem value="yes">{t('stories.withImage')}</SelectItem>
               <SelectItem value="no">{t('stories.withoutImage')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={hasAudio}
+            onValueChange={handleHasAudioChange}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={t('stories.allAudio')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('stories.allAudio')}</SelectItem>
+              <SelectItem value="yes">{t('stories.withAudio')}</SelectItem>
+              <SelectItem value="no">{t('stories.withoutAudio')}</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={handleSearch} variant="secondary" aria-label={t('common.search')}>

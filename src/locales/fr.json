@@ -398,6 +398,7 @@
     "allAges": "Tous les âges",
     "allDays": "Tous les jours",
     "allImages": "Toutes les illustrations",
+    "allAudio": "Tous les audios",
     "allThemes": "Tous les thèmes",
     "allWeeks": "Toutes les semaines",
     "create": "Créer une histoire",
@@ -408,7 +409,9 @@
     "searchStories": "Rechercher des histoires",
     "title": "Histoires",
     "withImage": "Avec illustration",
-    "withoutImage": "Sans illustration"
+    "withoutImage": "Sans illustration",
+    "withAudio": "Avec audio",
+    "withoutAudio": "Sans audio"
   },
   "story": {
     "ageGroup": "Tranche d'âge",

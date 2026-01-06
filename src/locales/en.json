@@ -398,6 +398,7 @@
     "allAges": "All Ages",
     "allDays": "All Days",
     "allImages": "All Illustrations",
+    "allAudio": "All Audio",
     "allThemes": "All Themes",
     "allWeeks": "All Weeks",
     "create": "Create Story",
@@ -408,7 +409,9 @@
     "searchStories": "Search Stories",
     "title": "Stories",
     "withImage": "With Illustration",
-    "withoutImage": "Without Illustration"
+    "withoutImage": "Without Illustration",
+    "withAudio": "With Audio",
+    "withoutAudio": "Without Audio"
   },
   "story": {
     "ageGroup": "Age Group",

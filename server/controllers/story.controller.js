@@ -1,5 +1,6 @@
 import { storyService } from '../services/story.service.js';
 import { geminiService } from '../services/gemini.service.js';
+import { localLLMService } from '../services/local_llm.service.js';
 import { handleError } from '../middleware/error.middleware.js';
 
 export const getStories = async (req, res) => {
@@ -114,7 +115,20 @@ export const restoreStoryVersion = async (req, res) => {
 
 export const generateAIStory = async (req, res) => {
   try {
-    const result = await geminiService.generateStory(req.body);
+    // Priority: Request Param > Env Var > Default 'gemini'
+    const requestedProvider = req.body.aiProvider;
+    const envProvider = process.env.AI_PROVIDER;
+    const aiProvider = requestedProvider || envProvider || 'gemini';
+    
+    console.log(`Generating story using provider: ${aiProvider} (Req: ${requestedProvider}, Env: ${envProvider})`);
+    
+    let result;
+    if (aiProvider === 'local') {
+        result = await localLLMService.generateStory(req.body);
+    } else {
+        result = await geminiService.generateStory(req.body);
+    }
+    
     res.json(result);
   } catch (error) {
     handleError(res, error);
@@ -156,8 +170,15 @@ export const generateAudio = async (req, res) => {
              return res.status(400).json({ error: 'Story content is empty' });
         }
 
+        // Remove illustration descriptions [Illustration: ...] to avoid reading them aloud
+        const contentToRead = story.content
+            .replace(/\[Illustration:.*?\]/gs, '') // Remove Illustration tags
+            .replace(/\*\*/g, '') // Remove bold markdown if any, creates cleaner reading flow
+            .replace(/\n\s*\n/g, '\n\n') // Fix spacing
+            .trim();
+
         console.log(`Generating audio for story ${id}...`);
-        const { audioBuffer, mimeType } = await geminiService.generateAudio(story.content);
+        const { audioBuffer, mimeType } = await geminiService.generateAudio(contentToRead);
         
         // Save to public/audio
         const audioDir = path.join(__dirname, '../../public/audio');
