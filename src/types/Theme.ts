@@ -6,7 +6,7 @@ export interface Theme {
   icon?: string | null;
   created_at: string;
   updated_at?: string;
-  story_count?: number;
+  storyCount?: number;
 }
 export interface WeeklyTheme {
   week_number: number;

@@ -45,31 +45,26 @@ const i18n = {
 async function loadLocales() {
   try {
       // Browser environment only
-      const [enResponse, frResponse] = await Promise.all([
-        fetch('/src/locales/en.json', {
-          headers: {
-            'Accept': 'application/json'
-          }
-        }),
-        fetch('/src/locales/fr.json', {
-          headers: {
-            'Accept': 'application/json'
-          }
-        })
+      const [enResponse, frResponse, obfResponse] = await Promise.all([
+        fetch('/src/locales/en.json', { headers: { 'Accept': 'application/json' } }),
+        fetch('/src/locales/fr.json', { headers: { 'Accept': 'application/json' } }),
+        fetch('/src/locales/obf.json', { headers: { 'Accept': 'application/json' } })
       ]);
 
-      if (!enResponse.ok || !frResponse.ok) {
+      if (!enResponse.ok || !frResponse.ok || !obfResponse.ok) {
         throw new Error('Failed to load one or more locale files');
       }
 
-      const [en, fr] = await Promise.all([
+      const [en, fr, obf] = await Promise.all([
         enResponse.json(),
-        frResponse.json()
+        frResponse.json(),
+        obfResponse.json()
       ]);
 
       translations = {
         en,
         fr,
+        obf,
       };
 
       return true;
@@ -77,7 +72,8 @@ async function loadLocales() {
     console.error("Failed to load locales:", err);
     translations = { 
       en: {},
-      fr: {}
+      fr: {},
+      obf: {}
     };
     return false;
   }

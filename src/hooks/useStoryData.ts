@@ -32,12 +32,7 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
   // Use centralized hooks
   const { data: story, isLoading: storyLoading, error: storyError, refetch: refetchStory } = useStory(id || "");
   
-  // Illustrations separate query (since getDetails might not include them or we want parity with old hook)
-  const { data: illustrations = [], isLoading: illusLoading, refetch: refetchIllus } = useQuery({
-      queryKey: ['story', id, 'illustrations'],
-      queryFn: async () => id ? (await storyApi.getIllustrations(id)) as unknown as Illustration[] : [],
-      enabled: !!id
-  });
+  // No need for separate illustrations query as useStory already hydrates them
 
   // Weekly themes query
   const { data: weeklyThemes = [], isLoading: themesLoading } = useQuery({
@@ -49,8 +44,7 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
 
   const refetch = useCallback(() => {
     refetchStory();
-    refetchIllus();
-  }, [refetchStory, refetchIllus]);
+  }, [refetchStory]);
 
   const addIllustrationToBackend = async (
     file: File,
@@ -65,13 +59,13 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
       const formData = new FormData();
       formData.append("image", file);
       formData.append("storyId", id);
-      formData.append("position", String(illustrations.length));
+      formData.append("position", String(story?.illustrations?.length || 0));
       
       const res = (await systemApi.uploadImage(formData)) as any;
       const { imagePath, filename: savedFilename } = res;
       
-      // We could use optimistic update here, but for now invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['story', id, 'illustrations'] });
+      // Invalidate story to refresh illustrations
+      queryClient.invalidateQueries({ queryKey: ['story', id] });
       
       toast.success("Illustration added successfully.");
     } catch (err) {
@@ -84,8 +78,8 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
     if (!id) return;
     try {
         await deleteIllustrationMutation.mutateAsync({ id, illustrationId });
-        // Mutation onSuccess already invalidates queries, but ensuring illustration list is refreshed
-        queryClient.invalidateQueries({ queryKey: ['story', id, 'illustrations'] });
+        // Mutation onSuccess already invalidates queries, but ensuring story is refreshed
+        queryClient.invalidateQueries({ queryKey: ['story', id] });
         toast.success("Illustration deleted successfully");
     } catch(err) {
          toast.error("Failed to delete illustration.");
@@ -94,9 +88,9 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
 
   return {
     story: story || null,
-    loading: storyLoading || illusLoading || themesLoading,
+    loading: storyLoading || themesLoading,
     error: storyError ? (storyError as Error).message : null,
-    illustrations,
+    illustrations: story?.illustrations || [],
     weeklyThemes,
     refetch,
     addIllustrationToBackend,

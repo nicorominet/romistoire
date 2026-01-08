@@ -23,56 +23,73 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Code2 } from "lucide-react";
 import { toast } from "sonner";
-
-import { Code2 } from "lucide-react";
+import { STORAGE_KEYS } from "@/constants";
 
 interface GeneralSettingsProps {
   devMode: boolean;
   onToggleDevMode: (checked: boolean) => void;
 }
 
+/**
+ * GeneralSettings Component
+ * 
+ * Manages global application settings like Theme (Dark/Light), Auto-save, and Developer Mode.
+ * Settings are persisted in LocalStorage.
+ */
 export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsProps) => {
   const { t, changeLocale } = i18n;
 
+  // Initialize state based on DOM class (for theme) to prevent mismatch
   const [darkMode, setDarkMode] = useState<boolean>(
     document.documentElement.classList.contains("dark")
   );
   const [autoSave, setAutoSave] = useState<boolean>(true);
 
-  // Load initial state
+  // Load persisted settings on mount
   useEffect(() => {
-    const savedAutoSave = localStorage.getItem("autoSave");
+    const savedAutoSave = localStorage.getItem(STORAGE_KEYS.AUTO_SAVE);
     if (savedAutoSave !== null) {
       setAutoSave(savedAutoSave === "true");
     }
   }, []);
 
+  /**
+   * Toggles Dark Mode and updates DOM + LocalStorage.
+   */
   const handleDarkModeToggle = (checked: boolean) => {
     setDarkMode(checked);
     document.documentElement.classList.toggle("dark", checked);
-    localStorage.setItem("theme", checked ? "dark" : "light");
+    localStorage.setItem(STORAGE_KEYS.THEME, checked ? "dark" : "light");
     toast.success(t("settings.appearanceChanged"));
   };
 
+  /**
+   * Toggles Auto Save and updates LocalStorage.
+   */
   const handleAutoSaveToggle = (checked: boolean) => {
     setAutoSave(checked);
-    localStorage.setItem("autoSave", checked.toString());
+    localStorage.setItem(STORAGE_KEYS.AUTO_SAVE, checked.toString());
     toast.success(t("settings.autoSaveChanged"));
   };
 
+  /**
+   * Resets all general settings to default values.
+   */
   const handleResetSettings = () => {
     try {
-      // Reset Language
+      // 1. Reset Language
       changeLocale("fr");
-      // Reset Theme
+      
+      // 2. Reset Theme to Light
       setDarkMode(false);
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-      // Reset AutoSave
+      localStorage.setItem(STORAGE_KEYS.THEME, "light");
+      
+      // 3. Reset AutoSave to True
       setAutoSave(true);
-      localStorage.setItem("autoSave", "true");
+      localStorage.setItem(STORAGE_KEYS.AUTO_SAVE, "true");
 
       toast.success(t("settings.settingsReset"));
     } catch (error) {
@@ -88,6 +105,7 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
         <CardDescription>{t("settings.generalDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Dark Mode Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="dark-mode">{t("settings.darkMode")}</Label>
@@ -101,7 +119,10 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
             onCheckedChange={handleDarkModeToggle}
           />
         </div>
+        
         <Separator />
+        
+        {/* Auto Save Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="auto-save">{t("settings.autoSave")}</Label>
@@ -115,7 +136,10 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
             onCheckedChange={handleAutoSaveToggle}
           />
         </div>
+        
         <Separator />
+        
+        {/* Developer Mode Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="dev-mode" className="flex items-center gap-2">
@@ -133,6 +157,7 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
           />
         </div>
       </CardContent>
+      
       <CardFooter>
         <AlertDialog>
           <AlertDialogTrigger asChild>

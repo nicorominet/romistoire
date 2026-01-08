@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { X, RefreshCw, Trash2, Filter, AlertTriangle, Info, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { API_ENDPOINTS } from '@/constants';
 
 interface LogEntry {
     timestamp: string;
@@ -22,7 +23,7 @@ const DebugConsole = () => {
 
     const fetchLogs = async () => {
         try {
-            const response = await fetch('/api/logs?limit=100');
+            const response = await fetch(`${API_ENDPOINTS.LOGS}?limit=100`);
             const data = await response.json();
             if (Array.isArray(data)) {
                 setLogs(data);
@@ -89,7 +90,7 @@ const DebugConsole = () => {
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={fetchLogs}>
                         <RefreshCw className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => fetch('/api/logs', { method: 'DELETE' }).then(fetchLogs)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => fetch(API_ENDPOINTS.LOGS, { method: 'DELETE' }).then(fetchLogs)}>
                         <Trash2 className="h-3 w-3" />
                     </Button>
                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>

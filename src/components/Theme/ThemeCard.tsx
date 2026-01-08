@@ -14,7 +14,7 @@ interface ThemeCardProps {
   isExpanded: boolean;
   storiesUsingTheme: Story[];
   onEdit: (theme: Theme) => void;
-  onDelete: (id: string) => void;
+  onDelete: (theme: Theme) => void;
   onToggleExpand: (id: string) => void;
   onNavigateToStory: (id: string) => void;
 }
@@ -35,7 +35,7 @@ const ThemeCard: React.FC<ThemeCardProps> = React.memo(
     const isSelected = selectedThemeId === theme.id;
     const isDisabled = loading || (isSelected && storiesUsingTheme.length > 0);
     // Use the count from the theme object if available (set by backend), otherwise fallback to local length if expanded
-    const storyCount = theme.story_count !== undefined ? theme.story_count : storiesUsingTheme.length;
+    const storyCount = theme.storyCount !== undefined ? theme.storyCount : storiesUsingTheme.length;
 
     const formattedDate = useMemo(() => {
         return formatDate(theme.created_at, i18n.getCurrentLocale());
@@ -76,7 +76,7 @@ const ThemeCard: React.FC<ThemeCardProps> = React.memo(
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={(e) => { e.stopPropagation(); onDelete(theme.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(theme); }}
                     disabled={isDisabled}
                     title={t('common.delete')}
                 >

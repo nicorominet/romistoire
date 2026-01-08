@@ -7,18 +7,20 @@ import { v4 as uuidv4 } from 'uuid';
 class SeriesService {
   /**
    * Fetch all series with story count.
+   * @param {string} [locale='fr'] - Locale filter.
    * @returns {Promise<Array>} List of series with story counts.
    */
-  async findAll() {
+  async findAll(locale = 'fr') {
       // Need story count?
       // Old route: SELECT s.*, COUNT(st.id) as storyCount FROM story_series s LEFT JOIN stories st ON s.id = st.series_id GROUP BY s.id
       const results = await query(`
         SELECT ss.*, CAST(COUNT(s.id) AS UNSIGNED) as storyCount 
         FROM story_series ss 
         LEFT JOIN stories s ON ss.id = s.series_id 
+        WHERE ss.locale = ? OR ss.locale IS NULL
         GROUP BY ss.id 
         ORDER BY ss.created_at DESC
-      `);
+      `, [locale]);
       return results;
   }
 
@@ -54,11 +56,11 @@ class SeriesService {
    * @param {string} [data.description] - Series description.
    * @returns {Promise<Object>} The created series object.
    */
-  async create({ name, description }) {
+  async create({ name, description, locale = 'fr' }) {
       const id = uuidv4();
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      await query('INSERT INTO story_series (id, name, description, created_at) VALUES (?, ?, ?, ?)', [id, name, description || null, now]);
-      return { id, name, description, created_at: now, storyCount: 0 };
+      await query('INSERT INTO story_series (id, name, description, locale, created_at) VALUES (?, ?, ?, ?, ?)', [id, name, description || null, locale, now]);
+      return { id, name, description, locale, created_at: now, storyCount: 0 };
   }
 
   /**

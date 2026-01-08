@@ -1,34 +1,57 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { systemApi } from '../api/system.api';
-import client from '../api/client';
+import { CleanupResponse } from '../types/system.types';
 
+/**
+ * Custom hook to handle System and Data mutations.
+ * Provides wrappers around system API calls with React Query integration.
+ * 
+ * @returns {Object} Object containing mutation hooks for upload, cleanup, reset, and import.
+ */
 export const useSystemMutations = () => {
     const queryClient = useQueryClient();
 
+    /**
+     * Mutation for uploading images.
+     */
     const uploadImage = useMutation({
-        mutationFn: async (formData: FormData) => (await systemApi.uploadImage(formData)) as any,
+        mutationFn: (formData: FormData) => systemApi.uploadImage(formData),
     });
 
+    /**
+     * Mutation for cleaning up unused images.
+     */
     const cleanupImages = useMutation({
-        mutationFn: async () => (await systemApi.cleanupImages()) as any,
+        mutationFn: () => systemApi.cleanupImages(),
     });
 
+    /**
+     * Mutation for factory reset.
+     * Invalidates all queries on success to refresh UI.
+     */
     const resetData = useMutation({
-        mutationFn: async () => (await systemApi.resetData()) as any,
+        mutationFn: () => systemApi.resetData(),
         onSuccess: () => {
+             // Invalidate all data to ensure UI reflects the empty state
              queryClient.invalidateQueries();
+             queryClient.clear(); // Clear cache explicitly
         }
     });
 
+    /**
+     * Mutation for importing data.
+     * Invalidates all queries on success to show new data immediately.
+     */
     const importData = useMutation({
-        mutationFn: async (formData: FormData) => (await systemApi.importData(formData)) as any,
+        mutationFn: (formData: FormData) => systemApi.importData(formData),
         onSuccess: () => {
+             // Refresh all queries (stories, themes, etc.)
              queryClient.invalidateQueries();
         }
     });
 
-    // Export is usually a direct download, not a mutation state we track same way, but consistent API helps.
-    // For PDF/ZIP download, we might handle it in component with api call to get blob.
+    // Note: Exports are handled directly via API calls in components 
+    // because they result in file downloads (Blob), not state mutations.
     
     return { uploadImage, cleanupImages, resetData, importData };
 };

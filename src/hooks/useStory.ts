@@ -6,6 +6,8 @@ export const useStory = (id: string) => {
     queryKey: ['story', id],
     queryFn: async () => (await storyApi.getById(id)) as any,
     enabled: !!id,
+    staleTime: 0,
+    gcTime: 0,
   });
 };
 
@@ -75,6 +77,8 @@ export const useStoryVersions = (id: string) => {
     return useQuery({
         queryKey: ['storyVersions', id],
         queryFn: async () => (await storyApi.getVersions(id)) as any,
-        enabled: !!id
+        enabled: !!id,
+        staleTime: 0,
+        gcTime: 0
     });
 };

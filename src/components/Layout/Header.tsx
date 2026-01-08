@@ -11,6 +11,7 @@ import { Book, PenLine, Settings, GlobeIcon, Columns3, Clock, Palette } from "lu
 import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { STORAGE_KEYS } from "@/constants";
 import useDarkMode from '@/hooks/useDarkMode';
 
 const Header = () => {
@@ -19,7 +20,7 @@ const Header = () => {
   const darkMode = useDarkMode();
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const storedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark', storedTheme === 'dark');  }, []);
 
 

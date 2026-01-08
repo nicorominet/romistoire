@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useSeries } from '@/hooks/useSeries';
 import { useThemeMutations } from '@/hooks/useThemes';
+import { APP_ROUTES } from '@/constants';
 
 /**
  * Content component with cleaner, ergonomic UI
@@ -43,6 +44,8 @@ const ThemepageContent: React.FC = () => {
     setFilterSeries,
     sortOrder,
     setSortOrder,
+    sortBy,
+    setSortBy,
     fetchThemes,
     removeTheme,
     addTheme,
@@ -56,7 +59,7 @@ const ThemepageContent: React.FC = () => {
   const [currentTheme, setCurrentTheme] = React.useState<Theme | null>(null);
   
   const [confirmDialogOpen, setConfirmDialogOpen] = React.useState(false);
-  const [themeToDelete, setThemeToDelete] = React.useState<string | null>(null);
+  const [themeToDelete, setThemeToDelete] = React.useState<Theme | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
 
@@ -93,8 +96,8 @@ const ThemepageContent: React.FC = () => {
       }
   };
 
-  const handleDeleteTheme = useCallback((id: string) => {
-    setThemeToDelete(id);
+  const handleDeleteTheme = useCallback((theme: Theme) => {
+    setThemeToDelete(theme);
     setConfirmDialogOpen(true);
   }, []);
 
@@ -102,7 +105,7 @@ const ThemepageContent: React.FC = () => {
     if (!themeToDelete) return;
     try {
       setIsDeleting(true);
-      await removeTheme(themeToDelete);
+      await removeTheme(themeToDelete.id);
       setConfirmDialogOpen(false);
       setThemeToDelete(null);
       toast({
@@ -121,7 +124,7 @@ const ThemepageContent: React.FC = () => {
   }, [themeToDelete, removeTheme, toast, t]);
 
   const handleNavigateToStory = useCallback((storyId: string) => {
-    navigate(`/stories/${storyId}`);
+    navigate(APP_ROUTES.STORY_DETAIL(storyId));
   }, [navigate]);
 
    const { mergeDuplicates } = useThemeMutations();
@@ -157,10 +160,10 @@ const ThemepageContent: React.FC = () => {
                 </div>
                 
                 {/* Filters Group */}
-                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar">
                     <Select value={filterAge} onValueChange={setFilterAge}>
                         <SelectTrigger className="w-[110px] h-9 text-xs bg-gray-50 border-gray-200">
-                            <SelectValue placeholder={t('story.ageGroup')} />
+                             <SelectValue placeholder={t('story.ageGroup')} />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">{t('themes.allAges')}</SelectItem>
@@ -183,22 +186,39 @@ const ThemepageContent: React.FC = () => {
                             ))}
                         </SelectContent>
                     </Select>
+
+                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block mx-1"></div>
+
+                    <Select value={sortBy} onValueChange={(v: 'name' | 'count') => setSortBy(v)}>
+                        <SelectTrigger className="w-[140px] h-9 text-xs bg-gray-50 border-gray-200">
+                             <SelectValue placeholder={t('themes.sortBy')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="name">{t('themes.sortByName')}</SelectItem>
+                            <SelectItem value="count">{t('themes.sortByCount')}</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 text-gray-600 dark:text-gray-300 px-2"
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        title={t('themes.sort')}
+                    >
+                        <ArrowUpDown className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs">
+                            {sortBy === 'name' 
+                                ? (sortOrder === 'asc' ? t('themes.sortAZ') : t('themes.sortZA'))
+                                : (sortOrder === 'asc' ? t('themes.sortAsc') : t('themes.sortDesc'))
+                            }
+                        </span>
+                    </Button>
                 </div>
             </div>
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                 <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-gray-600 dark:text-gray-300"
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    title={t('themes.sort')}
-                >
-                    <ArrowUpDown className="w-4 h-4" />
-                    <span className="hidden sm:inline">{sortOrder === 'asc' ? 'A-Z' : 'Z-A'}</span>
-                </Button>
-
                 <Button
                     variant="ghost"
                     size="sm"
@@ -241,6 +261,7 @@ const ThemepageContent: React.FC = () => {
                 themes={themes}
                 filterName={filterName}
                 sortOrder={sortOrder}
+                sortBy={sortBy}
                 onEditTheme={openEditDialog}
                 onDeleteTheme={handleDeleteTheme}
                 onNavigateToStory={handleNavigateToStory}
@@ -261,7 +282,7 @@ const ThemepageContent: React.FC = () => {
             open={confirmDialogOpen}
             onOpenChange={setConfirmDialogOpen}
             title={t('themes.deleteTheme')}
-            description={t('themes.confirmDeleteThemeDescription')}
+            description={themeToDelete ? `${t('themes.confirmDeleteThemeDescription')} "${themeToDelete.name}" ?` : t('themes.confirmDeleteThemeDescription')}
             onConfirm={handleConfirmDelete}
             isLoading={isDeleting}
         />

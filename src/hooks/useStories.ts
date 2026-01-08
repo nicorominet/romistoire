@@ -11,7 +11,16 @@ import { PaginatedResponse } from '../types/Api';
  * @param {Object} options - Additional options for the useQuery hook.
  * @returns {UseQueryResult<PaginatedResponse<Story>>} The query result containing the paginated stories.
  */
-export const useStories = (params: any = {}, options: any = {}) => {
+import { PaginationParams } from '../types/Story';
+
+/**
+ * Hook to fetch a paginated list of stories.
+ * 
+ * @param {PaginationParams} params - The query parameters for the API call (page, limit, filters).
+ * @param {Object} options - Additional options for the useQuery hook.
+ * @returns {UseQueryResult<PaginatedResponse<Story>>} The query result containing the paginated stories.
+ */
+export const useStories = (params: PaginationParams, options: any = {}) => {
   return useQuery<PaginatedResponse<Story>>({
     queryKey: ['stories', params],
     queryFn: async () => await storyApi.getAll(params),
@@ -23,15 +32,16 @@ export const useStories = (params: any = {}, options: any = {}) => {
 /**
  * Hook to fetch stories with infinite scrolling support.
  * 
- * @param {Object} params - The initial query parameters (filters, limit).
+ * @param {Partial<PaginationParams>} params - The initial query parameters (filters, limit).
  * @returns {UseInfiniteQueryResult<PaginatedResponse<Story>>} The infinite query result.
  */
-export const useInfiniteStories = (params: any = {}) => {
+export const useInfiniteStories = (params: Partial<PaginationParams>) => {
     return useInfiniteQuery<PaginatedResponse<Story>>({
         queryKey: ['stories-infinite', params],
         // params contains filters. page is handled by getNextPageParam
         // We override page in queryFn
-        queryFn: async ({ pageParam = 1 }) => await storyApi.getAll({ ...params, page: pageParam as number }),
+        // @ts-ignore - queryFn expects page to be number
+        queryFn: async ({ pageParam = 1 }) => await storyApi.getAll({ ...params, page: pageParam as number } as PaginationParams),
         getNextPageParam: (lastPage) => {
             const totalPages = Math.ceil(lastPage.total / lastPage.limit);
             const currentPage = Number(lastPage.page);

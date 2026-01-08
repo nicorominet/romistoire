@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
 import { logger } from '../config/logger.js';
+import { systemService } from '../services/system.service.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -90,62 +91,43 @@ router.delete('/', (req, res) => {
 
 /**
  * GET /api/logs/access/files
- * List available access log files.
+ * List available access and AI log files.
  * @returns {Array} List of access log file objects with metadata.
  */
-router.get('/access/files', (req, res) => {
-    const logsDir = path.join(__dirname, '../logs');
-    if (!fs.existsSync(logsDir)) {
-        return res.json([]);
-    }
-    
-    fs.readdir(logsDir, (err, files) => {
-        if (err) return res.status(500).json({ error: 'Failed to list logs' });
-        
-        const logFiles = files
-            .filter(f => f.startsWith('access-') && f.endsWith('.log'))
-            .map(f => {
-                const stat = fs.statSync(path.join(logsDir, f));
-                return {
-                    filename: f,
-                    date: f.replace('access-', '').replace('.log', ''),
-                    size: stat.size,
-                    mtime: stat.mtime
-                };
-            })
-            .sort((a, b) => b.mtime - a.mtime); // Newest first
-            
+router.get('/access/files', async (req, res) => {
+    try {
+        // Use systemService to get all logs (access and ai)
+        const logFiles = await systemService.getLogsList();
         res.json(logFiles);
-    });
+    } catch (error) {
+        console.error('Error listing log files:', error);
+        res.status(500).json({ error: 'Failed to list logs' });
+    }
 });
 
 /**
  * GET /api/logs/access/:filename
- * Read content of a specific access log file.
+ * Read content of a specific access/ai log file.
  * @param {string} req.params.filename - The filename of the log to read.
  * @returns {Array} parsed log entries.
  */
-router.get('/access/:filename', (req, res) => {
+router.get('/access/:filename', async (req, res) => {
     const filename = req.params.filename;
-    // Basic security check to prevent directory traversal
-    if (!filename.match(/^access-\d{4}-\d{2}-\d{2}\.log$/)) {
+    
+    // Allow both access- and ai- log files
+    if (!filename.match(/^(access|ai)-\d{4}-\d{2}-\d{2}\.log$/)) {
         return res.status(400).json({ error: 'Invalid filename' });
     }
 
-    const filePath = path.join(__dirname, '../logs', filename);
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'File not found' });
+    try {
+        const entries = await systemService.getLogContent(filename);
+        res.json(entries);
+    } catch (error) {
+        if (error.message === 'Log file not found') {
+            return res.status(404).json({ error: 'File not found' });
+        }
+        res.status(500).json({ error: 'Failed to read file' });
     }
-
-    fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) return res.status(500).json({ error: 'Failed to read file' });
-        // Parse JSONL to array
-        const lines = data.split('\n').filter(l => l.trim());
-        const entries = lines.map(line => {
-            try { return JSON.parse(line); } catch(e) { return { message: line }; }
-        });
-        res.json(entries.reverse()); // Newest first
-    });
 });
 
 export default router;

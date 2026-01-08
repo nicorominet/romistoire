@@ -30,7 +30,7 @@ class ThemeService {
     }
 
     let sql = `
-        SELECT t.*, COUNT(DISTINCT st.story_id) as story_count 
+        SELECT t.*, COUNT(DISTINCT st.story_id) as storyCount 
         FROM themes t 
         LEFT JOIN story_themes st ON t.id = st.theme_id 
     `;
@@ -148,10 +148,23 @@ class ThemeService {
    * @throws {Error} If theme is associated with stories.
    */
   async delete(id) {
-    const storiesUsingTheme = await query('SELECT COUNT(*) as count FROM story_themes WHERE theme_id = ?', [id]);
+    // Check for VALID stories using this theme
+    const storiesUsingTheme = await query(`
+        SELECT COUNT(DISTINCT s.id) as count 
+        FROM story_themes st
+        JOIN stories s ON st.story_id = s.id
+        WHERE st.theme_id = ?
+    `, [id]);
+
     if (storiesUsingTheme[0].count > 0) {
-        throw new Error('Cannot delete theme. It is used by one or more stories.');
+        throw new Error('Cannot delete theme. It is used by one or more active stories.');
     }
+
+    // Checking for ORPHANS (entries in story_themes where story doesn't exist)
+    // If we are here, it means 'valid' count is 0. 
+    // We can safely clean up story_themes for this theme ID before deleting the theme.
+    await query('DELETE FROM story_themes WHERE theme_id = ?', [id]);
+    
     await query('DELETE FROM themes WHERE id = ?', [id]);
     this.invalidateCache();
     return true;
@@ -191,7 +204,8 @@ class ThemeService {
       const connection = await getConnection();
       try {
           await connection.beginTransaction();
-          await connection.query('UPDATE stories SET theme_id = ? WHERE theme_id = ?', [newThemeId, oldThemeId]);
+          // The theme_id is in story_themes table, not stories
+          await connection.query('UPDATE story_themes SET theme_id = ? WHERE theme_id = ?', [newThemeId, oldThemeId]);
           await connection.commit();
           return true;
       } catch (error) {

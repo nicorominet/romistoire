@@ -40,6 +40,7 @@ import { useNavigate } from "react-router-dom";
 import { useSeries, useSeriesMutations } from "@/hooks/useSeries";
 import { SeriesDialog } from "@/components/Series/SeriesDialog";
 import { SeriesDetailsDialog } from "@/components/Series/SeriesDetailsDialog";
+import { APP_ROUTES } from "@/constants";
 
 type SortConfig = {
   key: "name" | "count" | "date";
@@ -48,7 +49,7 @@ type SortConfig = {
 
 const SeriesManagementPage = () => {
   const navigate = useNavigate();
-  const t = (key: string, params?: any) => i18n.t(key, params);
+  const t = (key: string, params?: Record<string, any>) => i18n.t(key, params);
 
   const { data: series = [], isLoading: loading } = useSeries();
   const { createSeries, updateSeries, deleteSeries } = useSeriesMutations();
@@ -221,7 +222,7 @@ const SeriesManagementPage = () => {
                   <TableCell className="font-medium">
                     <span
                       className="cursor-pointer hover:text-story-purple-600 hover:underline"
-                      onClick={() => navigate(`/stories?seriesId=${s.id}`)}
+                      onClick={() => navigate(`${APP_ROUTES.STORIES}?seriesId=${s.id}`)}
                     >
                       {s.name}
                     </span>

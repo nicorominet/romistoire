@@ -14,6 +14,7 @@ import { formSchema, FormValues } from "@/components/Story/StoryEditor/formSchem
 import { AgeGroup, Illustration, Story } from "@/types/Story";
 import { Series } from "@/types/Series";
 import { format } from 'date-fns';
+import { getDayOrder } from "@/utils/dayUtils";
 
 // Shared Components
 import StoryContent from "@/components/Story/StoryEditor/StoryContent";
@@ -28,6 +29,8 @@ import { systemApi } from "@/api/system.api";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
 import { Theme } from "@/types/Theme";
+import { APP_ROUTES } from "@/constants";
+import { UploadResponse } from "@/types/system.types";
 
 
 
@@ -89,7 +92,7 @@ const CreateStoryPage = () => {
       themes: data.themes.map((id: string) => ({ id } as Theme)),
       age_group: data.ageGroup as AgeGroup,
       locale: data.language,
-      day_order: +data.dayOfWeek || 1, // simplified logic or mapping needed if dayOfWeek is string "Monday" etc. 
+      day_order: getDayOrder(data.dayOfWeek),
       // Actually dayOfWeek in formValues is string, in Story it is number.
       week_number: parseInt(data.weekNumber, 10) || 1,
       series_name: data.seriesName,
@@ -104,11 +107,11 @@ const CreateStoryPage = () => {
     };
 
     try {
-      const response = await storyApi.create(payload as any); // Api might still need any if not fully typed yet, but payload is typed
-      const newStory = response as Story;
+      const response = await storyApi.create(payload);
+      const newStory = response;
       
       toast.success(t("create.success.storyCreated"));
-      navigate(`/stories/${newStory.id}`);
+      navigate(APP_ROUTES.STORY_DETAIL(newStory.id));
 
     } catch (error) {
       console.error("Error saving story:", error);
@@ -122,7 +125,7 @@ const CreateStoryPage = () => {
       const formData = new FormData();
       formData.append("image", file);
       try {
-        const res = (await systemApi.uploadImage(formData)) as any;
+        const res = await systemApi.uploadImage(formData);
         const { imagePath, filename: returnFilename } = res;
         
         setIllustrations(prev => [...prev, { 
@@ -146,7 +149,7 @@ const CreateStoryPage = () => {
 
   const handleStoryGenerated = () => {
     toast.success(t("create.success.generatedAndSaved"));
-    navigate('/stories'); 
+    navigate(APP_ROUTES.STORIES); 
   };
   
   const memoizedAvailableThemes = useMemo(() => availableThemes, [availableThemes]);
@@ -187,6 +190,8 @@ const CreateStoryPage = () => {
     modified_at: new Date().toISOString(),
     version: 1,
     locale: watch("language"),
+    source: 'manual' as const,
+    is_manually_edited: false,
     illustrations: illustrations,
     themes: []
   }), [watch, illustrations]);

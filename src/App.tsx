@@ -42,9 +42,13 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
     console.error("ErrorBoundary caught an error", error, errorInfo);
   }
 
+  resetErrorBoundary = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (this.state.hasError) {
-      return <ErrorPage error={this.state.error} />;
+      return <ErrorPage error={this.state.error} resetErrorBoundary={this.resetErrorBoundary} />;
     }
     return this.props.children;
   }

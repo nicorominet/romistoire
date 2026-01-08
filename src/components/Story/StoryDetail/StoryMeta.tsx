@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, BookOpen, User } from 'lucide-react';
+import { Calendar, Clock, BookOpen, User, Sparkles, Cpu } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { formatDate } from '@/lib/utils';
 
@@ -13,9 +13,11 @@ interface StoryMetaProps {
   dayOrder?: number;
   version?: number;
   locale?: string;
+  source?: 'manual' | 'gemini' | 'ollama';
+  is_manually_edited?: boolean;
 }
 
-const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale }: StoryMetaProps) => {
+const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale, source, is_manually_edited }: StoryMetaProps) => {
   const { t } = i18n;
 
   const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -71,8 +73,7 @@ const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, d
                 </div>
             </div>
         )}
-        
-         {locale && (
+        {locale && (
              <div className="flex flex-col items-center gap-1">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.language', 'Langue')}</span>
                 <div className="flex items-center gap-2 font-medium uppercase">
@@ -80,6 +81,21 @@ const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, d
                 </div>
             </div>
         )}
+        
+        <div className="flex flex-col items-center gap-1">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.source.title', 'Source')}</span>
+            <div className="flex items-center gap-2 font-medium text-story-purple-600 dark:text-story-purple-400">
+                {source === 'gemini' && <Sparkles className="h-4 w-4" />}
+                {source === 'ollama' && <Cpu className="h-4 w-4" />}
+                {source === 'manual' && <User className="h-4 w-4" />}
+                <span className="capitalize">
+                    {t(`story.source.${source || 'manual'}`)}
+                    {!!is_manually_edited && source !== 'manual' && (
+                        <span className="ml-1 text-xs opacity-70 italic">{t('story.source.editedByHuman')}</span>
+                    )}
+                </span>
+            </div>
+        </div>
 
       </div>
 

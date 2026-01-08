@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { APP_ROUTES } from "@/constants";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import PageLayout from "@/components/Layout/PageLayout";
@@ -25,7 +27,10 @@ import { Theme } from "@/types/Theme";
 import { Series } from "@/types/Series";
 import { Story } from "@/types/Story";
 import { themeApi } from "@/api/themes.api";
-import { storyApi, seriesApi } from "@/api/stories.api";
+import { storyApi } from "@/api/stories.api";
+import { useThemes } from "@/hooks/useThemes";
+import { useSeries } from "@/hooks/useSeries";
+import { getDayOrder } from "@/utils/dayUtils";
 
 const EditStoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,9 +47,10 @@ const EditStoryPage: React.FC = () => {
     deleteIllustration,
   } = useStoryData({ id });
 
+  const { data: availableThemes = [] } = useThemes();
+  const { data: availableSeries = [] } = useSeries();
+
   const [saving, setSaving] = useState<boolean>(false);
-  const [availableThemes, setAvailableThemes] = useState<Theme[]>([]);
-  const [availableSeries, setAvailableSeries] = useState<Series[]>([]);
   const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
   const [sortedDayOfWeekOptions, setSortedDayOfWeekOptions] = useState([
     { value: "Monday", label: t("days.monday") },
@@ -77,25 +83,6 @@ const EditStoryPage: React.FC = () => {
     },
   });
 
-  const fetchThemes = useCallback(async () => {
-    try {
-      const data = (await themeApi.getAll()) as any;
-      setAvailableThemes(data);
-    } catch (error) {
-      console.error("Error fetching themes:", error);
-      toast.error(t("common.errors.failedToLoadThemes"));
-    }
-  }, []);
-
-  const fetchSeries = useCallback(async () => {
-    try {
-      const data = (await seriesApi.getAll()) as any;
-      setAvailableSeries(data);
-    } catch (error) {
-      console.error("Error fetching series:", error);
-    }
-  }, []);
-
   const fetchVersions = useCallback(async () => {
     try {
       const data = (await storyApi.getVersions(id!)) as any;
@@ -104,7 +91,7 @@ const EditStoryPage: React.FC = () => {
       console.error("Error fetching versions:", error);
       toast.error(t("common.errors.failedToLoadVersions"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const handleDarkModeChange = () => {
@@ -117,11 +104,6 @@ const EditStoryPage: React.FC = () => {
       window.removeEventListener("darkModeChanged", handleDarkModeChange);
     };
   }, []);
-
-  useEffect(() => {
-    fetchThemes();
-    fetchSeries();
-  }, [fetchThemes, fetchSeries]);
 
   useEffect(() => {
     if (id) {
@@ -186,17 +168,7 @@ const EditStoryPage: React.FC = () => {
     try {
       const updatedVersion = story.version + 1;
 
-      // Conversion du jour texte en numéro (1 = Monday, 7 = Sunday)
-      const dayOfWeekMap = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-      ];
-      const dayOrder = dayOfWeekMap.indexOf(values.dayOfWeek) + 1;
+      const dayOrder = getDayOrder(values.dayOfWeek);
       if (dayOrder < 1 || dayOrder > 7) {
         throw new Error("Invalid day_order value");
       }
@@ -216,9 +188,9 @@ const EditStoryPage: React.FC = () => {
         version: updatedVersion,
       };
 
-      const updateRes = await storyApi.update(id!, payload as any);
+      const updateRes = await storyApi.update(id!, payload);
 
-      const updatedStory = updateRes as Story;
+      const updatedStory = updateRes;
       toast.success(t("story.updateSuccess"));
       navigate(`/stories/${id}`);
     } catch (err) {
@@ -230,7 +202,7 @@ const EditStoryPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate(`/stories/${id}`);
+    navigate(APP_ROUTES.STORY_DETAIL(id!));
   };
 
   const handleRestoreVersion = async () => {
@@ -241,7 +213,7 @@ const EditStoryPage: React.FC = () => {
       await storyApi.restoreVersion(id!, selectedVersion);
       
       toast.success(t("story.restoreSuccess"));
-      navigate(`/stories/${id}`);
+      navigate(APP_ROUTES.STORY_DETAIL(id!));
     } catch (err) {
       toast.error(t("story.restoreError"));
       console.error("Error restoring version:", err);
@@ -272,7 +244,7 @@ const EditStoryPage: React.FC = () => {
             </CardContent>
             <CardFooter>
               <Button
-                onClick={() => navigate("/stories")}
+                onClick={() => navigate(APP_ROUTES.STORIES)}
                 variant="outline"
                 className="flex items-center gap-1"
               >
@@ -359,13 +331,13 @@ const EditStoryPage: React.FC = () => {
                     <StorySettings
                       availableThemes={availableThemes.map((theme) => ({
                         ...theme,
-                        created_at: story.created_at || new Date().toISOString(),
+                        created_at: theme.created_at || new Date().toISOString(),
                       }))}
-                      setAvailableThemes={setAvailableThemes}
+                      setAvailableThemes={() => {}}
                       weeklyThemes={weeklyThemes}
                       sortedDayOfWeekOptions={sortedDayOfWeekOptions}
                       story={story}
-                      availableSeries={availableSeries}
+                      availableSeries={availableSeries as unknown as Series[]}
                     />
                   </CardContent>
                   <CardFooter>

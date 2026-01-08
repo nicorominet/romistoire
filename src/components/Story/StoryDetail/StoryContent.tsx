@@ -19,6 +19,68 @@ const StoryContent = ({ story }: StoryContentProps) => {
     return imagePath ? imagePath.replace(/\\/g, '/') : '';
   };
 
+  const content = story.content || '';
+  const isHtml = /^\s*<p>|^\s*<div>|^\s*<ul>|^\s*<ol>|^\s*<h1>|^\s*<h2>|^\s*<h3>/i.test(content);
+
+  // Helper to render content
+  const renderContent = () => {
+    if (isHtml) {
+        // HTML Rendering Logic
+        let htmlContent = content;
+        
+        // Remove illustration prompts if illustrations exist
+        if (hasIllustrations) {
+             htmlContent = htmlContent.replace(/<p>\s*(\*\*Illustration|\[Illustration|Illustration suggérée|&gt; \*\*Illustration).*?<\/p>/gi, '');
+        } else {
+            // Style illustration prompts if no illustrations
+            htmlContent = htmlContent.replace(
+                /<p>\s*((\*\*Illustration|\[Illustration|Illustration suggérée|&gt; \*\*Illustration).*?)<\/p>/gi, 
+                '<div class="my-6 p-3 bg-muted/40 rounded-md border border-dashed border-muted-foreground/20 text-sm text-muted-foreground flex gap-2 items-start"><div class="shrink-0 mt-0.5">🎨</div><div class="italic opacity-80">$1</div></div>'
+            );
+        }
+
+        return <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left" dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+    } else {
+        // Plain Text Logic (Legacy)
+        return (
+            <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left">
+                {content.split('\n')
+                    .map((paragraph: string, index: number) => {
+                        const trimmed = paragraph.trim();
+                        const isIllustrationPrompt = 
+                            trimmed.startsWith('[Illustration:') ||
+                            trimmed.startsWith('> **Illustration') ||
+                            trimmed.startsWith('**Illustration') ||
+                            trimmed.startsWith('Illustration suggérée');
+
+                        // If image exists, hide the prompt
+                        if (hasIllustrations && isIllustrationPrompt) {
+                            return null;
+                        }
+
+                        // If no image, show the prompt but styled
+                        if (!hasIllustrations && isIllustrationPrompt) {
+                            return (
+                                <div key={index} className="my-6 p-3 bg-muted/40 rounded-md border border-dashed border-muted-foreground/20 text-sm text-muted-foreground flex gap-2 items-start">
+                                     <div className="shrink-0 mt-0.5">🎨</div>
+                                     <div className="italic opacity-80">{paragraph.replace(/^> \*\*Illustration.*:\*\*\s*/, '').replace(/^\[Illustration:\s*/, '').replace(/\]$/, '')}</div>
+                                </div>
+                            );
+                        }
+
+                        if (!trimmed) return <p key={index} className="mb-6">&nbsp;</p>;
+
+                        return (
+                          <p key={index} className="mb-6 text-gray-800 dark:text-gray-200">
+                            {paragraph}
+                          </p>
+                        );
+                    })}
+            </div>
+        );
+    }
+  };
+
   return (
     <div className="space-y-8">
       {hasIllustrations && (
@@ -63,40 +125,7 @@ const StoryContent = ({ story }: StoryContentProps) => {
         </div>
       )}
 
-      <div className={`prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left`}>
-        {story.content.split('\n')
-            .map((paragraph: string, index: number) => {
-                const trimmed = paragraph.trim();
-                const isIllustrationPrompt = 
-                    trimmed.startsWith('[Illustration:') ||
-                    trimmed.startsWith('> **Illustration') ||
-                    trimmed.startsWith('**Illustration') ||
-                    trimmed.startsWith('Illustration suggérée');
-
-                // If image exists, hide the prompt
-                if (hasIllustrations && isIllustrationPrompt) {
-                    return null;
-                }
-
-                // If no image, show the prompt but styled
-                if (!hasIllustrations && isIllustrationPrompt) {
-                    return (
-                        <div key={index} className="my-8 p-4 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/30 text-sm text-muted-foreground flex gap-3 items-start">
-                             <div className="shrink-0 mt-0.5">🎨</div>
-                             <div className="italic">{paragraph.replace(/^> \*\*Illustration.*:\*\*\s*/, '').replace(/^\[Illustration:\s*/, '').replace(/\]$/, '')}</div>
-                        </div>
-                    );
-                }
-
-                if (!trimmed) return <p key={index} className="mb-6">&nbsp;</p>;
-
-                return (
-                  <p key={index} className="mb-6 text-gray-800 dark:text-gray-200">
-                    {paragraph}
-                  </p>
-                );
-            })}
-      </div>
+      {renderContent()}
     </div>
   );
 };

@@ -40,6 +40,7 @@
     "cancel": "Cancel",
     "create": "Create",
     "delete": "Delete",
+    "deleteWarning": "Are you sure you want to delete {{item}}? This action cannot be undone.",
     "deleteConfirmDesc": "Are you sure you want to delete this item? This action cannot be undone.",
     "deleteConfirmTitle": "Confirm Deletion",
     "edit": "Edit",
@@ -81,6 +82,23 @@
       "numCharacters": "Number of Characters (optional)",
       "numCharactersPlaceholder": "Ex: 2",
       "subtitle": "Use AI to create an educational story base.",
+      "projectWeek": "Project Week",
+      "holdCtrl": "(Hold Ctrl for multiple)",
+      "aiProvider": "AI Provider",
+      "provider": {
+        "gemini": "Cloud (Google Gemini - Fast & High Quality)",
+        "local": "Local (Gemma 3 4B - Free & Private)"
+      },
+      "logs": {
+        "start": "🚀 Starting generation...",
+        "weekNotFound": "⚠️ Week {{week}} not found, skipped.",
+        "generatingIterative": "⏳ Generating for Week {{week}} ({{day}}) - {{age}} (Iterative Local Mode)...",
+        "generating": "⏳ Generating for Week {{week}} ({{theme}}) - {{age}}...",
+        "success": "✨ Generation completed successfully!",
+        "error": "❌ Error: {{error}}",
+        "selectRequired": "Please select at least one week, age group and day.",
+        "errorGeneric": "An error occurred during generation."
+      },
       "theme": "Weekly Theme",
       "title": "AI Story Generator",
       "weekNumber": "Week Number"
@@ -132,6 +150,12 @@
     },
     "title": "Create a new story",
     "weekNumber": "Week Number"
+  },
+  "errors": {
+    "addThemeFailed": "Failed to add theme",
+    "editThemeFailed": "Failed to edit theme",
+    "removeThemeFailed": "Failed to delete theme",
+    "themeInUse": "This theme is used by stories"
   },
   "database": {
     "error": "Database connection error"
@@ -385,14 +409,67 @@
     "languageChanged": "Language changed successfully.",
     "languageDescription": "Choose the application language.",
     "languageNote": "Changes will take effect immediately.",
-    "network": "Network",
     "reset": "Reset",
     "resetError": "Error resetting settings.",
     "resetSettings": "Reset Settings",
     "resetWarning": "Are you sure you want to reset all settings to default? This action cannot be undone.",
     "selectLanguage": "Select Language",
     "settingsReset": "Settings have been reset to default.",
-    "title": "Settings"
+    "title": "Settings",
+    "networkTitle": "Network & System",
+    "network": {
+      "tabs": {
+        "debug": "System Logs",
+        "access": "HTTP Access",
+        "ai": "AI & Prompts",
+        "config": "Configuration"
+      },
+      "actions": {
+        "refresh": "Refresh"
+      },
+      "debug": {
+        "title": "Developer Logs (SQL, Interactions, Errors)",
+        "table": {
+          "time": "Time",
+          "category": "Category",
+          "message": "Message",
+          "data": "Data"
+        }
+      },
+      "access": {
+        "selectFile": "Log File",
+        "table": {
+          "method": "Method",
+          "path": "Path",
+          "status": "Status",
+          "time": "Duration"
+        },
+        "noEntries": "No entries found."
+      },
+      "ai": {
+        "selectFile": "AI Log File",
+        "table": {
+          "time": "Time",
+          "provider": "Provider",
+          "type": "Type",
+          "details": "Details",
+          "duration": "Duration"
+        },
+        "details": {
+          "input": "Input (Prompt)",
+          "output": "Output (Response)",
+          "error": "Error"
+        },
+        "noEntries": "No AI logs found."
+      },
+      "config": {
+        "sql": "Enable SQL Logging",
+        "access": "Enable Access Logging",
+        "readonly": "These settings are server-managed and read-only for now."
+      }
+    },
+    "cleanupSuccess": "Cleanup complete: {{count}} files deleted ({{size}} MB reclaimed).",
+    "cleanupError": "Error during image cleanup."
   },
   "stories": {
     "allAges": "All Ages",
@@ -411,7 +488,8 @@
     "withImage": "With Illustration",
     "withoutImage": "Without Illustration",
     "withAudio": "With Audio",
-    "withoutAudio": "Without Audio"
+    "withoutAudio": "Without Audio",
+    "noMoreStories": "No more stories to load."
   },
   "story": {
     "ageGroup": "Age Group",
@@ -467,7 +545,14 @@
     "week": "Week",
     "weekNumber": "Week {{number}}",
     "weekNumberPlaceholder": "Enter week number",
-    "weeklyTheme": "Weekly Theme"
+    "weeklyTheme": "Weekly Theme",
+    "source": {
+      "title": "Source",
+      "manual": "Manual",
+      "gemini": "Gemini (Cloud)",
+      "ollama": "Ollama (Local)",
+      "editedByHuman": "(edited)"
+    }
   },
   "success": {
     "title": "Success",
@@ -475,6 +560,25 @@
     "delete": "Story deleted successfully",
     "restore": "Version restored successfully",
     "update": "Story updated successfully"
+  },
+  "filters": {
+    "title": "Filters",
+    "reset": "Reset",
+    "allThemes": "All Themes",
+    "allSeries": "All Series",
+    "allAges": "All Ages",
+    "allWeeks": "All Weeks",
+    "allDays": "All Days",
+    "hasImage": "With Image",
+    "hasAudio": "With Audio",
+    "onlyImages": "Images Only",
+    "onlyAudio": "Audio Only",
+    "source": "Source",
+    "allSources": "All Sources",
+    "status": "Status",
+    "allStatus": "All Statuses",
+    "original": "Original",
+    "edited": "Manually Edited"
   },
   "themes": {
     "addNewTheme": "Add New Theme",
@@ -506,6 +610,9 @@
       "nullData": "Data is null or undefined. Please check source.",
       "loadingError": "Error loading themes"
     },
+    "sortBy": "Sort by",
+    "sortByCount": "Sort by count",
+    "sortByName": "Sort by name",
     "filterNamePlaceholder": "Filter by name",
     "filterSelectTheme": "Filter by selected theme",
     "found": "found",
@@ -567,9 +674,14 @@
       "descriptionTooLong": "Description too long",
       "nameRequired": "Name is required",
       "nameTooLong": "Name too long"
-    }
+    },
+    "sortAZ": "A-Z",
+    "sortZA": "Z-A",
+    "sortAsc": "- +",
+    "sortDesc": "+ -"
   },
   "timeline": {
+    "thisStory": "this story",
     "allAges": "All Ages",
     "allWeeks": "All Weeks",
     "exploreStories": "Explore stories in a timeline view",
@@ -578,6 +690,7 @@
     "manageWeeklyThemes": "Chronological Stories",
     "selectAgeGroup": "Select Age Group",
     "selectWeek": "Select Week Number",
+    "noMoreStories": "No more stories to load.",
     "weekNumber": "Week {{number}}"
   },
   "version": {

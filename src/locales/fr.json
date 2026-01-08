@@ -40,6 +40,7 @@
     "cancel": "Annuler",
     "create": "Créer",
     "delete": "Supprimer",
+    "deleteWarning": "Êtes-vous sûr de vouloir supprimer {{item}} ? Cette action est irréversible.",
     "deleteConfirmDesc": "Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.",
     "deleteConfirmTitle": "Confirmer la suppression",
     "edit": "Modifier",
@@ -81,6 +82,23 @@
       "numCharacters": "Nombre de personnages (optionnel)",
       "numCharactersPlaceholder": "Ex : 2",
       "subtitle": "Utilisez l'intelligence artificielle pour créer une base d'histoire éducative.",
+      "projectWeek": "Semaine du Projet",
+      "holdCtrl": "(Maintenir Ctrl pour plusieurs)",
+      "aiProvider": "Moteur IA",
+      "provider": {
+        "gemini": "Cloud (Google Gemini - Rapide & Qualitatif)",
+        "local": "Local (Gemma 3 4B - Gratuit & Privé)"
+      },
+      "logs": {
+        "start": "🚀 Démarrage de la génération...",
+        "weekNotFound": "⚠️ Semaine {{week}} introuvable, ignorée.",
+        "generatingIterative": "⏳ Génération pour Semaine {{week}} ({{day}}) - {{age}} (Mode Iteratif Local)...",
+        "generating": "⏳ Génération pour Semaine {{week}} ({{theme}}) - {{age}}...",
+        "success": "✨ Génération terminée avec succès !",
+        "error": "❌ Erreur: {{error}}",
+        "selectRequired": "Veuillez sélectionner au moins une semaine, une tranche d'âge et le jour.",
+        "errorGeneric": "Une erreur est survenue pendant la génération."
+      },
       "theme": "Thème Hebdomadaire",
       "title": "Générateur d'Histoires IA",
       "weekNumber": "Numéro de Semaine"
@@ -385,14 +403,67 @@
     "languageChanged": "Langue modifiée avec succès.",
     "languageDescription": "Choisir la langue de l'application.",
     "languageNote": "Les changements prendront effet immédiatement.",
-    "network": "Réseau",
     "reset": "Réinitialiser",
     "resetError": "Erreur lors de la réinitialisation des paramètres.",
     "resetSettings": "Réinitialiser les paramètres",
     "resetWarning": "Êtes-vous sûr de vouloir réinitialiser tous les paramètres ? Cette action est irréversible.",
     "selectLanguage": "Sélectionner une langue",
     "settingsReset": "Paramètres réinitialisés par défaut.",
-    "title": "Paramètres"
+    "title": "Paramètres",
+    "networkTitle": "Réseau et Système",
+    "network": {
+      "tabs": {
+        "debug": "Logs Système",
+        "access": "Accès HTTP",
+        "ai": "IA & Prompts",
+        "config": "Configuration"
+      },
+      "actions": {
+        "refresh": "Rafraîchir"
+      },
+      "debug": {
+        "title": "Logs Développeur (SQL, Interactions, Erreurs)",
+        "table": {
+          "time": "Heure",
+          "category": "Catégorie",
+          "message": "Message",
+          "data": "Données"
+        }
+      },
+      "access": {
+        "selectFile": "Fichier de log",
+        "table": {
+          "method": "Méthode",
+          "path": "Chemin",
+          "status": "Statut",
+          "time": "Durée"
+        },
+        "noEntries": "Aucune entrée trouvée."
+      },
+      "ai": {
+        "selectFile": "Fichier de log IA",
+        "table": {
+          "time": "Heure",
+          "provider": "Moteur",
+          "type": "Type",
+          "details": "Détails",
+          "duration": "Durée"
+        },
+        "details": {
+          "input": "Entrée (Prompt)",
+          "output": "Sortie (Réponse)",
+          "error": "Erreur"
+        },
+        "noEntries": "Aucun log IA trouvé."
+      },
+      "config": {
+        "sql": "Log des requêtes SQL",
+        "access": "Log des accès HTTP",
+        "readonly": "Ces paramètres sont définis au niveau serveur et sont en lecture seule pour le moment."
+      }
+    },
+    "cleanupSuccess": "Nettoyage terminé : {{count}} fichiers supprimés ({{size}} Mo récupérés).",
+    "cleanupError": "Erreur lors du nettoyage des images."
   },
   "stories": {
     "allAges": "Tous les âges",
@@ -403,6 +474,7 @@
     "allWeeks": "Toutes les semaines",
     "create": "Créer une histoire",
     "empty": "Aucune histoire disponible. Créez-en une maintenant !",
+    "noMoreStories": "Plus d'histoires à charger.",
     "noResults": "Aucun résultat",
     "noStoriesMatchSearch": "Aucune histoire ne correspond à votre terme de recherche.",
     "searchPlaceholder": "Rechercher une histoire...",
@@ -467,7 +539,14 @@
     "weekNumber": "Semaine {{number}}",
     "weekNumberPlaceholder": "Saisir le numéro de semaine",
     "week": "Semaine",
-    "weeklyTheme": "Thème de la semaine"
+    "weeklyTheme": "Thème de la semaine",
+    "source": {
+      "title": "Source",
+      "manual": "Manuel",
+      "gemini": "Gemini (Cloud)",
+      "ollama": "Ollama (Local)",
+      "editedByHuman": "(modifiée)"
+    }
   },
   "success": {
     "title": "Succès",
@@ -475,6 +554,25 @@
     "delete": "Histoire supprimée avec succès",
     "restore": "Version restaurée avec succès",
     "update": "Histoire mise à jour avec succès"
+  },
+  "filters": {
+    "title": "Filtres",
+    "reset": "Réinitialiser",
+    "allThemes": "Tous les thèmes",
+    "allSeries": "Toutes les séries",
+    "allAges": "Tous les âges",
+    "allWeeks": "Toutes les semaines",
+    "allDays": "Tous les jours",
+    "hasImage": "Avec image",
+    "hasAudio": "Avec audio",
+    "onlyImages": "Images uniquement",
+    "onlyAudio": "Audio uniquement",
+    "source": "Source",
+    "allSources": "Toutes les sources",
+    "status": "Statut",
+    "allStatus": "Tous les statuts",
+    "original": "Non modifiée",
+    "edited": "Texte retouché"
   },
   "themes": {
     "addNewTheme": "Ajouter un nouveau thème",
@@ -547,7 +645,10 @@
     "search": "Rechercher",
     "searchThemes": "Rechercher des thèmes...",
     "selectAgeGroup": "Sélectionner un groupe d'âges",
-    "selectWeek": "Sélectionner une semaine `[",
+    "selectWeek": "Sélectionner une semaine",
+    "sortBy": "Trier par",
+    "sortByName": "Nom (A-Z)",
+    "sortByCount": "Nombre d'histoires",
     "sort": "Trier",
     "space": "Espace",
     "success": {
@@ -567,9 +668,20 @@
       "descriptionTooLong": "Description trop longue",
       "nameRequired": "Le nom est requis",
       "nameTooLong": "Nom trop long"
-    }
+    },
+    "sortAZ": "A-Z",
+    "sortZA": "Z-A",
+    "sortAsc": "- +",
+    "sortDesc": "+ -"
+  },
+  "errors": {
+    "addThemeFailed": "Échec de l'ajout du thème",
+    "editThemeFailed": "Échec de la modification du thème",
+    "removeThemeFailed": "Échec de la suppression du thème",
+    "themeInUse": "Ce thème est utilisé par des histoires"
   },
   "timeline": {
+    "thisStory": "cette histoire",
     "allAges": "Tous les âges",
     "allWeeks": "Toutes les semaines",
     "exploreStories": "Explorez les histoires dans une vue chronologique",
@@ -578,6 +690,7 @@
     "manageWeeklyThemes": "Histoires chronologiques",
     "selectAgeGroup": "Sélectionner une tranche d'âge",
     "selectWeek": "Sélectionner un numéro de semaine",
+    "noMoreStories": "Plus d'histoires à charger.",
     "weekNumber": "Semaine {{number}}"
   },
   "version": {

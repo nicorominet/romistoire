@@ -163,6 +163,61 @@ export async function initializeDatabase() {
       `);
       console.log('Migration: series_id column added.');
     }
+
+
+    try {
+      const [seriesColumns] = await pool.query('SHOW COLUMNS FROM story_series LIKE "parent_series_id"');
+      if (seriesColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE story_series
+          ADD COLUMN parent_series_id VARCHAR(36) NULL,
+          ADD CONSTRAINT fk_series_parent
+          FOREIGN KEY (parent_series_id) REFERENCES story_series(id) ON DELETE SET NULL
+        `);
+        console.log('Migration: parent_series_id column added to story_series.');
+      }
+
+      const [seriesLocaleColumns] = await pool.query('SHOW COLUMNS FROM story_series LIKE "locale"');
+      if (seriesLocaleColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE story_series
+          ADD COLUMN locale VARCHAR(5) NULL DEFAULT 'fr',
+          ADD INDEX idx_series_locale (locale)
+        `);
+        console.log('Migration: locale column added to story_series.');
+      }
+
+      const [storySourceColumns] = await pool.query('SHOW COLUMNS FROM stories LIKE "source"');
+      if (storySourceColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE stories
+          ADD COLUMN source ENUM('manual', 'gemini', 'ollama') DEFAULT 'manual' AFTER locale
+        `);
+        console.log('Migration: source column added to stories.');
+      }
+
+      const [storyEditedColumns] = await pool.query('SHOW COLUMNS FROM stories LIKE "is_manually_edited"');
+      if (storyEditedColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE stories
+          ADD COLUMN is_manually_edited BOOLEAN DEFAULT FALSE AFTER source
+        `);
+        console.log('Migration: is_manually_edited column added to stories.');
+      }
+
+      const [versionEditedColumns] = await pool.query('SHOW COLUMNS FROM story_versions LIKE "is_manually_edited"');
+      if (versionEditedColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE story_versions
+          ADD COLUMN is_manually_edited BOOLEAN DEFAULT FALSE AFTER version
+        `);
+        console.log('Migration: is_manually_edited column added to story_versions.');
+      }
+    } catch (migError) {
+       console.error("Migration Failed:", migError);
+       fs.writeFileSync(path.join(__dirname, '../../migration_debug.log'), `Migration Error: ${migError.message}\n${migError.stack}`);
+    }
+
   } catch (error) {
     console.error('Database initialization error:', error);
     throw new Error('Failed to initialize database');

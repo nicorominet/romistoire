@@ -34,6 +34,8 @@ export interface Story {
   modified_at: string;
   version: number;
   locale: string;
+  source: 'manual' | 'gemini' | 'ollama';
+  is_manually_edited: boolean;
   audio_path?: string;
   illustrations: Illustration[];
 }
@@ -75,7 +77,7 @@ export interface StoryVersion {
 export interface PaginationParams {
   page: number;
   limit: number;
-  locale: string;
+  locale?: string;
   theme_id?: string;
   age_group?: string;
   week_number?: number;
@@ -90,6 +92,8 @@ export interface PaginationParams {
   ageGroup?: string; // Align with findAll 'ageGroup'
   weekNumber?: string; // Align with findAll 'weekNumber'
   dayOfWeek?: string; // Align with findAll 'dayOfWeek'
+  source?: string;
+  editStatus?: string;
 }
 
 /**

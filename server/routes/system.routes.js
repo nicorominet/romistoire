@@ -64,6 +64,18 @@ router.get('/logs', systemController.getLogs);
 router.get('/logs/:filename', systemController.getLogDetails);
 
 /**
+ * GET /api/system/config/logs
+ * Get current log configuration.
+ */
+router.get('/config/logs', systemController.getLogConfig);
+
+/**
+ * PUT /api/system/config/logs
+ * Update log configuration.
+ */
+router.put('/config/logs', systemController.updateLogConfig);
+
+/**
  * GET /api/system/images/:yearMonth/:filename
  * Serve a specific image file (proxy/helper).
  * @param {string} req.params.yearMonth - Year/Month folder.

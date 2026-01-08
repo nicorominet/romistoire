@@ -87,30 +87,35 @@ export const getLogDetails = async (req, res) => {
     }
 };
 
+export const getLogConfig = async (req, res) => {
+    try {
+        const config = systemService.getLogConfig();
+        res.json(config);
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
+export const updateLogConfig = async (req, res) => {
+    try {
+        const config = systemService.updateLogConfig(req.body);
+        res.json(config);
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 export const serveImage = async (req, res) => {
   try {
     const { yearMonth, filename } = req.params;
-    // Security check
-    const safeYearMonth = yearMonth.replace(/[^0-9-]/g, '');
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-    
-    const imagePath = path.join(ENV_CONFIG.UPLOADS_DIR, safeYearMonth, safeFilename);
-    
-    if (!fs.existsSync(imagePath)) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
-    
-    const ext = path.extname(imagePath).toLowerCase();
-    const mimeType = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif'
-    }[ext] || 'application/octet-stream';
+    const { filePath, mimeType } = systemService.serveImage(yearMonth, filename);
     
     res.setHeader('Content-Type', mimeType);
-    fs.createReadStream(imagePath).pipe(res);
+    fs.createReadStream(filePath).pipe(res);
   } catch (error) {
+    if (error.message === 'Image not found') {
+        return res.status(404).json({ error: 'Image not found' });
+    }
     res.status(500).json({ error: 'Failed to serve image' });
   }
 };

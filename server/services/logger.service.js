@@ -39,23 +39,42 @@ class LoggerService {
   }
 
   /**
+   * Log AI interaction.
+   * @param {string} provider - 'Gemini' or 'Ollama'.
+   * @param {string} type - 'Story' or 'Audio'.
+   * @param {Object} input - input prompt/params.
+   * @param {Object} output - output text/audio metadata.
+   * @param {Object} meta - Additional metadata (duration, model, etc).
+   */
+  ai(provider, type, input, output, meta = {}) {
+    const message = `AI Interaction: ${provider} [${type}]`;
+    const fullMeta = { ...meta, provider, type, input, output };
+    
+    // Console log for immediate feedback (brief)
+    console.log(`[AI] ${provider} ${type} - ${meta.duration}ms`);
+
+    this._writeToFile('AI', message, fullMeta, 'ai');
+  }
+
+  /**
    * Writes log entry to file.
    * @private
    * @param {string} level - Log level.
    * @param {string} message - Log message.
    * @param {Object} meta - Additional metadata.
+   * @param {string} [logType='access'] - Type of log file prefix (access or ai).
    */
-  _writeToFile(level, message, meta = {}) {
+  _writeToFile(level, message, meta = {}, logType = 'access') {
     try {
       const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const logFile = path.join(this.logsDir, `access-${dateStr}.log`); // Keeping same filename format as requestLogger
+      const logFile = path.join(this.logsDir, `${logType}-${dateStr}.log`); 
       
       const logEntry = {
         timestamp: new Date().toISOString(),
         level,
         message,
         meta,
-        type: 'app'
+        type: logType
       };
 
       const logLine = JSON.stringify(logEntry) + '\n';
@@ -75,7 +94,7 @@ class LoggerService {
    */
   info(message, meta = {}) {
     console.log(this._formatMessage(this.levels.INFO, message, meta));
-    this._writeToFile(this.levels.INFO, message, meta);
+    this._writeToFile(this.levels.INFO, message, meta, 'access');
   }
 
   /**
@@ -85,7 +104,7 @@ class LoggerService {
    */
   warn(message, meta = {}) {
     console.warn(this._formatMessage(this.levels.WARN, message, meta));
-    this._writeToFile(this.levels.WARN, message, meta);
+    this._writeToFile(this.levels.WARN, message, meta, 'access');
   }
 
   /**
@@ -102,7 +121,7 @@ class LoggerService {
       meta.stack = error.stack;
     }
     console.error(errorMessage);
-    this._writeToFile(this.levels.ERROR, message, meta);
+    this._writeToFile(this.levels.ERROR, message, meta, 'access');
   }
 
   /**

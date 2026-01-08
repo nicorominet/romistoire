@@ -58,7 +58,7 @@ const StoriesListGrid = ({
               ))}
               <div ref={observerRef} className="h-10 flex justify-center items-center">
                  {loading && <Spinner />}
-                 {!loading && !hasMore && <p className="text-gray-500 text-sm">No more stories to load.</p>}
+                 {!loading && !hasMore && <p className="text-gray-500 text-sm">{t('stories.noMoreStories')}</p>}
               </div>
             </>
         );

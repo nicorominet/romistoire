@@ -26,39 +26,51 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSystemMutations } from "@/hooks/useSystem";
 import { systemApi } from "@/api/system.api"; 
+import { downloadBlob, generateDateFilename } from "@/utils/fileUtils";
+import { STORAGE_KEYS } from "@/constants";
+import { CleanupResponse, ExportType, ImportMode } from "@/types/system.types";
 
+/**
+ * DataSettings Component
+ * 
+ * Manages data import/export, cleanup, and factory reset operations.
+ * Uses system mutations for API interactions and provides safe confirmations for destructive actions.
+ */
 export const DataSettings = () => {
     const { t } = i18n;
-    // We can use local loading state or mutation state
+    
+    // Mutations for data operations
     const { importData, resetData, cleanupImages } = useSystemMutations();
-    const [importMode, setImportMode] = useState<'skip' | 'overwrite'>('skip');
-    const [isExporting, setIsExporting] = useState(false); // Manual loading state for export since it's not a mutation hook call
+    
+    // Local state
+    const [importMode, setImportMode] = useState<ImportMode>('skip');
+    const [isExporting, setIsExporting] = useState(false); 
 
+    // Composite loading state
     const isLoading = importData.isPending || resetData.isPending || cleanupImages.isPending || isExporting;
 
-    const handleExportData = async (type: 'json' | 'zip') => {
+    /**
+     * Handles data export (JSON or ZIP).
+     * Downloads the file directly using browser blob handling.
+     * 
+     * @param {ExportType} type - 'json' to export data only, 'zip' for full backup with images.
+     */
+    const handleExportData = async (type: ExportType) => {
         setIsExporting(true);
         try {
-            // using api directly for blob download logic simplicity inside component?
-            // systemApi.exportData() returns blob data (Axios Response or data depending on interceptor?)
-            // My interceptor returns response.data. If responseType is blob, response.data IS the blob.
-            
             const action = type === 'zip' ? systemApi.exportFull : systemApi.exportData;
-            const blob = await action() as unknown as Blob; // API client returns 'any', cast to Blob
+            
+            // Fetch blob from API
+            const response = await action();
+            // Client already returns unwrapped data (the blob)
+            const blob = response as unknown as Blob; 
 
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
+            // Generate filename and trigger download
+            const extension = type === 'zip' ? 'zip' : 'json';
+            const prefix = type === 'zip' ? 'romihistoire-full-export' : 'romihistoire-data-export';
+            const filename = generateDateFilename(prefix, extension);
 
-            // Filename
-            const dateStr = new Date().toISOString().slice(0, 10);
-            const name = type === 'zip' ? `romihistoire-full-export-${dateStr}.zip` : `romihistoire-data-export-${dateStr}.json`;
-
-            a.download = name;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            a.remove();
+            downloadBlob(blob, filename);
 
             toast.success(t("settings.dataExported"));
         } catch (error) {
@@ -69,6 +81,11 @@ export const DataSettings = () => {
         }
     };
 
+    /**
+     * Handles data import from a file.
+     * 
+     * @param {React.ChangeEvent<HTMLInputElement>} event - File input change event.
+     */
     const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
@@ -83,41 +100,54 @@ export const DataSettings = () => {
         try {
             await importData.mutateAsync(formData);
             toast.success(t("settings.dataImported"));
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
+            // UI update handled by React Query invalidation in hook
         } catch (error: any) {
+             console.error("Import failed:", error);
              toast.error(error.message || t("settings.importError"));
         }
     };
 
+    /**
+     * Handles factory reset.
+     * Clears local storage and invokes backend reset.
+     */
     const handleClearData = async () => {
         try {
-            // Clear LocalStorage
-            localStorage.removeItem("imagitales-stories");
-            localStorage.removeItem("imagitales-versions");
-            localStorage.removeItem("imagitales-illustrations");
+            // Clear Client-side Storage using Constants
+            localStorage.removeItem(STORAGE_KEYS.STORIES);
+            localStorage.removeItem(STORAGE_KEYS.VERSIONS);
+            localStorage.removeItem(STORAGE_KEYS.ILLUSTRATIONS);
             
+            // Clear Server-side Data
             await resetData.mutateAsync();
 
             toast.success(t("settings.dataCleared"));
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // UI update handled by React Query invalidation in hook
         } catch (error) {
+            console.error("Clear data failed:", error);
             toast.error(t("settings.clearError"));
         }
     };
 
+    /**
+     * Handles cleanup of unused images.
+     */
     const handleCleanupImages = async () => {
         try {
-            const result: any = await cleanupImages.mutateAsync();
-            if (result.success) {
-                toast.success(`Cleanup complete: ${result.deletedCount} files deleted (${(result.reclaimedSpace / 1024 / 1024).toFixed(2)} MB reclaimed).`);
+            const response = await cleanupImages.mutateAsync();
+             // Client already returns response.data
+            const result  = response as unknown as CleanupResponse;
+
+            if (result && result.success) {
+                toast.success(t("settings.cleanupSuccess", { 
+                    count: result.deletedCount, 
+                    size: (result.reclaimedSpace / 1024 / 1024).toFixed(2) 
+                }));
             } else {
-                toast.error(result.message || 'Cleanup failed');
+                toast.error(result?.message || t("settings.cleanupError"));
             }
         } catch (error) {
+            console.error("Cleanup failed:", error);
             toast.error(t("settings.cleanupError"));
         }
     };

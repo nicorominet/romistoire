@@ -18,7 +18,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 - **🎨 AI Illustration Prompts**: Generate detailed prompts for illustrations to guide your creative process.
 - **📂 Theme Management**: Organize stories into customizable weekly themes.
 - **🖨️ PDF Export**: Export single stories or entire collections (Theme Books) to PDF with cover pages and table of contents.
-- **⚙️ Advanced Settings**: Manage data, logs (System & Network), and developer modes.
+- **⚙️ Advanced Settings**: Manage data, logs (System & Network), and developer modes with dynamic logging configuration.
 - **🌍 Bilingual**: Fully localized in English and French.
 
 ### 🇫🇷 Français
@@ -27,7 +27,7 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 - **🎨 Prompts d'Illustration par IA** : Générez des descriptions détaillées pour guider la création de vos illustrations.
 - **📂 Gestion des Thèmes** : Organisez les histoires dans des thèmes hebdomadaires personnalisables.
 - **🖨️ Export PDF** : Exportez des histoires individuelles ou des collections entières (Livres Thématiques) en PDF avec couvertures et table des matières.
-- **⚙️ Paramètres Avancés** : Gérez les données, les journaux (Système & Réseau) et le mode développeur.
+- **⚙️ Paramètres Avancés** : Gérez les données, les journaux (Système & Réseau) et configurez les logs dynamiquement sans redémarrage.
 - **🌍 Bilingue** : Entièrement traduit en Anglais et Français.
 
 ## 📸 Screenshots / Captures d'écran
@@ -47,11 +47,11 @@ Romistoire est une plateforme éducative interactive conçue pour aider les enfa
 
 ## 🛠️ Tech Stack / Stack Technique
 
-- **Frontend**: React 18, Vite, TypeScript
-- **UI Architecture**: TailwindCSS, Radix UI, Lucide React
+- **Frontend**: React 18, Vite, TypeScript, React Query
+- **UI Architecture**: TailwindCSS, Radix UI, Lucide React, Shadcn/ui
 - **Backend**: Node.js, Express
 - **Database**: MySQL (via `mysql2`)
-- **AI Integration**: Google Gemini API
+- **AI Integration**: Google Gemini API, Ollama (Local)
 - **Utilities**: `jspdf` (PDF), `winston` (Logging), `i18next` (Internationalization)
 
 ---

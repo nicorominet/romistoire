@@ -9,6 +9,31 @@ const __dirname = path.dirname(__filename);
 const LOG_DIR = path.join(__dirname, '../debug');
 const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
 
+// Default Configuration
+let config = {
+    enableSqlLogging: true,
+    enableAccessLogging: true,
+    minLevel: 'INFO'
+};
+
+/**
+ * Updates the logger configuration.
+ * @param {Object} newConfig - New configuration values.
+ * @returns {Object} Current configuration.
+ */
+export function updateLoggerConfig(newConfig) {
+    config = { ...config, ...newConfig };
+    return config;
+}
+
+/**
+ * Gets the current logger configuration.
+ * @returns {Object} Current configuration.
+ */
+export function getLoggerConfig() {
+    return config;
+}
+
 /**
  * Appends a log entry to the JSONL file.
  * @param {string} category - Category of log (DB, API, SYSTEM, etc.)
@@ -17,6 +42,10 @@ const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
  * @param {string} level - Log level (INFO, WARN, ERROR)
  */
 export function log(category, message, data = {}, level = 'INFO') {
+    // Filter based on configuration
+    if (category === 'DB' && !config.enableSqlLogging) return;
+    if ((category === 'API' || category === 'ACCESS') && !config.enableAccessLogging) return;
+
     const timestamp = new Date().toISOString();
     const entry = {
         timestamp,
@@ -48,4 +77,6 @@ export const logger = {
     info: (cat, msg, data) => log(cat, msg, data, 'INFO'),
     warn: (cat, msg, data) => log(cat, msg, data, 'WARN'),
     error: (cat, msg, data) => log(cat, msg, data, 'ERROR'),
+    updateConfig: updateLoggerConfig,
+    getConfig: getLoggerConfig
 };

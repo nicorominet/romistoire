@@ -29,6 +29,20 @@ Thank you for your interest in contributing to Romistoire! Here is how you can h
    ```
 6. Open a **Pull Request** (PR) on the main repository comparing your branch.
 
+## 📐 Coding Standards
+
+### TypeScript
+- We enforce **strict typing**. Avoid using `any` unless absolutely necessary.
+- Define interfaces for all data structures (API responses, Props) in `src/types`.
+
+### React & State Management
+- Use **React Query** for data fetching and caching. Avoid `useEffect` for data loading where possible.
+- **Do not use `window.location.reload()`**. Use `queryClient.invalidateQueries()` to refresh data.
+
+### Architecture
+- **Constants**: Store all magic strings, storage keys, and API endpoints in `src/constants.ts`.
+- **Services**: Business logic should reside in `server/services`, not in controllers.
+
 ---
 
 # Contribuer à Romistoire
@@ -61,3 +75,17 @@ Merci de votre intérêt pour Romistoire ! Voici comment vous pouvez aider.
    git push origin feature/ma-super-fonctionnalite
    ```
 6. Ouvrez une **Pull Request** (PR) sur le dépôt principal en comparant votre branche.
+
+## 📐 Standards de Code
+
+### TypeScript
+- Nous appliquons un **typage strict**. Évitez `any` sauf absolue nécessité.
+- Définissez des interfaces pour toutes les structures de données dans `src/types`.
+
+### React & Gestion d'État
+- Utilisez **React Query** pour la récupération de données. Évitez `useEffect` pour le chargement de données simple.
+- **Ne jamais utiliser `window.location.reload()`**. Utilisez `queryClient.invalidateQueries()` pour rafraîchir.
+
+### Architecture
+- **Constantes** : Stockez toutes les chaînes magiques, clés de stockage et endpoints API dans `src/constants.ts`.
+- **Services** : La logique métier doit résider dans `server/services`, et non dans les contrôleurs.

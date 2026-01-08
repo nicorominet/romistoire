@@ -3,6 +3,7 @@ import { themeApi } from '@/api/themes.api';
 import { Theme } from '@/types/Theme';
 import { Story } from '@/types/Story';
 import { useThemes, useThemeMutations } from '@/hooks/useThemes';
+import { i18n } from '@/lib/i18n';
 
 export interface ThemeContextType {
   // State
@@ -17,6 +18,7 @@ export interface ThemeContextType {
   filterAge: string;
   filterSeries: string;
   sortOrder: 'asc' | 'desc';
+  sortBy: 'name' | 'count';
   newTheme: Theme;
 
   // Actions
@@ -31,6 +33,7 @@ export interface ThemeContextType {
   setFilterAge: (age: string) => void;
   setFilterSeries: (seriesId: string) => void;
   setSortOrder: (order: 'asc' | 'desc') => void;
+  setSortBy: (by: 'name' | 'count') => void;
   setNewTheme: (theme: Theme) => void;
 
   // Complex actions
@@ -51,6 +54,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [filterAge, setFilterAge] = useState<string>('all');
   const [filterSeries, setFilterSeries] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'count'>('name');
   
   // UI States
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
@@ -109,7 +113,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       resetNewTheme();
       setManualError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add theme';
+      const errorMessage = err instanceof Error ? err.message : i18n.t('errors.addThemeFailed');
       setManualError(errorMessage);
       throw err;
     }
@@ -122,7 +126,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setSelectedThemeId(null);
       setManualError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to edit theme';
+      const errorMessage = err instanceof Error ? err.message : i18n.t('errors.editThemeFailed');
       setManualError(errorMessage);
       throw err;
     }
@@ -134,13 +138,13 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Check for usage
       const stories = (await themeApi.getStories(id)) as any;
       if (stories.length > 0) {
-           throw new Error('Theme has stories using it');
+            throw new Error(i18n.t('errors.themeInUse'));
       }
 
       await deleteTheme.mutateAsync(id);
       setManualError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove theme';
+      const errorMessage = err instanceof Error ? err.message : i18n.t('errors.removeThemeFailed');
       setManualError(errorMessage);
       throw err;
     } finally {
@@ -177,6 +181,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     filterAge,
     filterSeries,
     sortOrder,
+    sortBy,
     newTheme,
     setThemes: () => {}, // No-op, managed by Query
     setLoading: () => {}, // No-op
@@ -189,6 +194,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setFilterAge,
     setFilterSeries,
     setSortOrder,
+    setSortBy,
     setNewTheme,
     fetchThemes,
     fetchStoriesUsingTheme,

@@ -18,11 +18,22 @@ import {
 } from "@/components/ui/select";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
+import { STORAGE_KEYS } from "@/constants";
 
+/**
+ * LanguageSettings Component
+ * 
+ * Allows users to switch the application language.
+ * Changes are applied immediately using the i18n helper.
+ */
 export const LanguageSettings = () => {
   const { t, getCurrentLocale, changeLocale } = i18n;
-  const [language, setLanguage] = React.useState<string>(getCurrentLocale() || "fr");
+  const [language, setLanguage] = React.useState<string>(getCurrentLocale() || STORAGE_KEYS.LANGUAGES.FR);
 
+  /**
+   * Handles language change events.
+   * Updates state, applies locale change, and notifies the user.
+   */
   const handleLanguageChange = (value: string) => {
     setLanguage(value);
     changeLocale(value);
@@ -43,8 +54,9 @@ export const LanguageSettings = () => {
               <SelectValue placeholder={t("settings.selectLanguage")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">{t("languages.en")}</SelectItem>
-              <SelectItem value="fr">{t("languages.fr")}</SelectItem>
+              <SelectItem value={STORAGE_KEYS.LANGUAGES.EN}>{t("languages.en")}</SelectItem>
+              <SelectItem value={STORAGE_KEYS.LANGUAGES.FR}>{t("languages.fr")}</SelectItem>
+              <SelectItem value={STORAGE_KEYS.LANGUAGES.OBF}>Obfuscated (Debug)</SelectItem>
             </SelectContent>
           </Select>
         </div>

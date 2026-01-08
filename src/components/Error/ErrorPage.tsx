@@ -20,10 +20,8 @@ const ErrorPage = ({ error, resetErrorBoundary }: ErrorPageProps) => {
         </div>
       )}
       <div className="flex gap-4">
-        {resetErrorBoundary ? (
+        {resetErrorBoundary && (
              <Button onClick={resetErrorBoundary}>Try Again</Button>
-        ) : (
-             <Button onClick={() => window.location.reload()}>Reload Page</Button>
         )}
         <Button variant="outline" onClick={() => window.location.href = '/'}>
           Go Home

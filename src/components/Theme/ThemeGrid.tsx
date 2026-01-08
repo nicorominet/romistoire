@@ -9,14 +9,15 @@ interface ThemeGridProps {
   themes: Theme[];
   filterName: string;
   sortOrder: 'asc' | 'desc';
+  sortBy: 'name' | 'count';
   onEditTheme: (theme: Theme) => void;
-  onDeleteTheme: (id: string) => void;
+  onDeleteTheme: (theme: Theme) => void;
   onNavigateToStory: (id: string) => void;
   isLoading?: boolean;
 }
 
 const ThemeGrid: React.FC<ThemeGridProps> = React.memo(
-  ({ themes, filterName, sortOrder, onEditTheme, onDeleteTheme, onNavigateToStory, isLoading }) => {
+  ({ themes, filterName, sortOrder, sortBy, onEditTheme, onDeleteTheme, onNavigateToStory, isLoading }) => {
     const { t } = i18n;
     const { expandedThemeId, setExpandedThemeId, storiesUsingTheme, fetchStoriesUsingTheme } =
       useThemeContext();
@@ -79,6 +80,14 @@ const ThemeGrid: React.FC<ThemeGridProps> = React.memo(
       // Apply sort
       try {
         result.sort((a, b) => {
+          if (sortBy === 'count') {
+             const countA = a.storyCount || 0;
+             const countB = b.storyCount || 0;
+             if (countA !== countB) {
+                 return sortOrder === 'asc' ? countA - countB : countB - countA;
+             }
+             // Fallback to name if counts are equal
+          }
           const nameA = (a.name || '').toLowerCase();
           const nameB = (b.name || '').toLowerCase();
           const comparison = nameA.localeCompare(nameB);
@@ -89,7 +98,7 @@ const ThemeGrid: React.FC<ThemeGridProps> = React.memo(
       }
 
       return result;
-    }, [themes, filterName, sortOrder, normalizeString]);
+    }, [themes, filterName, sortOrder, sortBy, normalizeString]);
 
     const handleToggleExpand = useCallback(
       async (themeId: string) => {

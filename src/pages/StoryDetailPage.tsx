@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader'; 
 import StoryNavigation from '@/components/Story/StoryDetail/StoryNavigation';
 import StoryContent from '@/components/Story/StoryDetail/StoryContent';
+import { APP_ROUTES } from '@/constants';
+import { WeeklyTheme } from '@/types/Theme';
 import StoryMeta from '@/components/Story/StoryDetail/StoryMeta';
 import { StoryDetailSkeleton } from '@/components/Story/StorySkeleton';
 import {
@@ -43,7 +45,7 @@ const StoryDetailPage = (): JSX.Element => {
   // Determine weekly theme name
   const weeklyThemeName = useMemo(() => {
      if (!story || !weeklyThemes) return '';
-     const theme = weeklyThemes.find((wt: any) => wt.week_number === story.week_number);
+     const theme = (weeklyThemes as WeeklyTheme[]).find((wt) => wt.week_number === story.week_number);
      return theme ? theme.theme_name : '';
   }, [story, weeklyThemes]);
 
@@ -55,7 +57,7 @@ const StoryDetailPage = (): JSX.Element => {
         title: t('common.success'),
         description: t('story.deleteSuccess'),
       });
-      navigate('/');
+      navigate(APP_ROUTES.HOME);
     } catch (error) {
       toast({
         title: t('common.error'),
@@ -87,7 +89,7 @@ const StoryDetailPage = (): JSX.Element => {
   };
 
   const handleEdit = () => {
-    navigate(`/edit/${id}`); 
+    navigate(APP_ROUTES.EDIT_STORY(id)); 
   };
 
   if (isLoading) {
@@ -103,7 +105,7 @@ const StoryDetailPage = (): JSX.Element => {
       <PageLayout>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-red-600 mb-4">{t('common.error')}</h2>
-          <Button onClick={() => navigate('/')} variant="outline">
+          <Button onClick={() => navigate(APP_ROUTES.HOME)} variant="outline">
             {t('common.back')}
           </Button>
         </div>
@@ -119,7 +121,7 @@ const StoryDetailPage = (): JSX.Element => {
           <Button 
             variant="ghost" 
             className="gap-2 hover:bg-white/50 dark:hover:bg-gray-800/50"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(APP_ROUTES.HOME)}
           >
             <ArrowLeft className="h-4 w-4" />
             {t('common.back')}
@@ -224,6 +226,8 @@ const StoryDetailPage = (): JSX.Element => {
                     dayOrder={story.day_order}
                     version={story.version}
                     locale={story.locale}
+                    source={story.source}
+                    is_manually_edited={story.is_manually_edited}
                 />
             </div>
         </div>

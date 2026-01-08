@@ -1,6 +1,4 @@
 import { storyService } from '../services/story.service.js';
-import { geminiService } from '../services/gemini.service.js';
-import { localLLMService } from '../services/local_llm.service.js';
 import { handleError } from '../middleware/error.middleware.js';
 
 export const getStories = async (req, res) => {
@@ -115,20 +113,7 @@ export const restoreStoryVersion = async (req, res) => {
 
 export const generateAIStory = async (req, res) => {
   try {
-    // Priority: Request Param > Env Var > Default 'gemini'
-    const requestedProvider = req.body.aiProvider;
-    const envProvider = process.env.AI_PROVIDER;
-    const aiProvider = requestedProvider || envProvider || 'gemini';
-    
-    console.log(`Generating story using provider: ${aiProvider} (Req: ${requestedProvider}, Env: ${envProvider})`);
-    
-    let result;
-    if (aiProvider === 'local') {
-        result = await localLLMService.generateStory(req.body);
-    } else {
-        result = await geminiService.generateStory(req.body);
-    }
-    
+    const result = await storyService.generateFromAI(req.body, req.body.aiProvider);
     res.json(result);
   } catch (error) {
     handleError(res, error);
@@ -138,69 +123,20 @@ export const generateAIStory = async (req, res) => {
 export const deleteIllustration = async (req, res) => {
     try {
         const { id, illustrationId } = req.params;
-        const imagePath = await storyService.deleteIllustration(id, illustrationId);
-        
-        if (imagePath) {
-             // Optional: delete file immediately
-        }
-        
+        await storyService.deleteIllustration(id, illustrationId);
         res.json({ success: true, message: 'Illustration deleted' });
     } catch (error) {
         handleError(res, error);
     }
 };
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export const generateAudio = async (req, res) => {
     try {
-        const { id } = req.params;
-        const story = await storyService.findById(id);
-        
-        if (!story) {
-            return res.status(404).json({ error: 'Story not found' });
-        }
-
-        if (!story.content) {
-             return res.status(400).json({ error: 'Story content is empty' });
-        }
-
-        // Remove illustration descriptions [Illustration: ...] to avoid reading them aloud
-        const contentToRead = story.content
-            .replace(/\[Illustration:.*?\]/gs, '') // Remove Illustration tags
-            .replace(/\*\*/g, '') // Remove bold markdown if any, creates cleaner reading flow
-            .replace(/\n\s*\n/g, '\n\n') // Fix spacing
-            .trim();
-
-        console.log(`Generating audio for story ${id}...`);
-        const { audioBuffer, mimeType } = await geminiService.generateAudio(contentToRead);
-        
-        // Save to public/audio
-        const audioDir = path.join(__dirname, '../../public/audio');
-        if (!fs.existsSync(audioDir)) {
-            fs.mkdirSync(audioDir, { recursive: true });
-        }
-
-        const extension = 'wav';
-        console.log(`Received audio, saving as .${extension}`);
-
-        const fileName = `${id}_v${story.version || 1}.${extension}`;
-        const filePath = path.join(audioDir, fileName);
-        
-        fs.writeFileSync(filePath, audioBuffer);
-        
-        const publicUrl = `/audio/${fileName}`;
-        
-        // Update story
-        await storyService.saveAudioPath(id, publicUrl);
-        
-        res.json({ success: true, audioPath: publicUrl });
+        const audioPath = await storyService.generateAudioForStory(req.params.id);
+        res.json({ success: true, audioPath });
     } catch (error) {
+        if (error.message === 'Story not found') return res.status(404).json({ error: error.message });
+        if (error.message === 'Story content is empty') return res.status(400).json({ error: error.message });
         handleError(res, error);
     }
 };

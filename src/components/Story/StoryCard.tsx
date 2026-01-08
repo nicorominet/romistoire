@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { i18n } from "@/lib/i18n";
 import { Story } from "@/types/Story";
-import { BookOpen, Clock, Calendar, ListOrdered, FileText } from "lucide-react";
+import { BookOpen, Clock, Calendar, ListOrdered, FileText, Sparkles, Cpu, User } from "lucide-react";
 import { getAgeGroupColor, formatDate, truncateText } from "@/lib/utils";
 import SafeImage from "@/components/ui/SafeImage";
 
@@ -144,6 +144,15 @@ const StoryCard = ({ story, themeColors = {} }: StoryCardProps) => {
             <div className="flex items-center">
               <ListOrdered className="h-3 w-3 mr-1" />
               {t("story.day")} {getDayOfWeek(story.day_order)}
+            </div>
+            <div className="flex items-center text-story-purple-600 dark:text-story-purple-400 font-medium">
+              {story.source === 'gemini' && <Sparkles className="h-3 w-3 mr-1" />}
+              {story.source === 'ollama' && <Cpu className="h-3 w-3 mr-1" />}
+              {story.source === 'manual' && <User className="h-3 w-3 mr-1" />}
+              <span className="capitalize">{t(`story.source.${story.source || 'manual'}`)}</span>
+              {!!story.is_manually_edited && story.source !== 'manual' && (
+                <span className="ml-1 text-[10px] opacity-70 italic">{t('story.source.editedByHuman')}</span>
+              )}
             </div>
           </div>
         </CardFooter>

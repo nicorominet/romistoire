@@ -66,9 +66,10 @@ const handleThemeChange = useCallback((week_number: number, field: 'theme_name' 
     try {
       await saveThemes(themes);
       toast({ title: t('success.title'), description: t('WeeklyThemesPage.allThemesSaved') });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(err);
-      toast({ title: t('common.error'), description: t('WeeklyThemesPage.failedToSaveAllThemes', { message: err?.message || err }), variant: 'destructive' });
+      toast({ title: t('common.error'), description: t('WeeklyThemesPage.failedToSaveAllThemes', { message }), variant: 'destructive' });
     } finally { setIsSavingAll(false); }
   }, [themes, t, toast, saveThemes]);
 

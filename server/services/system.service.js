@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip';
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ENV_CONFIG } from '../config/env.config.js';
+import { logger } from '../config/logger.js';
 
 /**
  * Service for system-level operations like data import/export, file management, and logs.
@@ -274,18 +275,33 @@ class SystemService {
    * List available log files.
    * @returns {Promise<Array<{filename: string, date: string, size: number}>>} List of logs.
    */
-  async getLogsList() {
+  async getLogsList(type = 'all') {
       const logsDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
       if (!fs.existsSync(logsDir)) return [];
       
       const files = await fs.promises.readdir(logsDir);
       return files
-          .filter(f => f.startsWith('access-') && f.endsWith('.log'))
-          .map(f => ({
-              filename: f,
-              date: f.replace('access-', '').replace('.log', ''),
-              size: fs.statSync(path.join(logsDir, f)).size
-          }))
+          .filter(f => f.endsWith('.log'))
+          .map(f => {
+              let logType = 'unknown';
+              let date = '';
+              
+              if (f.startsWith('access-')) {
+                  logType = 'access';
+                  date = f.replace('access-', '').replace('.log', '');
+              } else if (f.startsWith('ai-')) {
+                  logType = 'ai';
+                  date = f.replace('ai-', '').replace('.log', '');
+              }
+              
+              return {
+                  filename: f,
+                  date: date,
+                  type: logType,
+                  size: fs.statSync(path.join(logsDir, f)).size
+              };
+          })
+          .filter(f => (type === 'all' || f.type === type) && f.type !== 'unknown')
           .sort((a, b) => b.date.localeCompare(a.date));
   }
 
@@ -306,11 +322,56 @@ class SystemService {
       }
 
       const content = await fs.promises.readFile(filePath, 'utf-8');
+      const lines = content.split('\n');
       // Parse NDJSON (Newlines Delimited JSON)
-      const lines = content.trim().split('\n');
       return lines.map(line => {
           try { return JSON.parse(line); } catch (e) { return null; }
       }).filter(Boolean).reverse(); // Newest first
+  }
+
+  /**
+   * Get current log configuration.
+   * @returns {Object} Config object.
+   */
+  getLogConfig() {
+      return logger.getConfig();
+  }
+
+  /**
+   * Update log configuration.
+   * @param {Object} config - New config values.
+   * @returns {Object} Updated config.
+   */
+  updateLogConfig(config) {
+      return logger.updateConfig(config);
+  }
+
+  /**
+   * Serve an uploaded image securely.
+   * @param {string} yearMonth - Year-month folder name.
+   * @param {string} filename - Filename.
+   * @returns {Object} { filePath: string, mimeType: string }
+   */
+  serveImage(yearMonth, filename) {
+      // Security check
+      const safeYearMonth = yearMonth.replace(/[^0-9-]/g, '');
+      const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+      
+      const imagePath = path.join(ENV_CONFIG.UPLOADS_DIR, safeYearMonth, safeFilename);
+      
+      if (!fs.existsSync(imagePath)) {
+          throw new Error('Image not found');
+      }
+      
+      const ext = path.extname(imagePath).toLowerCase();
+      const mimeType = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif'
+      }[ext] || 'application/octet-stream';
+
+      return { filePath: imagePath, mimeType };
   }
 }
 

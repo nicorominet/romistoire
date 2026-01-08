@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { themeApi, weeklyThemeApi } from '../api/themes.api';
 import { Theme } from '@/types/Theme';
 
-export const useThemes = (params?: any) => {
+export const useThemes = (params?: { locale?: string }) => {
   return useQuery({
     queryKey: ['themes', params],
     queryFn: async () => await themeApi.getAll(params),
@@ -33,7 +33,7 @@ export const useThemeMutations = () => {
     });
     
     const updateStoriesTheme = useMutation({
-        mutationFn: async ({ themeId, newThemeId }: { themeId: string, newThemeId: string }) => (await themeApi.updateStoriesTheme(themeId, newThemeId)) as any,
+        mutationFn: async ({ themeId, newThemeId }: { themeId: string, newThemeId: string }) => await themeApi.updateStoriesTheme(themeId, newThemeId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['themes'] });
             queryClient.invalidateQueries({ queryKey: ['stories'] });
@@ -46,7 +46,7 @@ export const useThemeMutations = () => {
 export const useWeeklyThemes = () => {
     return useQuery({
         queryKey: ['weeklyThemes'],
-        queryFn: async () => (await weeklyThemeApi.getAll()) as any,
+        queryFn: async () => await weeklyThemeApi.getAll(),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 };
@@ -54,7 +54,7 @@ export const useWeeklyThemes = () => {
 export const useWeeklyThemeMutation = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (themes: any[]) => (await weeklyThemeApi.update(themes)) as any,
+        mutationFn: async (themes: any[]) => await weeklyThemeApi.update(themes),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weeklyThemes'] })
     });
 };

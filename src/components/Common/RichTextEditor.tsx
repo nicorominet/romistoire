@@ -33,7 +33,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-lg dark:prose-invert m-5 focus:outline-none min-h-[300px] max-w-none',
+        class: 'prose prose-lg dark:prose-invert my-2 focus:outline-none min-h-[300px] max-w-none',
       },
     },
   });
@@ -51,10 +51,19 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
       let contentToSet = content;
       if (isLegacyContent) {
           // Convert plain newlines to proper HTML paragraphs for the editor
+          // Convert plain newlines to proper HTML paragraphs for the editor
+          // Collapse multiple empty lines to single
           contentToSet = content
             .split(/\r?\n/)
-            .filter(line => line.trim() !== '')
-            .map(line => `<p>${line}</p>`)
+            .reduce((acc: string[], line) => {
+                const trimmed = line.trim();
+                // If previous line was empty and current is empty, skip (max 1 empty line)
+                if (trimmed === '' && acc.length > 0 && acc[acc.length - 1] === '<p><br></p>') {
+                    return acc;
+                }
+                acc.push(trimmed === '' ? '<p><br></p>' : `<p>${line}</p>`);
+                return acc;
+            }, [])
             .join('');
       }
 

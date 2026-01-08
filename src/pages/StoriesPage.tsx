@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { i18n } from '@/lib/i18n';
 import { Story, AgeGroup } from '@/types/Story';
-import { Theme } from '@/types/Theme';
+import { Theme, WeeklyTheme } from '@/types/Theme';
 import { Series } from '@/types/Series';
 import PageLayout from '@/components/Layout/PageLayout';
 import PDFExport from '@/components/Common/PDFExport';
@@ -11,6 +11,7 @@ import { Book, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import 'flag-icons/css/flag-icons.min.css';
 import useDarkMode from '@/hooks/useDarkMode';
+import { APP_ROUTES } from '@/constants';
 
 // New Components
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader';
@@ -34,11 +35,13 @@ const StoriesPage = (): JSX.Element => {
   // Filter State
   const [selectedTheme, setSelectedTheme] = useState<string>('');
   const [selectedSeries, setSelectedSeries] = useState<string>('all');
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>('' as AgeGroup);
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup | 'all'>('all');
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('');
   const [hasImage, setHasImage] = useState<string>('all');
   const [hasAudio, setHasAudio] = useState<string>('all');
+  const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [selectedEditStatus, setSelectedEditStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
   
@@ -53,8 +56,10 @@ const StoriesPage = (): JSX.Element => {
       hasImage: hasImage !== 'all' ? hasImage : '',
       hasAudio: hasAudio !== 'all' ? hasAudio : '',
       seriesId: selectedSeries !== 'all' ? selectedSeries : '',
+      source: selectedSource !== 'all' ? selectedSource : '',
+      editStatus: selectedEditStatus !== 'all' ? selectedEditStatus : '',
       search: debouncedSearchTerm
-  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, debouncedSearchTerm]);
+  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, selectedSource, selectedEditStatus, debouncedSearchTerm]);
 
   // React Query Hooks
   const { 
@@ -72,7 +77,7 @@ const StoriesPage = (): JSX.Element => {
   const { data: seriesData } = useSeries();
 
   const themes = (themesData as Theme[]) || [];
-  const weeklyThemes = (weeklyThemesData as any[]) || [];
+  const weeklyThemes = (weeklyThemesData as WeeklyTheme[]) || [];
   const seriesList = (seriesData as Series[]) || [];
 
   const stories = useMemo(() => {
@@ -94,7 +99,7 @@ const StoriesPage = (): JSX.Element => {
 
   const weeklyThemesMap = useMemo(() => {
       const map: { [key: number]: string } = {};
-      weeklyThemes.forEach((wt: any) => {
+      weeklyThemes.forEach((wt: WeeklyTheme) => {
           map[wt.week_number] = wt.theme_name;
       });
       return map;
@@ -165,6 +170,11 @@ const StoriesPage = (): JSX.Element => {
     if (dayOfWeekParam) setSelectedDayOfWeek(dayOfWeekParam);
     if (hasImageParam) setHasImage(hasImageParam);
     if (hasAudioParam) setHasAudio(hasAudioParam);
+    
+    const sourceParam = params.get('source');
+    const editStatusParam = params.get('editStatus');
+    if (sourceParam) setSelectedSource(sourceParam);
+    if (editStatusParam) setSelectedEditStatus(editStatusParam);
   }, [location.search]);
 
   // Debounce search
@@ -176,14 +186,31 @@ const StoriesPage = (): JSX.Element => {
   }, [searchTerm]);
 
   const handleThemeChange = (theme: string) => setSelectedTheme(theme);
-  const handleAgeGroupChange = (ageGroup: AgeGroup) => setSelectedAgeGroup(ageGroup);
+  const handleAgeGroupChange = (ageGroup: AgeGroup | 'all') => setSelectedAgeGroup(ageGroup);
   const handleWeekNumberChange = (weekNumber: number | null) => setSelectedWeekNumber(weekNumber);
   const handleDayOfWeekChange = (dayOfWeek: string) => setSelectedDayOfWeek(dayOfWeek);
   const handleHasImageChange = (value: string) => setHasImage(value);
   const handleHasAudioChange = (value: string) => setHasAudio(value);
   const handleSeriesChange = (value: string) => setSelectedSeries(value);
+  const handleSourceChange = (value: string) => setSelectedSource(value);
+  const handleEditStatusChange = (value: string) => setSelectedEditStatus(value);
   const handleSearch = () => setDebouncedSearchTerm(searchTerm);
-  const handleCreateStory = () => navigate('/create');
+  
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setSelectedTheme('all');
+    setSelectedAgeGroup('all');
+    setSelectedWeekNumber(null);
+    setSelectedDayOfWeek('');
+    setHasImage('all');
+    setHasAudio('all');
+    setSelectedSeries('all');
+    setSelectedSource('all');
+    setSelectedEditStatus('all');
+  };
+
+  const handleCreateStory = () => navigate(APP_ROUTES.CREATE_STORY);
 
   const groupedStories = useMemo(() => {
     return stories.filter(Boolean).reduce((acc, story) => {
@@ -230,6 +257,11 @@ const StoriesPage = (): JSX.Element => {
             series={seriesList}
             selectedSeries={selectedSeries}
             handleSeriesChange={handleSeriesChange}
+            selectedSource={selectedSource}
+            handleSourceChange={handleSourceChange}
+            selectedEditStatus={selectedEditStatus}
+            handleEditStatusChange={handleEditStatusChange}
+            handleResetFilters={handleResetFilters}
           />
           <Tabs defaultValue="grid" className="w-full">
             <TabsList className="mb-4">
@@ -253,7 +285,7 @@ const StoriesPage = (): JSX.Element => {
                 hasMore={!!hasNextPage}
                 handleCreateStory={handleCreateStory}
               />
-              {isFetchingNextPage && <div className="text-center py-4">{t('common.loading')}...</div>}
+              {isFetchingNextPage && <div className="text-center py-4">{t('common.loading')}</div>}
             </TabsContent>
             <TabsContent value="export">
               <PDFExport availableStories={stories} />
