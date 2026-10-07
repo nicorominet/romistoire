@@ -4,60 +4,46 @@ import * as themeController from '../controllers/theme.controller.js';
 const router = express.Router();
 
 /**
- * GET /api/themes
- * Retrieve all themes.
- * @param {string} [req.query.search] - Optional search query.
- * @returns {Array} List of themes.
+ * GET /api/themes?search=&sort=name|usage|recent&needsReview=true&unused=true
+ * Themes with their story count.
  */
 router.get('/', themeController.getThemes);
 
 /**
+ * GET /api/themes/duplicates
+ * Groups of themes that look like duplicates ("Océan" / "les océans"), most used first.
+ */
+router.get('/duplicates', themeController.getDuplicateThemes);
+
+/**
  * GET /api/themes/:id/stories
- * Retrieve stories associated with a specific theme.
- * @param {string} req.params.id - Theme ID.
- * @returns {Array} List of stories.
+ * Stories linked to a theme.
  */
 router.get('/:id/stories', themeController.getStoriesByTheme);
 
 /**
  * POST /api/themes
- * Create a new theme.
- * @param {Object} req.body - Theme data.
- * @returns {Object} The created theme.
+ * Create a theme { name, description?, color?, icon?, source? }.
+ * 201 when created, 200 with `existing: true` when a theme with the same name exists.
  */
 router.post('/', themeController.createTheme);
 
 /**
+ * POST /api/themes/merge
+ * Merge { sourceIds: string[], targetId } into the target theme.
+ */
+router.post('/merge', themeController.mergeThemes);
+
+/**
  * PUT /api/themes/:id
- * Update an existing theme.
- * @param {string} req.params.id - Theme ID.
- * @param {Object} req.body - Updated theme data.
- * @returns {Object} The updated theme.
+ * Partial update. 404 unknown theme, 409 { conflictWith } when the name is taken.
  */
 router.put('/:id', themeController.updateTheme);
 
 /**
- * DELETE /api/themes/:id
- * Delete a theme.
- * @param {string} req.params.id - Theme ID.
- * @returns {Object} Success status.
+ * DELETE /api/themes/:id?reassignTo=<themeId>
+ * 409 { storyCount } when the theme is used and no replacement theme is given.
  */
 router.delete('/:id', themeController.deleteTheme);
-
-/**
- * POST /api/themes/merge-duplicates
- * Merge duplicate themes based on name similarity.
- * @returns {Object} Merge result statistics.
- */
-router.post('/merge-duplicates', themeController.mergeDuplicates);
-
-/**
- * PUT /api/themes/:themeId/stories
- * Update theme associations for stories.
- * @param {string} req.params.themeId - Theme ID.
- * @param {Object} req.body - Update data.
- * @returns {Object} Success status.
- */
-router.put('/:themeId/stories', themeController.updateStoriesTheme);
 
 export default router;

@@ -1,8 +1,25 @@
 import express from 'express';
 import * as systemController from '../controllers/system.controller.js';
-import { upload, dataUpload } from '../config/upload.config.js';
+import multer from 'multer';
+import { upload, dataUpload, InvalidFileTypeError } from '../config/upload.config.js';
 
 const router = express.Router();
+
+/**
+ * Runs multer's single-image upload and turns its errors (size, type) into a readable 400.
+ */
+const uploadSingleImage = (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+        if (!err) return next();
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Image too large (5 MB maximum).' });
+        }
+        if (err instanceof multer.MulterError || err instanceof InvalidFileTypeError) {
+            return res.status(400).json({ error: err.message });
+        }
+        next(err);
+    });
+};
 
 /**
  * POST /api/system/import-data
@@ -46,7 +63,7 @@ router.delete('/reset-data', systemController.resetData);
  * @param {Object} req.file - The uploaded image file.
  * @returns {Object} Upload result with file path.
  */
-router.post('/upload', upload.single('image'), systemController.uploadImage);
+router.post('/upload', uploadSingleImage, systemController.uploadImage);
 
 /**
  * GET /api/system/logs

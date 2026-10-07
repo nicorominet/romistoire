@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CreateStoryPage from './CreateStoryPage';
 import { themeApi, weeklyThemeApi } from '@/api/themes.api';
@@ -11,7 +11,7 @@ vi.mock('@/lib/i18n', () => ({
     i18n: {
         t: (key: string) => key,
         getCurrentLocale: () => 'fr',
-        getAvailableLocales: () => [{ code: 'fr', label: 'Français' }, { code: 'en', label: 'English' }],
+        getAvailableLocales: () => ['fr', 'en'],
         setLocale: vi.fn(),
         subscribe: vi.fn(() => () => {})
     }
@@ -93,9 +93,8 @@ describe('CreateStoryPage', () => {
     it('renders and loads initial data', async () => {
         render(
             <QueryClientProvider client={queryClient}>
-                <MemoryRouter>
-                    <CreateStoryPage />
-                </MemoryRouter>
+                {/* Data router: the page uses useBlocker (unsaved changes guard) */}
+                <RouterProvider router={createMemoryRouter([{ path: '/create', element: <CreateStoryPage /> }], { initialEntries: ['/create'] })} />
             </QueryClientProvider>
         );
 

@@ -2,16 +2,51 @@ import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { themeService } from './theme.service.js';
 import { storyVersionService } from './story_version.service.js';
 import { storyQueryHelper } from './story_query.helper.js';
 import { storySeriesHelper } from './story_series.helper.js';
 import { geminiService } from './gemini.service.js';
 import { localLLMService } from './local_llm.service.js';
+import { fileCleanup, AUDIO_DIR } from './helpers/file_cleanup.helper.js';
+import { parseStoryOutput } from './helpers/story_output.helper.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/**
+ * Turns stored story content (plain text, markdown or editor HTML) into text fit for speech.
+ * Illustration descriptions, HTML tags and markdown markers are never read aloud.
+ * @param {string} content - Story content.
+ * @returns {string} Text to read.
+ */
+export const buildSpeechText = (content) => (content || '')
+    .replace(/<\/(p|div|h[1-6]|li|blockquote)>|<br\s*\/?>/gi, '\n') // Block ends become line breaks
+    .replace(/<[^>]+>/g, '') // Remove remaining HTML tags
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/\[\s*(?:Illustration|Description)[^\]]*\]/gis, '') // Remove [Illustration: ...] tags
+    .replace(/^[ \t]*>?[ \t]*\**[ \t]*(?:Illustration(?:[ \t]+sugg[ée]r[ée]e)?|Description de l['’]illustration)[ \t]*\**[ \t]*:.*$/gim, '') // Labelled illustration lines
+    .replace(/^[ \t]*🎨.*$/gm, '')
+    .replace(/\*\*/g, '') // Remove bold markdown
+    .replace(/^[ \t]*#+[ \t]*/gm, '') // Remove markdown headings
+    .replace(/\n\s*\n/g, '\n\n') // Fix spacing
+    .trim();
+
+/**
+ * Cleans the themes sent for a story: ids or { id, isPrimary } objects, duplicates removed,
+ * exactly one primary theme (the first one when none is marked).
+ * @param {Array<string|{id: string, isPrimary?: boolean}>} themes
+ * @returns {Array<{id: string, isPrimary: boolean}>}
+ */
+export const normalizeStoryThemes = (themes) => {
+  const seen = new Set();
+  const cleaned = [];
+  for (const theme of Array.isArray(themes) ? themes : []) {
+    const id = typeof theme === 'string' ? theme : theme?.id;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    cleaned.push({ id, isPrimary: typeof theme === 'object' && (theme.isPrimary === true || Number(theme.isPrimary ?? theme.is_primary) === 1) });
+  }
+  const primaryIndex = Math.max(0, cleaned.findIndex(theme => theme.isPrimary));
+  return cleaned.map((theme, index) => ({ ...theme, isPrimary: cleaned.length > 0 && index === primaryIndex }));
+};
 
 /**
  * Service for managing stories and related data.
@@ -22,6 +57,8 @@ class StoryService {
 
   /**
    * Generate a story using AI (Gemini or Local).
+   * @returns {Promise<{text: string, model: string, truncated: boolean, stories: Object[]|null}>}
+   *   `stories` holds the parsed JSON answer, or null when the client must fall back to the text parser.
    */
   async generateFromAI(params, providerOverride = null) {
       // Priority: Param > Env > Default 'gemini'
@@ -30,11 +67,24 @@ class StoryService {
       
       console.log(`[StoryService] Generating story using provider: ${aiProvider}`);
       
-      if (aiProvider === 'local') {
-          return await localLLMService.generateStory(params);
-      } else {
-          return await geminiService.generateStory(params);
-      }
+      // The model reuses the library's themes instead of inventing near-duplicates
+      const existingThemes = (await themeService.findAll({ sort: 'usage' })).map(theme => theme.name);
+      const promptParams = { ...params, existingThemes };
+
+      const result = aiProvider === 'local'
+          ? await localLLMService.generateStory(promptParams)
+          : await geminiService.generateStory(promptParams);
+
+      const stories = parseStoryOutput(result.text);
+      if (!stories) console.warn('[StoryService] AI answer is not valid JSON, client will use the text parser.');
+      return { ...result, stories };
+  }
+
+  /**
+   * Get available models from local LLM provider (Ollama).
+   */
+  async getOllamaModels() {
+      return await localLLMService.listModels();
   }
 
   /**
@@ -45,33 +95,26 @@ class StoryService {
     if (!story) throw new Error('Story not found');
     if (!story.content) throw new Error('Story content is empty');
 
-    // Remove illustration descriptions [Illustration: ...] to avoid reading them aloud
-    const contentToRead = story.content
-        .replace(/\[Illustration:.*?\]/gs, '') // Remove Illustration tags
-        .replace(/\*\*/g, '') // Remove bold markdown
-        .replace(/\n\s*\n/g, '\n\n') // Fix spacing
-        .trim();
+    const contentToRead = buildSpeechText(story.content);
+    if (!contentToRead) throw new Error('Story content is empty');
 
     console.log(`[StoryService] Generating audio for story ${id}...`);
-    const { audioBuffer } = await geminiService.generateAudio(contentToRead);
-    
-    // Ensure public/audio directory exists
-    // Note: Assuming __dirname points to server/services, so ../../public/audio
-    const audioDir = path.join(__dirname, '../../public/audio');
-    if (!fs.existsSync(audioDir)) {
-        fs.mkdirSync(audioDir, { recursive: true });
+    const { audioBuffer, extension } = await geminiService.generateAudio(contentToRead);
+
+    // Stored under uploads/audio: served by Express (/uploads) in production and by Vite in dev
+    if (!fs.existsSync(AUDIO_DIR)) {
+        fs.mkdirSync(AUDIO_DIR, { recursive: true });
     }
 
-    const extension = 'wav';
-    const fileName = `${id}_v${story.version || 1}.${extension}`;
-    const filePath = path.join(audioDir, fileName);
-    
-    fs.writeFileSync(filePath, audioBuffer);
-    const publicUrl = `/audio/${fileName}`;
-    
-    // Update story
+    // Timestamp in the name so a regenerated file is never served from the browser cache
+    const fileName = `${id}_v${story.version || 1}_${Date.now()}.${extension || 'wav'}`;
+    fs.writeFileSync(path.join(AUDIO_DIR, fileName), audioBuffer);
+    const publicUrl = `/uploads/audio/${fileName}`;
+
+    // Update story, then drop the previous file
     await this.saveAudioPath(id, publicUrl);
-    
+    await fileCleanup.removeAudioIfUnused(story.audio_path);
+
     return publicUrl;
   }
 
@@ -87,16 +130,11 @@ class StoryService {
 
     const dataQueryPromise = (async () => {
         const queryStr = `
-            SELECT s.*, ss.name as series_name, GROUP_CONCAT(t.name) as theme_names,
-                   GROUP_CONCAT(t.description) as theme_descriptions,
-                   GROUP_CONCAT(t.id) as theme_ids,
-                   GROUP_CONCAT(st.is_primary) as theme_primaries
+            SELECT s.*, ss.name as series_name
             FROM stories s
-            LEFT JOIN story_themes st ON s.id = st.story_id
-            LEFT JOIN themes t ON st.theme_id = t.id
             LEFT JOIN story_series ss ON s.series_id = ss.id
             WHERE ${whereClause}
-            GROUP BY s.id ORDER BY s.day_order ASC, s.created_at ASC LIMIT ? OFFSET ?
+            ORDER BY s.day_order ASC, s.created_at ASC LIMIT ? OFFSET ?
         `;
         const stories = await query(queryStr, [...queryParams, String(limit), String(offset)]);
         return await this._hydrateStories(stories);
@@ -156,15 +194,16 @@ class StoryService {
 
     // Themes
     const themesResult = await query(`
-      SELECT t.*, st.is_primary
+      SELECT t.id, t.name, t.description, t.color, t.icon, t.created_at, st.is_primary
       FROM themes t
       INNER JOIN story_themes st ON t.id = st.theme_id
       WHERE st.story_id = ?
+      ORDER BY st.is_primary DESC, t.name ASC
     `, [id]);
   
-    story.themes = themesResult.map(theme => ({
+    story.themes = themesResult.map(({ is_primary, ...theme }) => ({
       ...theme,
-      isPrimary: theme.is_primary === 1,
+      isPrimary: Number(is_primary) === 1,
       createdAt: theme.created_at
     }));
 
@@ -190,23 +229,24 @@ class StoryService {
       let seriesId = await storySeriesHelper.resolveSeriesId(connection, storyData.seriesId || storyData.series_id, storyData.seriesName || storyData.series_name);
       
       // Handle Collisions & Branching
-      seriesId = await storySeriesHelper.handleCollisions(connection, {
+      const slot = await storySeriesHelper.resolveSlot(connection, {
         weekNumber: storyData.weekNumber || storyData.week_number,
         dayOrder,
         ageGroup: storyData.ageGroup || storyData.age_group,
         locale: storyData.locale,
         seriesId
       }, storyData.seriesName || storyData.series_name);
+      seriesId = slot.seriesId;
 
       // Insert Story
       await connection.query(
-        `INSERT INTO stories (id, title, content, age_group, week_number, day_order, created_at, modified_at, version, locale, source, is_manually_edited, series_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, storyData.title, storyData.content, storyData.ageGroup || storyData.age_group, storyData.weekNumber || storyData.week_number, dayOrder, now, now, 1, storyData.locale, storyData.source || 'manual', false, seriesId]
+        `INSERT INTO stories (id, title, content, age_group, week_number, day_order, created_at, modified_at, version, locale, source, is_manually_edited, series_id, illustration_prompt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, storyData.title, storyData.content, storyData.ageGroup || storyData.age_group, storyData.weekNumber || storyData.week_number, dayOrder, now, now, 1, storyData.locale, storyData.source || 'manual', false, seriesId, storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null]
       );
 
       // Link Themes
-      for (const theme of (storyData.themes || [])) {
+      for (const theme of normalizeStoryThemes(storyData.themes)) {
           await connection.query(
             `INSERT INTO story_themes (id, story_id, theme_id, is_primary, created_at) VALUES (?, ?, ?, ?, ?)`,
             [uuidv4(), id, theme.id, theme.isPrimary, now]
@@ -225,7 +265,7 @@ class StoryService {
 
       await connection.commit();
       themeService.invalidateCache();
-      return { id, ...storyData };
+      return { id, ...storyData, series_id: seriesId, aliasSeries: slot.alias };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -254,6 +294,41 @@ class StoryService {
 
       // Map day order
       const dayOrder = storyData.day_order ?? (storyData.dayOfWeek ? this._mapDayToOrder(storyData.dayOfWeek) : oldStory.day_order);
+      const weekNumber = storyData.weekNumber || storyData.week_number || oldStory.week_number;
+      const ageGroup = storyData.ageGroup || storyData.age_group || oldStory.age_group;
+      const locale = storyData.locale || oldStory.locale;
+
+      // Resolve Series: only when the payload carries a series field (empty name = remove from series)
+      const hasSeriesField = ['seriesId', 'series_id', 'seriesName', 'series_name'].some(key => key in storyData);
+      let seriesName = storyData.seriesName ?? storyData.series_name ?? null;
+      let seriesId = hasSeriesField
+        ? await storySeriesHelper.resolveSeriesId(connection, storyData.seriesId || storyData.series_id, seriesName)
+        : oldStory.series_id;
+
+      // Handle Collisions & Branching when the story moves to another slot
+      let aliasSeries = null;
+      const slotChanged = Number(weekNumber) !== Number(oldStory.week_number)
+        || Number(dayOrder) !== Number(oldStory.day_order)
+        || ageGroup !== oldStory.age_group
+        || locale !== oldStory.locale
+        || (seriesId || null) !== (oldStory.series_id || null);
+
+      if (slotChanged) {
+        if (!seriesName && seriesId) {
+          const [seriesRows] = await connection.query('SELECT name FROM story_series WHERE id = ?', [seriesId]);
+          seriesName = seriesRows[0]?.name || null;
+        }
+        const slot = await storySeriesHelper.resolveSlot(connection, {
+          weekNumber,
+          dayOrder,
+          ageGroup,
+          locale,
+          seriesId,
+          excludeStoryId: id
+        }, seriesName);
+        seriesId = slot.seriesId;
+        aliasSeries = slot.alias;
+      }
 
       // Update Main Record
       const isCurrentlyManual = oldStory.source === 'manual';
@@ -261,14 +336,20 @@ class StoryService {
       // Calculate NEXT linear version (Max + 1) to avoid collision/rewind
       const nextVersion = await storyVersionService.getNextVersionNumber(id);
 
+      // Illustration prompt is only changed when explicitly sent
+      const hasIllustrationPrompt = 'illustrationPrompt' in storyData || 'illustration_prompt' in storyData;
+      const illustrationPrompt = hasIllustrationPrompt
+        ? (storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null)
+        : (oldStory.illustration_prompt ?? null);
+
       await connection.query(
-           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, audio_path = NULL WHERE id = ?`,
-           [storyData.title, storyData.content, storyData.ageGroup || storyData.age_group, storyData.weekNumber || storyData.week_number, dayOrder, now, storyData.locale, nextVersion, !isCurrentlyManual, id]
+           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, series_id = ?, illustration_prompt = ?, audio_path = NULL WHERE id = ?`,
+           [storyData.title, storyData.content, ageGroup, weekNumber, dayOrder, now, locale, nextVersion, !isCurrentlyManual, seriesId, illustrationPrompt, id]
       );
 
       // Refresh Themes
       await connection.query('DELETE FROM story_themes WHERE story_id = ?', [id]);
-      for (const theme of (storyData.themes || [])) {
+      for (const theme of normalizeStoryThemes(storyData.themes)) {
           await connection.query(
               'INSERT INTO story_themes (id, story_id, theme_id, is_primary, created_at) VALUES (?, ?, ?, ?, ?)',
               [uuidv4(), id, theme.id, theme.isPrimary, now]
@@ -292,7 +373,9 @@ class StoryService {
 
       await connection.commit();
       themeService.invalidateCache();
-      return { id, ...storyData, modified_at: now };
+      // Saving resets the audio (content may have changed): delete the old file
+      await fileCleanup.removeAudioIfUnused(oldStory.audio_path);
+      return { id, ...storyData, series_id: seriesId, modified_at: now, aliasSeries };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -305,8 +388,17 @@ class StoryService {
    * Delete a story.
    */
   async delete(id) {
-    await query('DELETE FROM stories WHERE id = ?', [id]);
+    const [story] = await query('SELECT audio_path FROM stories WHERE id = ?', [id]);
+    const illustrations = await query('SELECT image_path FROM illustrations WHERE story_id = ?', [id]);
+
+    await query('DELETE FROM stories WHERE id = ?', [id]); // Illustrations cascade
     themeService.invalidateCache();
+
+    // Files go once no other row references them
+    for (const illustration of illustrations) {
+      await fileCleanup.removeImageIfUnused(illustration.image_path);
+    }
+    await fileCleanup.removeAudioIfUnused(story?.audio_path);
     return true;
   }
 
@@ -329,7 +421,40 @@ class StoryService {
        if (rows.length === 0) return null;
        await query('DELETE FROM illustrations WHERE id = ? AND story_id = ?', [illustrationId, storyId]);
        themeService.invalidateCache();
+       await fileCleanup.removeImageIfUnused(rows[0].image_path);
        return rows[0].image_path;
+  }
+
+  /**
+   * Rewrites illustration positions (0..n-1) following the given order.
+   * The list must contain exactly the story's illustrations.
+   * @param {string} storyId - Story ID.
+   * @param {string[]} orderedIds - Illustration IDs in the new order.
+   * @returns {Promise<Array>} Illustrations in their new order.
+   */
+  async reorderIllustrations(storyId, orderedIds) {
+      const connection = await getConnection();
+      try {
+          const [rows] = await connection.query('SELECT id FROM illustrations WHERE story_id = ?', [storyId]);
+          const existingIds = rows.map(row => row.id);
+          const sameSet = orderedIds.length === existingIds.length
+            && new Set(orderedIds).size === orderedIds.length
+            && orderedIds.every(id => existingIds.includes(id));
+          if (!sameSet) throw new Error('Illustration list mismatch');
+
+          await connection.beginTransaction();
+          for (const [position, illustrationId] of orderedIds.entries()) {
+              await connection.query('UPDATE illustrations SET position = ? WHERE id = ? AND story_id = ?', [position, illustrationId, storyId]);
+          }
+          await connection.commit();
+      } catch (error) {
+          await connection.rollback();
+          throw error;
+      } finally {
+          connection.release();
+      }
+      themeService.invalidateCache();
+      return this.getIllustrations(storyId);
   }
 
   async saveAudioPath(storyId, audioPath) {
@@ -338,19 +463,27 @@ class StoryService {
       themeService.invalidateCache();
   }
 
+  /**
+   * Previous / next story in reading order: same age group, language and series,
+   * ordered by (week, day) so Sunday leads to the next week's Monday.
+   */
   async getNeighbors(id) {
-     const story = await query(`SELECT week_number, day_order, age_group, series_id FROM stories WHERE id = ?`, [id]);
+     const story = await query(`SELECT week_number, day_order, age_group, locale, series_id FROM stories WHERE id = ?`, [id]);
      if (story.length === 0) return { next: null, prev: null };
-     const { week_number, day_order, age_group, series_id } = story[0];
+     const { week_number, day_order, age_group, locale, series_id } = story[0];
 
-     let nextR, prevR;
-     if (series_id) {
-         nextR = await query(`SELECT id, title FROM stories WHERE week_number = ? AND day_order > ? AND age_group = ? AND series_id = ? ORDER BY day_order ASC LIMIT 1`, [week_number, day_order, age_group, series_id]);
-         prevR = await query(`SELECT id, title FROM stories WHERE week_number = ? AND day_order < ? AND age_group = ? AND series_id = ? ORDER BY day_order DESC LIMIT 1`, [week_number, day_order, age_group, series_id]);
-     } else {
-         nextR = await query(`SELECT id, title FROM stories WHERE week_number = ? AND day_order > ? AND age_group = ? AND series_id IS NULL ORDER BY day_order ASC LIMIT 1`, [week_number, day_order, age_group]);
-         prevR = await query(`SELECT id, title FROM stories WHERE week_number = ? AND day_order < ? AND age_group = ? AND series_id IS NULL ORDER BY day_order DESC LIMIT 1`, [week_number, day_order, age_group]);
-     }
+     const seriesClause = series_id ? 'series_id = ?' : 'series_id IS NULL';
+     const baseParams = series_id ? [age_group, locale, series_id] : [age_group, locale];
+     const base = `SELECT id, title FROM stories WHERE age_group = ? AND locale = ? AND ${seriesClause} AND id <> ?`;
+
+     const nextR = await query(
+         `${base} AND (week_number > ? OR (week_number = ? AND day_order > ?)) ORDER BY week_number ASC, day_order ASC LIMIT 1`,
+         [...baseParams, id, week_number, week_number, day_order]
+     );
+     const prevR = await query(
+         `${base} AND (week_number < ? OR (week_number = ? AND day_order < ?)) ORDER BY week_number DESC, day_order DESC LIMIT 1`,
+         [...baseParams, id, week_number, week_number, day_order]
+     );
      return { next: nextR[0] || null, prev: prevR[0] || null };
   }
 
@@ -362,22 +495,26 @@ class StoryService {
   async _hydrateStories(stories) {
     if (stories.length === 0) return [];
     
-    // N+1 Optimization for illustrations
+    // One query per relation for the whole page (no N+1, no GROUP_CONCAT splitting on commas)
     const storyIds = stories.map(s => s.id);
     const placeholders = storyIds.map(() => '?').join(',');
-    const allIllu = await query(
-        `SELECT id, story_id, image_path, filename, file_type, position FROM illustrations WHERE story_id IN (${placeholders}) ORDER BY story_id, position ASC`,
-        storyIds
-    );
+    const [allIllu, allThemes] = await Promise.all([
+        query(
+            `SELECT id, story_id, image_path, filename, file_type, position FROM illustrations WHERE story_id IN (${placeholders}) ORDER BY story_id, position ASC`,
+            storyIds
+        ),
+        query(
+            `SELECT st.story_id, st.is_primary, t.id, t.name, t.description, t.color, t.icon
+             FROM story_themes st INNER JOIN themes t ON st.theme_id = t.id
+             WHERE st.story_id IN (${placeholders}) ORDER BY st.is_primary DESC, t.name ASC`,
+            storyIds
+        )
+    ]);
 
     return stories.map((story) => {
-        const themes = story.theme_ids?.split(',').map((id, index) => ({
-            id,
-            name: story.theme_names?.split(',')[index],
-            isPrimary: story.theme_primaries?.split(',')[index] === '1'
-        })) || [];
-          
-        delete story.theme_names; delete story.theme_descriptions; delete story.theme_ids; delete story.theme_primaries;
+        const themes = allThemes
+            .filter(theme => theme.story_id === story.id)
+            .map(({ story_id, is_primary, ...theme }) => ({ ...theme, isPrimary: Number(is_primary) === 1 }));
         const illustrations = allIllu.filter(img => img.story_id === story.id);
         return { ...story, themes, illustrations };
     });

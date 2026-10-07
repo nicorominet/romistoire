@@ -1,8 +1,7 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, Navigate } from "react-router-dom";
 import React, { Suspense, lazy } from "react";
 import Spinner from "@/components/ui/Spinner";
 import ErrorPage from "@/components/Error/ErrorPage";
@@ -15,9 +14,8 @@ const StoryDetailPage = lazy(() => import("./pages/StoryDetailPage"));
 const CreateStoryPage = lazy(() => import("./pages/CreateStoryPage"));
 const EditStoryPage = lazy(() => import("./pages/EditStoryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
-const WeeklyThemesPage = lazy(() => import("./pages/WeeklyThemesPage"));
 const TimelinePage = lazy(() => import("@/pages/TimelinePage"));
-const Themepage = lazy(() => import("@/pages/Themepage"));
+const ThemesPage = lazy(() => import("@/pages/ThemesPage"));
 const SeriesManagementPage = lazy(() => import("@/pages/SeriesManagementPage"));
 const DebugConsole = lazy(() => import("@/components/Debug/DebugConsole"));
 
@@ -110,35 +108,51 @@ const GlobalLogger = () => {
     return null;
 };
 
+// Root layout: everything that needs the router context (logger, error boundary, lazy pages)
+const RootLayout = () => (
+  <>
+    <GlobalLogger />
+    <ErrorBoundary>
+      <Suspense fallback={
+        <div className="flex h-screen w-full items-center justify-center">
+          <Spinner className="h-12 w-12 text-primary" />
+        </div>
+      }>
+        <Outlet />
+      </Suspense>
+    </ErrorBoundary>
+  </>
+);
+
+// Data router: required by useBlocker (unsaved changes guard on create/edit pages)
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: "/", element: <Index /> },
+      { path: "/stories", element: <StoriesPage /> },
+      { path: "/stories/:id", element: <StoryDetailPage /> },
+      { path: "/create", element: <CreateStoryPage /> },
+      { path: "/edit/:id", element: <EditStoryPage /> },
+      { path: "/series-management", element: <SeriesManagementPage /> },
+      { path: "/settings", element: <SettingsPage /> },
+      // Old URLs of the theme pages
+      { path: "/weekly-themes", element: <Navigate to="/themes?tab=calendar" replace /> },
+      { path: "/theme", element: <Navigate to="/themes" replace /> },
+      { path: "/timeline", element: <TimelinePage /> },
+      { path: "/themes", element: <ThemesPage /> },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+], {
+  future: { v7_relativeSplatPath: true },
+});
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <GlobalLogger />
-        <ErrorBoundary>
-          <Suspense fallback={
-            <div className="flex h-screen w-full items-center justify-center">
-              <Spinner className="h-12 w-12 text-primary" />
-            </div>
-          }>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/stories" element={<StoriesPage />} />
-              <Route path="/stories/:id" element={<StoryDetailPage />} />
-              <Route path="/create" element={<CreateStoryPage />} />
-              <Route path="/edit/:id" element={<EditStoryPage />} />
-              <Route path="/series-management" element={<SeriesManagementPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/weekly-themes" element={<WeeklyThemesPage />} />
-              <Route path="/timeline" element={<TimelinePage />} />
-              <Route path="/theme" element={<Themepage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </BrowserRouter>
+      <RouterProvider router={router} future={{ v7_startTransition: true }} />
       {process.env.NODE_ENV === 'development' && <Suspense fallback={null}><DebugConsole /></Suspense>}
     </TooltipProvider>
   </QueryClientProvider>

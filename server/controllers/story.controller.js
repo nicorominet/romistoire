@@ -120,12 +120,33 @@ export const generateAIStory = async (req, res) => {
   }
 };
 
+export const getOllamaModels = async (req, res) => {
+    try {
+        const models = await storyService.getOllamaModels();
+        res.json({ models });
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 export const deleteIllustration = async (req, res) => {
     try {
         const { id, illustrationId } = req.params;
         await storyService.deleteIllustration(id, illustrationId);
         res.json({ success: true, message: 'Illustration deleted' });
     } catch (error) {
+        handleError(res, error);
+    }
+};
+
+export const reorderIllustrations = async (req, res) => {
+    try {
+        const { illustrationIds } = req.body;
+        if (!Array.isArray(illustrationIds)) return res.status(400).json({ error: 'illustrationIds must be an array' });
+        const illustrations = await storyService.reorderIllustrations(req.params.id, illustrationIds);
+        res.json(illustrations);
+    } catch (error) {
+        if (error.message === 'Illustration list mismatch') return res.status(400).json({ error: error.message });
         handleError(res, error);
     }
 };

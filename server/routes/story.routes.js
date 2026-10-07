@@ -111,6 +111,15 @@ router.delete('/:id/illustrations/:illustrationId', storyController.deleteIllust
 router.get('/:id/illustrations', storyController.getStoryIllustrations);
 
 /**
+ * PUT /api/stories/:id/illustrations/order
+ * Reorder the illustrations of a story (the first one is the cover used by cards and PDF).
+ * @param {string} req.params.id - Story ID.
+ * @param {string[]} req.body.illustrationIds - Illustration IDs in the new order.
+ * @returns {Array} Illustrations in their new order.
+ */
+router.put('/:id/illustrations/order', storyController.reorderIllustrations);
+
+/**
  * POST /api/stories/:id/audio
  * Generate audio for a story.
  * @param {string} req.params.id - Story ID.

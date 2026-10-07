@@ -15,6 +15,9 @@ import { AgeGroup, Illustration, Story } from "@/types/Story";
 import { Series } from "@/types/Series";
 import { format } from 'date-fns';
 import { getDayOrder } from "@/utils/dayUtils";
+import useDarkMode from "@/hooks/useDarkMode";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { SelectedTheme } from "@/components/Theme/ThemeSelect";
 
 // Shared Components
 import StoryContent from "@/components/Story/StoryEditor/StoryContent";
@@ -28,7 +31,7 @@ import { storyApi, seriesApi } from "@/api/stories.api";
 import { systemApi } from "@/api/system.api";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
-import { Theme } from "@/types/Theme";
+import { Theme, WeeklyTheme } from "@/types/Theme";
 import { APP_ROUTES } from "@/constants";
 import { UploadResponse } from "@/types/system.types";
 
@@ -38,13 +41,14 @@ const CreateStoryPage = () => {
   const { t } = i18n;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("write");
+  const [isGenerating, setIsGenerating] = useState(false);
   const { data: availableThemes = [] } = useThemes();
   const { data: weeklyThemesQuery = [] } = useWeeklyThemes();
-  const weeklyThemes = weeklyThemesQuery as { week_number: number; theme_name: string }[];
+  const weeklyThemes = weeklyThemesQuery as WeeklyTheme[];
   const { data: availableSeries = [] } = useSeries();
 
   const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState<boolean>(document.documentElement.classList.contains("dark"));
+  const darkMode = useDarkMode();
   
   // Local state for illustrations (since they are not fully in form schema yet or handled differently)
   // EditStory handles them via backend queries. Here we hold them in state until save.
@@ -65,14 +69,10 @@ const CreateStoryPage = () => {
     },
   });
 
-  const { handleSubmit, watch, setValue, formState: { errors } } = methods;
+  const { handleSubmit, watch, setValue, formState: { errors, isDirty } } = methods;
 
-  // Effects
-  useEffect(() => {
-    const handleDarkModeChange = () => setDarkMode(document.documentElement.classList.contains("dark"));
-    window.addEventListener("darkModeChanged", handleDarkModeChange);
-    return () => window.removeEventListener("darkModeChanged", handleDarkModeChange);
-  }, []);
+  // Leaving loses the text, the uploaded illustrations, or interrupts a running generation
+  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(isDirty || illustrations.length > 0 || isGenerating);
 
 
   const onSubmit = async (data: FormValues) => {
@@ -89,7 +89,7 @@ const CreateStoryPage = () => {
     const payload: Partial<Story> = {
       title: truncatedTitle,
       content: sanitizedContent,
-      themes: data.themes.map((id: string) => ({ id } as Theme)),
+      themes: data.themes.map(({ id, isPrimary }) => ({ id, isPrimary } as unknown as Theme)),
       age_group: data.ageGroup as AgeGroup,
       locale: data.language,
       day_order: getDayOrder(data.dayOfWeek),
@@ -111,6 +111,8 @@ const CreateStoryPage = () => {
       const newStory = response;
       
       toast.success(t("create.success.storyCreated"));
+      if (newStory.aliasSeries) toast.warning(t("story.aliasCreated", { series: newStory.aliasSeries.name }));
+      allowNavigation();
       navigate(APP_ROUTES.STORY_DETAIL(newStory.id));
 
     } catch (error) {
@@ -137,7 +139,7 @@ const CreateStoryPage = () => {
         }]);
         toast.success(t("create.illustrate.success.imageUploaded"));
       } catch (err) {
-        toast.error(t("create.error.failedToUploadImage"));
+        toast.error((err as Error)?.message || t("create.error.failedToUploadImage"));
       }
   };
 
@@ -147,9 +149,16 @@ const CreateStoryPage = () => {
       toast.success(t('create.illustrate.success.imageDeleted'));
   };
 
+  const reorderIllustrations = (orderedIds: string[]) => {
+      // For Create Mode: reorder local state, positions are assigned on save
+      setIllustrations(prev => orderedIds
+          .map(illustrationId => prev.find(img => img.id === illustrationId))
+          .filter((img): img is Illustration => Boolean(img)));
+  };
+
+  // No redirect: the generation tab lists the created stories with links
   const handleStoryGenerated = () => {
     toast.success(t("create.success.generatedAndSaved"));
-    navigate(APP_ROUTES.STORIES); 
   };
   
   const memoizedAvailableThemes = useMemo(() => availableThemes, [availableThemes]);
@@ -218,22 +227,26 @@ const CreateStoryPage = () => {
                       <Wand2 className="h-4 w-4 mr-1" />
                       {t("create.tabs.generate")}
                     </TabsTrigger>
-                    <TabsTrigger value="write" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="write" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <PenLine className="h-4 w-4 mr-1" />
                       {t("create.tabs.write")}
                     </TabsTrigger>
-                    <TabsTrigger value="illustrate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="illustrate" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Paintbrush className="h-4 w-4 mr-1"  />
                       {t("create.tabs.illustrate")}
                     </TabsTrigger>
-                    <TabsTrigger value="preview" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="preview" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Book className="h-4 w-4 mr-1"  />
                       {t("create.tabs.preview")}
                     </TabsTrigger>
                   </TabsList>
 
-                   <TabsContent value="generate">
-                    <StoryGenerationTab onStoryGenerated={handleStoryGenerated} />
+                  {/* Kept mounted so an ongoing generation (and its log) survives a tab switch */}
+                  <TabsContent value="generate" forceMount className="data-[state=inactive]:hidden">
+                    <StoryGenerationTab
+                      onStoryGenerated={handleStoryGenerated}
+                      onGeneratingChange={setIsGenerating}
+                    />
                   </TabsContent>
 
                   <TabsContent value="write">
@@ -245,6 +258,7 @@ const CreateStoryPage = () => {
                         illustrations={illustrations}
                         addIllustrationToBackend={addIllustrationToBackend}
                         deleteIllustration={deleteIllustration}
+                        reorderIllustrations={reorderIllustrations}
                      />
                   </TabsContent>
 
@@ -252,7 +266,7 @@ const CreateStoryPage = () => {
                      <StoryPreviewTab
                         title={watch("title")}
                         content={watch("content")}
-                        watchThemes={watch("themes")}
+                        watchThemes={watch("themes") as SelectedTheme[]}
                         watchAgeGroup={watch("ageGroup")}
                         availableThemes={availableThemes}
                         illustrations={illustrations}
@@ -275,7 +289,6 @@ const CreateStoryPage = () => {
                 </h2>
                 <StorySettings
                   availableThemes={memoizedAvailableThemes}
-                  setAvailableThemes={() => {}}
                   weeklyThemes={weeklyThemes}
                   sortedDayOfWeekOptions={sortedDayOfWeekOptions}
                   story={defaultStoryForSetting}
@@ -284,6 +297,7 @@ const CreateStoryPage = () => {
 
                 <Button
                   type="submit"
+                  disabled={isGenerating}
                   className="w-full bg-story-purple hover:bg-story-purple-600 mt-6"
                 >
                   <Save className="mr-2 h-4 w-4" />
@@ -293,6 +307,7 @@ const CreateStoryPage = () => {
             </div>
           </form>
         </FormProvider>
+        {unsavedChangesDialog}
     </PageLayout>
   );
 };

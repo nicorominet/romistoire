@@ -6,11 +6,16 @@ import { Loader2, Wand2 } from "lucide-react";
 import { i18n } from "@/lib/i18n";
 import { SeriesSelector } from "@/components/Story/SeriesSelector";
 import { Series } from '@/types/Series';
+import { MultiSelect } from "@/components/Common/MultiSelect";
+import { AGE_GROUPS } from "@/types/Story";
+import { ALL_WEEK, GENERATION_DAYS_FR } from "@/constants";
+import { mapFrToEnDay } from "@/utils/dayUtils";
 
 interface GenerationFormProps {
     isGenerating: boolean;
     availableWeeklyThemes: any[];
     availableSeries: Series[];
+    availableModels?: string[];
     seriesName: string;
     onSeriesNameChange: (name: string) => void;
     onGenerate: (config: any) => void;
@@ -20,6 +25,7 @@ export const GenerationForm = ({
     isGenerating, 
     availableWeeklyThemes, 
     availableSeries,
+    availableModels = [],
     seriesName,
     onSeriesNameChange,
     onGenerate 
@@ -32,6 +38,7 @@ export const GenerationForm = ({
     const [numCharacters, setNumCharacters] = useState("");
     const [characterNames, setCharacterNames] = useState("");
     const [aiProvider, setAiProvider] = useState("gemini");
+    const [aiModel, setAiModel] = useState("");
 
     const handleGenerateClick = () => {
         onGenerate({
@@ -40,39 +47,42 @@ export const GenerationForm = ({
             dayOfWeek,
             numCharacters,
             characterNames,
-            aiProvider
+            aiProvider,
+            aiModel
         });
     };
 
-    const handleWeeklyThemeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const values = Array.from(e.target.selectedOptions, option => option.value);
-        setSelectedWeeks(values);
+    const multiSelectLabels = {
+        selectedLabel: (count: number) => t("create.generate.selectedCount", { count: String(count) }),
+        selectAllLabel: t("create.generate.selectAll"),
+        clearLabel: t("create.generate.clearSelection"),
     };
 
-    const handleAgeRangeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const values = Array.from(e.target.selectedOptions, option => option.value);
-        setSelectedAgeRanges(values);
+    // This form is rendered inside the manual story <form>: pressing Enter in an input
+    // must not submit the manual form.
+    const preventEnterSubmit = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
+            e.preventDefault();
+        }
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4" onKeyDown={preventEnterSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="gen-week-select">{t("create.generate.projectWeek")} <span className="text-xs text-gray-500">{t("create.generate.holdCtrl")}</span></Label>
-                    <select 
+                    <Label htmlFor="gen-week-select">{t("create.generate.projectWeek")}</Label>
+                    <MultiSelect
                         id="gen-week-select"
-                        multiple
-                        size={6}
-                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        options={availableWeeklyThemes.map((wt: any) => ({
+                            value: String(wt.week_number),
+                            label: `${t("timeline.weekNumber", { number: wt.week_number })} - ${wt.theme_name}`
+                        }))}
                         value={selectedWeeks}
-                        onChange={handleWeeklyThemeSelect}
-                    >
-                        {availableWeeklyThemes.map((wt: any) => (
-                            <option key={wt.week_number} value={wt.week_number}>
-                                {t("timeline.weekNumber", { number: wt.week_number })} - {wt.theme_name}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={setSelectedWeeks}
+                        placeholder={t("create.generate.selectWeeks")}
+                        disabled={isGenerating}
+                        {...multiSelectLabels}
+                    />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
@@ -96,24 +106,35 @@ export const GenerationForm = ({
                         <option value="local">{t("create.generate.provider.local")}</option>
                     </select>
                 </div>
+                
+                {aiProvider === 'local' && (
+                    <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="ai-model">{t("create.generate.aiModel")}</Label>
+                         <select 
+                            id="ai-model"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                        >
+                            <option value="">{t("create.generate.model.default")}</option>
+                            {availableModels.map((model) => (
+                                <option key={model} value={model}>{model}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 <div className="space-y-2">
-                    <Label htmlFor="gen-age">{t("create.generate.age")} <span className="text-xs text-gray-500">{t("create.generate.holdCtrl")}</span></Label>
-                    <select 
+                    <Label htmlFor="gen-age">{t("create.generate.age")}</Label>
+                    <MultiSelect
                         id="gen-age"
-                        multiple
-                        size={4}
-                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        options={AGE_GROUPS.map(age => ({ value: age, label: t(`ages.${age}`) }))}
                         value={selectedAgeRanges}
-                        onChange={handleAgeRangeChange}
-                    >
-                        <option value="2-3">{t("ages.2-3")}</option>
-                        <option value="4-6">{t("ages.4-6")}</option>
-                        <option value="7-9">{t("ages.7-9")}</option>
-                        <option value="10-12">{t("ages.10-12")}</option>
-                        <option value="13-15">{t("ages.13-15")}</option>
-                        <option value="16-18">{t("ages.16-18")}</option>
-                    </select>
+                        onChange={setSelectedAgeRanges}
+                        placeholder={t("create.generate.selectAges")}
+                        disabled={isGenerating}
+                        {...multiSelectLabels}
+                    />
                 </div>
 
                 <div className="space-y-2">
@@ -125,14 +146,11 @@ export const GenerationForm = ({
                         onChange={(e) => setDayOfWeek(e.target.value)}
                     >
                         <option value="">{t("create.selectDayOfWeek")}</option>
-                        <option value="Lundi">{t("days.monday")}</option>
-                        <option value="Mardi">{t("days.tuesday")}</option>
-                        <option value="Mercredi">{t("days.wednesday")}</option>
-                        <option value="Jeudi">{t("days.thursday")}</option>
-                        <option value="Vendredi">{t("days.friday")}</option>
-                        <option value="Samedi">{t("days.saturday")}</option>
-                        <option value="Dimanche">{t("days.sunday")}</option>
-                        <option value="Toute la semaine">Toute la semaine</option>
+                        {/* Values are the French day names expected by the prompt; labels follow the UI language */}
+                        {GENERATION_DAYS_FR.map(day => (
+                            <option key={day} value={day}>{t(`days.${mapFrToEnDay(day).toLowerCase()}`)}</option>
+                        ))}
+                        <option value={ALL_WEEK}>{t("create.generate.allWeek")}</option>
                     </select>
                 </div>
 
@@ -159,6 +177,7 @@ export const GenerationForm = ({
             </div>
 
             <Button 
+                type="button"
                 onClick={handleGenerateClick} 
                 disabled={isGenerating} 
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white"

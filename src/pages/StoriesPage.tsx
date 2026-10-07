@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { i18n } from '@/lib/i18n';
 import { Story, AgeGroup } from '@/types/Story';
 import { Theme, WeeklyTheme } from '@/types/Theme';
@@ -8,10 +8,9 @@ import PageLayout from '@/components/Layout/PageLayout';
 import PDFExport from '@/components/Common/PDFExport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Book, FileText } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import 'flag-icons/css/flag-icons.min.css';
-import useDarkMode from '@/hooks/useDarkMode';
 import { APP_ROUTES } from '@/constants';
+import { currentIsoWeek } from '@/utils/weekUtils';
 
 // New Components
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader';
@@ -27,32 +26,41 @@ const { t } = i18n;
 
 const StoriesPage = (): JSX.Element => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { themeId } = useParams<{ themeId: string }>();
-  const { toast } = useToast();
-  const darkMode = useDarkMode(); // Kept for consistency if needed by children (though StoriesListGrid usually handles it)
   
-  // Filter State
-  const [selectedTheme, setSelectedTheme] = useState<string>('');
-  const [selectedSeries, setSelectedSeries] = useState<string>('all');
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup | 'all'>('all');
-  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('');
-  const [hasImage, setHasImage] = useState<string>('all');
-  const [hasAudio, setHasAudio] = useState<string>('all');
-  const [selectedSource, setSelectedSource] = useState<string>('all');
-  const [selectedEditStatus, setSelectedEditStatus] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
-  
+  // Filters live in the URL (single source of truth): back/forward, reload and shared links keep them.
+  // 'all' (or a missing param) means "no filter".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = (key: string) => searchParams.get(key) || 'all';
+  const setFilter = useCallback((key: string, value: string | null) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (!value || value === 'all') next.delete(key);
+      else next.set(key, value);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const selectedTheme = filterParam('theme');
+  const selectedSeries = filterParam('seriesId');
+  const selectedAgeGroup = filterParam('ageGroup') as AgeGroup | 'all';
+  const weekNumberParam = parseInt(searchParams.get('weekNumber') || '', 10);
+  const selectedWeekNumber = Number.isNaN(weekNumberParam) ? null : weekNumberParam;
+  const selectedDayOfWeek = filterParam('dayOfWeek');
+  const hasImage = filterParam('hasImage');
+  const hasAudio = filterParam('hasAudio');
+  const selectedSource = filterParam('source');
+  const selectedEditStatus = filterParam('editStatus');
+  const debouncedSearchTerm = searchParams.get('search') || '';
+  const [searchTerm, setSearchTerm] = useState<string>(debouncedSearchTerm);
+
   // Computed Params for Query
   const queryParams = useMemo(() => ({
       limit: 12, // Page size
       // locale: undefined, // Fetch all locales
-      theme: selectedTheme,
+      theme: selectedTheme !== 'all' ? selectedTheme : '',
       ageGroup: selectedAgeGroup,
       weekNumber: selectedWeekNumber?.toString() || '',
-      dayOfWeek: selectedDayOfWeek,
+      dayOfWeek: selectedDayOfWeek !== 'all' ? selectedDayOfWeek : '',
       hasImage: hasImage !== 'all' ? hasImage : '',
       hasAudio: hasAudio !== 'all' ? hasAudio : '',
       seriesId: selectedSeries !== 'all' ? selectedSeries : '',
@@ -88,15 +96,6 @@ const StoriesPage = (): JSX.Element => {
       return storiesData?.pages[0]?.total || 0;
   }, [storiesData]);
 
-  // Data processing for UI
-  const themeColors = useMemo(() => {
-     const colors: { [key: string]: string } = {};
-     themes.forEach((t: Theme) => {
-          if (t.id && t.color) colors[t.id] = t.color;
-     });
-     return colors;
-  }, [themes]);
-
   const weeklyThemesMap = useMemo(() => {
       const map: { [key: number]: string } = {};
       weeklyThemes.forEach((wt: WeeklyTheme) => {
@@ -105,30 +104,11 @@ const StoriesPage = (): JSX.Element => {
       return map;
   }, [weeklyThemes]);
 
-  // Current Week Theme Logic
-  const getWeekNumber = (date: Date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  };
-  
-  const [weeklyThemeDetails, setWeeklyThemeDetails] = useState<{id: string | null, name: string | null}>({ id: null, name: null });
-
-  useEffect(() => {
-      if (weeklyThemesMap && themes) {
-          const currentWeek = getWeekNumber(new Date());
-          const currentThemeName = weeklyThemesMap[currentWeek];
-          if (currentThemeName) {
-                const matchingTheme = themes.find((t: Theme) => t.name === currentThemeName);
-                setWeeklyThemeDetails({
-                    name: currentThemeName,
-                    id: matchingTheme ? matchingTheme.id : null
-                });
-          }
-      }
-  }, [weeklyThemesMap, themes]);
+  // Theme of the current week: pinned on top of the theme filter
+  const currentWeekThemeId = useMemo(
+      () => weeklyThemes.find((wt: WeeklyTheme) => wt.week_number === currentIsoWeek().week)?.theme_id ?? null,
+      [weeklyThemes]
+  );
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -154,60 +134,33 @@ const StoriesPage = (): JSX.Element => {
     };
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Sync Filters with URL
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const themeParam = params.get('theme');
-    const ageGroupParam = params.get('ageGroup') as AgeGroup;
-    const weekNumberParam = params.get('weekNumber');
-    const dayOfWeekParam = params.get('dayOfWeek');
-    const hasImageParam = params.get('hasImage');
-    const hasAudioParam = params.get('hasAudio');
-
-    if (themeParam) setSelectedTheme(themeParam);
-    if (ageGroupParam) setSelectedAgeGroup(ageGroupParam);
-    if (weekNumberParam) setSelectedWeekNumber(parseInt(weekNumberParam, 10));
-    if (dayOfWeekParam) setSelectedDayOfWeek(dayOfWeekParam);
-    if (hasImageParam) setHasImage(hasImageParam);
-    if (hasAudioParam) setHasAudio(hasAudioParam);
-    
-    const sourceParam = params.get('source');
-    const editStatusParam = params.get('editStatus');
-    if (sourceParam) setSelectedSource(sourceParam);
-    if (editStatusParam) setSelectedEditStatus(editStatusParam);
-  }, [location.search]);
-
-  // Debounce search
+  // Debounce search into the URL
   useEffect(() => {
     const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
+      if (searchTerm !== debouncedSearchTerm) setFilter('search', searchTerm.trim() || null);
     }, 500);
     return () => clearTimeout(handler);
-  }, [searchTerm]);
+  }, [searchTerm, debouncedSearchTerm, setFilter]);
 
-  const handleThemeChange = (theme: string) => setSelectedTheme(theme);
-  const handleAgeGroupChange = (ageGroup: AgeGroup | 'all') => setSelectedAgeGroup(ageGroup);
-  const handleWeekNumberChange = (weekNumber: number | null) => setSelectedWeekNumber(weekNumber);
-  const handleDayOfWeekChange = (dayOfWeek: string) => setSelectedDayOfWeek(dayOfWeek);
-  const handleHasImageChange = (value: string) => setHasImage(value);
-  const handleHasAudioChange = (value: string) => setHasAudio(value);
-  const handleSeriesChange = (value: string) => setSelectedSeries(value);
-  const handleSourceChange = (value: string) => setSelectedSource(value);
-  const handleEditStatusChange = (value: string) => setSelectedEditStatus(value);
-  const handleSearch = () => setDebouncedSearchTerm(searchTerm);
+  // Keep the input in sync when the URL changes (back/forward, reset)
+  useEffect(() => {
+    setSearchTerm(debouncedSearchTerm);
+  }, [debouncedSearchTerm]);
+
+  const handleThemeChange = (theme: string) => setFilter('theme', theme);
+  const handleAgeGroupChange = (ageGroup: AgeGroup | 'all') => setFilter('ageGroup', ageGroup);
+  const handleWeekNumberChange = (weekNumber: number | null) => setFilter('weekNumber', weekNumber === null ? null : String(weekNumber));
+  const handleDayOfWeekChange = (dayOfWeek: string) => setFilter('dayOfWeek', dayOfWeek);
+  const handleHasImageChange = (value: string) => setFilter('hasImage', value);
+  const handleHasAudioChange = (value: string) => setFilter('hasAudio', value);
+  const handleSeriesChange = (value: string) => setFilter('seriesId', value);
+  const handleSourceChange = (value: string) => setFilter('source', value);
+  const handleEditStatusChange = (value: string) => setFilter('editStatus', value);
+  const handleSearch = () => setFilter('search', searchTerm.trim() || null);
   
   const handleResetFilters = () => {
     setSearchTerm('');
-    setDebouncedSearchTerm('');
-    setSelectedTheme('all');
-    setSelectedAgeGroup('all');
-    setSelectedWeekNumber(null);
-    setSelectedDayOfWeek('');
-    setHasImage('all');
-    setHasAudio('all');
-    setSelectedSeries('all');
-    setSelectedSource('all');
-    setSelectedEditStatus('all');
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   const handleCreateStory = () => navigate(APP_ROUTES.CREATE_STORY);
@@ -241,8 +194,7 @@ const StoriesPage = (): JSX.Element => {
             selectedTheme={selectedTheme}
             handleThemeChange={handleThemeChange}
             themes={themes}
-            weeklyThemeId={weeklyThemeDetails.id}
-            weeklyThemeName={weeklyThemeDetails.name}
+            currentWeekThemeId={currentWeekThemeId}
             weeklyThemesMap={weeklyThemesMap}
             selectedAgeGroup={selectedAgeGroup}
             handleAgeGroupChange={handleAgeGroupChange}
@@ -280,7 +232,6 @@ const StoriesPage = (): JSX.Element => {
                 error={storiesError ? (storiesError as Error).message : null}
                 stories={stories}
                 groupedStories={groupedStories}
-                themeColors={themeColors}
                 observerRef={observerTarget}
                 hasMore={!!hasNextPage}
                 handleCreateStory={handleCreateStory}

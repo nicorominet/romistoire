@@ -54,6 +54,8 @@ describe('StoryCard', () => {
         week_number: 1,
         day_order: 1,
         version: 1,
+        source: 'manual',
+        is_manually_edited: false,
         themes: [
             { id: 't1', name: 'Adventure', color: '#ff0000', description: 'Adventure theme description', created_at: '2023-01-01T10:00:00Z' },
             { id: 't2', name: 'Magic', color: '#0000ff', description: 'Magic theme description', created_at: '2023-01-01T10:00:00Z' }
@@ -141,25 +143,29 @@ describe('StoryCard', () => {
         expect(link).toHaveAttribute('href', '/stories/123');
     });
 
-    it('uses fallback theme colors if provided', () => {
-        // This tests the visual logic (getThemeBadgeStyle). 
-        // Hard to test style computed values easily in JSDOM without getting into computedStyle.
-        // We can check the style attribute if it's inline.
-        // The component uses `style={{ backgroundColor: ... }}`
-        
+    it('colors each badge with its theme color and shows the primary theme first', () => {
+        const story: Story = {
+            ...mockStory,
+            themes: [
+                { ...mockStory.themes[0] },
+                { ...mockStory.themes[1], isPrimary: true } as Story['themes'][number],
+            ],
+        };
+
         render(
             <MemoryRouter>
-                <StoryCard story={mockStory} themeColors={{ 't1': '#fabada' }} />
+                <StoryCard story={story} />
             </MemoryRouter>
         );
-        
-        const badge = screen.getByText('Adventure').closest('.badge') || screen.getByText('Adventure');
-        // Look for the specific hex code in the style
-        expect(badge).toHaveStyle({ backgroundColor: '#fabada' }); // #ff0000 was default in object, but themeColors prop should override?
-        // Wait, logic is: `const color = themeColors[themeId] || fallback || "#ccc";`
-        // In mockStory, theme objects have color.
-        // `themeObj.color` is passed as fallback.
-        // But `themeColors` prop has precedence!
-        // So it should be #fabada.
+
+        const adventure = screen.getByText('Adventure').closest('span[style]') as HTMLElement;
+        // Black text reads better than white on pure red (WCAG contrast 5.25 vs 4.0)
+        expect(adventure).toHaveStyle({ backgroundColor: '#ff0000', color: '#000000' });
+        const magic = screen.getByText('Magic').closest('span[style]') as HTMLElement;
+        expect(magic).toHaveStyle({ backgroundColor: '#0000ff', color: '#ffffff' });
+        // Primary theme ("Magic") is rendered before the other one, with a star
+        const names = screen.getAllByText(/^(Adventure|Magic)$/).map(node => node.textContent);
+        expect(names).toEqual(['Magic', 'Adventure']);
+        expect(screen.getByLabelText('themes.primary')).toBeInTheDocument();
     });
 });

@@ -11,6 +11,7 @@ import {
 } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
+import { i18n } from "@/lib/i18n"
 import { Label } from "@/components/ui/label"
 
 const Form = FormProvider
@@ -145,7 +146,8 @@ const FormMessage = React.forwardRef<
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, children, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message) : children
+  // Schema messages are i18n keys (see StoryEditor/formSchema.ts); other messages are shown as is
+  const body = error ? i18n.t(String(error?.message)) : children
 
   if (!body) {
     return null

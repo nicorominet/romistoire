@@ -59,7 +59,13 @@
     "saving": "Saving...",
     "search": "Search",
     "success": "Success",
-    "noDaysAvailable": "No days available"
+    "noDaysAvailable": "No days available",
+    "unsavedTitle": "Leave without saving?",
+    "unsavedDesc": "Your changes have not been saved and will be lost.",
+    "leave": "Leave",
+    "stay": "Stay",
+    "close": "Close",
+    "confirmDelete": "Confirm deletion"
   },
   "create": {
     "ageGroup": "Age Group",
@@ -87,21 +93,48 @@
       "aiProvider": "AI Provider",
       "provider": {
         "gemini": "Cloud (Google Gemini - Fast & High Quality)",
-        "local": "Local (Gemma 3 4B - Free & Private)"
+        "local": "Local Ollama"
+      },
+      "aiModel": "Ollama Model",
+      "model": {
+        "default": "Default"
       },
       "logs": {
         "start": "🚀 Starting generation...",
         "weekNotFound": "⚠️ Week {{week}} not found, skipped.",
+        "segmentWithoutDay": "⚠️ Story \"{{title}}\" skipped: no day of the week found in the AI response.",
+        "truncated": "⚠️ AI response truncated (length limit reached, model {{model}}): the last story may be incomplete.",
+        "noThemesError": "Cannot save the story without a theme.",
         "generatingIterative": "⏳ Generating for Week {{week}} ({{day}}) - {{age}} (Iterative Local Mode)...",
         "generating": "⏳ Generating for Week {{week}} ({{theme}}) - {{age}}...",
         "success": "✨ Generation completed successfully!",
         "error": "❌ Error: {{error}}",
         "selectRequired": "Please select at least one week, age group and day.",
-        "errorGeneric": "An error occurred during generation."
+        "errorGeneric": "An error occurred during generation.",
+        "themeCreated": "🏷️ New theme created: \"{{name}}\".",
+        "aliasCreated": "⚠️ Slot already taken: \"{{title}}\" was filed in the series \"{{series}}\".",
+        "textFallback": "ℹ️ Unstructured AI answer: reading the text in fallback mode.",
+        "saved": "\"{{title}}\" saved ({{age}} - {{day}})",
+        "nothingCreated": "❌ No story was created.",
+        "summary": "✨ Done: {{created}} story(ies) created, {{failed}} failure(s), {{skipped}} skipped."
       },
       "theme": "Weekly Theme",
       "title": "AI Story Generator",
-      "weekNumber": "Week Number"
+      "weekNumber": "Week Number",
+      "untitled": "Generated story",
+      "weeklyThemeDescription": "Weekly theme",
+      "progress": "Generation progress",
+      "allWeek": "Whole week",
+      "report": {
+        "title": "{{count}} story(ies) created",
+        "issues": "{{failed}} failure(s) and {{skipped}} skipped item(s): see the log above.",
+        "openLibrary": "Open the library"
+      },
+      "selectWeeks": "Choose weeks",
+      "selectAges": "Choose age groups",
+      "selectedCount": "{{count}} selected",
+      "selectAll": "Select all",
+      "clearSelection": "Clear selection"
     },
     "illustrate": {
       "aiDisclaimer": "Powered by Google Gemini. Images are generated based on your prompt.",
@@ -110,13 +143,17 @@
       "createIllustration": "Create an Illustration",
       "error": {
         "failedToRead": "Failed to read image file",
-        "imageTooLarge": "Image is too large. Maximum size is 5MB"
+        "imageTooLarge": "Image is too large. Maximum size is 5MB",
+        "missingStory": "Story not found: unable to add the illustration.",
+        "deleteFailed": "Unable to delete the illustration.",
+        "reorderFailed": "Unable to reorder the illustrations."
       },
       "generateButton": "Generate",
       "savedIllustrations": "Saved Illustrations ({{count}})",
       "smartSuggestions": "Smart Suggestions",
       "success": {
-        "imageUploaded": "Image uploaded successfully"
+        "imageUploaded": "Image uploaded successfully",
+        "imageDeleted": "Illustration deleted"
       },
       "uploadButton": "Upload",
       "uploadImage": "Upload an Image"
@@ -291,7 +328,15 @@
     "tableOfContents": "Include Table of Contents",
     "themeBook": "A collection of stories on theme {{theme}}",
     "title": "Export Stories to PDF",
-    "tocTitle": "Table of Contents"
+    "tocTitle": "Table of Contents",
+    "filtersApplied": "Filters applied",
+    "filtersAppliedDesc": "{{count}} story(ies) selected from your filters.",
+    "noStories": "No story selected",
+    "pleaseSelectStories": "Select at least one story to export.",
+    "readyToDownload": "Your PDF is ready to download.",
+    "unknownError": "Unknown error while creating the PDF.",
+    "exportDate": "Exported on",
+    "invalidResponse": "Invalid server response while creating the PDF."
   },
   "series": {
     "createSuccess": "Series created successfully",
@@ -525,6 +570,17 @@
     "restoreSuccess": "Version restored successfully",
     "restoreVersion": "Restore Version",
     "savedIllustrations": "Saved Illustrations",
+    "illustrationPrompt": "Illustration prompt (AI)",
+    "illustrationPromptHint": "Description suggested by the AI to create this story's illustration.",
+    "copyPrompt": "Copy prompt",
+    "promptCopied": "Prompt copied to clipboard",
+    "coverIllustrationHint": "The first illustration is the cover (card and PDF). Use the arrows to change the order.",
+    "moveIllustrationBefore": "Move before",
+    "moveIllustrationAfter": "Move after",
+    "deleteIllustrationTitle": "Delete this illustration?",
+    "deleteIllustrationDesc": "The image will be removed from the story. This cannot be undone.",
+    "invalidImageType": "Unsupported format: use a JPEG, PNG, GIF or WebP image.",
+    "imageTooLarge": "Image too large (5 MB maximum).",
     "years": "years",
     "searchPlaceholder": "Search story...",
     "searchStories": "Search Stories",
@@ -552,7 +608,27 @@
       "gemini": "Gemini (Cloud)",
       "ollama": "Ollama (Local)",
       "editedByHuman": "(edited)"
-    }
+    },
+    "deleteConfirmDesc": "The story \"{{title}}\" will be permanently deleted, with its illustrations and audio.",
+    "audio": {
+      "generate": "Generate audio",
+      "regenerate": "Regenerate audio",
+      "generating": "Generating audio…",
+      "generatingDesc": "This can take a few seconds.",
+      "generated": "Audio generated!",
+      "generatedDesc": "You can now listen to the story.",
+      "error": "Unable to generate audio",
+      "errorDesc": "Check the API key or try again.",
+      "unsupported": "Your browser does not support audio playback.",
+      "willBeDeleted": "This story has audio: it will be deleted on save and will have to be regenerated."
+    },
+    "aliasCreated": "Slot already taken: the story was filed in the series \"{{series}}\".",
+    "illustrationsSavedImmediately": "Illustrations are saved as soon as they are uploaded or deleted, without waiting for the Save button.",
+    "restoreConfirmTitle": "Restore version {{version}}?",
+    "restoreConfirmDesc": "The current content will be replaced by this version. It stays in the history and can be restored.",
+    "restoreUnsavedWarning": "Unsaved changes will be lost.",
+    "loadError": "Unable to load the story.",
+    "contentPlaceholder": "Write your story…"
   },
   "success": {
     "title": "Success",
@@ -678,7 +754,68 @@
     "sortAZ": "A-Z",
     "sortZA": "Z-A",
     "sortAsc": "- +",
-    "sortDesc": "+ -"
+    "sortDesc": "+ -",
+    "deleteInUseError": "Unable to delete this theme: it may be used by stories.",
+    "pageTitle": "Themes",
+    "pageSubtitle": "Organize the themes of your stories and pick the theme of each week.",
+    "tabs": {
+      "themes": "Themes",
+      "calendar": "Weekly calendar"
+    },
+    "actions": "Actions for \"{{name}}\"",
+    "addToStory": "Add a theme",
+    "alreadyExists": "The theme \"{{name}}\" already exists: it was reused.",
+    "chooseReplacement": "Choose a replacement theme",
+    "clearFilters": "Clear filters",
+    "color": "Color",
+    "colorCode": "Color code",
+    "customColor": "Custom color",
+    "createNamed": "Create \"{{name}}\"",
+    "deleteUnusedDesc": "No story uses this theme. It will be permanently deleted.",
+    "deleteUsedDesc": "This theme is used by {{count}} story(ies). Choose the theme that will replace it in these stories.",
+    "deletedAndMoved": "Theme deleted: {{count}} story(ies) moved to the replacement theme.",
+    "description": "Description",
+    "duplicatesBanner": "{{count}} group(s) of themes look like duplicates.",
+    "duplicatesTitle": "Possible duplicates",
+    "duplicatesDesc": "These themes have very similar names. Choose the one to keep: the stories, versions and weeks of the others will move to it.",
+    "noDuplicates": "No duplicates found.",
+    "filters": {
+      "all": "All",
+      "review": "To review",
+      "unused": "Unused"
+    },
+    "quickFilters": "Quick filters",
+    "formDescription": "Names are unique: case, accents and leading articles are ignored.",
+    "icon": "Icon",
+    "noIcon": "No icon",
+    "keepTheme": "Theme to keep",
+    "makePrimary": "Make it the primary theme",
+    "primary": "Primary theme",
+    "primaryHint": "The star marks the primary theme: it is shown first on cards and in the timeline.",
+    "mergeTitle": "Merge into another theme",
+    "mergeDesc": "The {{count}} story(ies) of this theme, its versions and weeks will move to the chosen theme, then this theme will be deleted.",
+    "mergeInto": "Merge with \"{{name}}\"",
+    "mergeIntoOther": "Merge into…",
+    "mergePreview": "{{count}} story(ies) will move to the kept theme.",
+    "mergedInto": "Merged into \"{{name}}\" ({{count}} story(ies) moved).",
+    "moveAndDelete": "Move and delete",
+    "name": "Name",
+    "nameConflict": "Another theme is already named \"{{name}}\".",
+    "needsReview": "AI · to review",
+    "needsReviewHint": "Created by AI generation. Edit it (or merge it) to approve it.",
+    "removeFromStory": "Remove \"{{name}}\"",
+    "replacement": "Replacement theme",
+    "reviewDuplicates": "Review",
+    "similarExists": "Similar theme already exists: {{names}}",
+    "sortOptions": {
+      "name": "Name (A → Z)",
+      "usage": "Most used",
+      "recent": "Recently modified"
+    },
+    "storyCount": "{{count}} story(ies)",
+    "unusedLabel": "No story",
+    "thisWeek": "This week",
+    "weekTheme": "Theme of the week"
   },
   "timeline": {
     "thisStory": "this story",
@@ -711,6 +848,25 @@
     "title": "Week"
   },
   "weeklyThemes": {
-    "week": "Week"
+    "week": "Week",
+    "chooseTheme": "Choose a theme",
+    "clearWeek": "Remove the theme of week {{week}}",
+    "current": "Current",
+    "hint": "Each week gets a theme, saved as soon as you pick it. It applies to the same week every year and becomes the primary theme of generated stories.",
+    "nextYear": "Next year",
+    "previousYear": "Previous year",
+    "progress": "{{done}} / {{total}} weeks with a theme",
+    "saved": "Week {{week}} saved",
+    "thisYear": "This year",
+    "weekStories": "Stories of week {{week}}"
+  },
+  "validation": {
+    "titleRequired": "Title is required.",
+    "contentRequired": "Content is required.",
+    "themeRequired": "Choose at least one theme.",
+    "ageGroupRequired": "Choose an age group.",
+    "languageRequired": "Choose a language (French or English).",
+    "dayRequired": "Choose a day of the week.",
+    "weekRequired": "Choose a week (1 to 53)."
   }
 }

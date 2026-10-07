@@ -18,3 +18,21 @@ export const updateWeeklyThemes = async (req, res) => {
         handleError(res, error);
     }
 };
+
+export const setWeekTheme = async (req, res) => {
+    try {
+        const week = await weeklyThemeService.setWeek(req.params.week, req.body || {});
+        res.json(week);
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
+export const clearWeekTheme = async (req, res) => {
+    try {
+        await weeklyThemeService.clearWeek(req.params.week);
+        res.json({ success: true });
+    } catch (error) {
+        handleError(res, error);
+    }
+};

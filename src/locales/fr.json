@@ -59,7 +59,13 @@
     "saving": "Enregistrement...",
     "search": "Rechercher",
     "success": "Succès",
-    "noDaysAvailable": "Aucun jour disponible"
+    "noDaysAvailable": "Aucun jour disponible",
+    "unsavedTitle": "Quitter sans enregistrer ?",
+    "unsavedDesc": "Vos modifications n'ont pas été enregistrées et seront perdues.",
+    "leave": "Quitter",
+    "stay": "Rester",
+    "close": "Fermer",
+    "confirmDelete": "Confirmer la suppression"
   },
   "create": {
     "ageGroup": "Tranche d'âge",
@@ -87,21 +93,48 @@
       "aiProvider": "Moteur IA",
       "provider": {
         "gemini": "Cloud (Google Gemini - Rapide & Qualitatif)",
-        "local": "Local (Gemma 3 4B - Gratuit & Privé)"
+        "local": "Local Ollama"
+      },
+      "aiModel": "Modèle Ollama",
+      "model": {
+        "default": "Défaut"
       },
       "logs": {
         "start": "🚀 Démarrage de la génération...",
         "weekNotFound": "⚠️ Semaine {{week}} introuvable, ignorée.",
+        "segmentWithoutDay": "⚠️ Histoire « {{title}} » ignorée : jour de la semaine introuvable dans la réponse de l'IA.",
+        "truncated": "⚠️ Réponse de l'IA tronquée (limite de longueur atteinte, modèle {{model}}) : la dernière histoire peut être incomplète.",
+        "noThemesError": "Impossible de sauvegarder l'histoire sans thème.",
         "generatingIterative": "⏳ Génération pour Semaine {{week}} ({{day}}) - {{age}} (Mode Iteratif Local)...",
         "generating": "⏳ Génération pour Semaine {{week}} ({{theme}}) - {{age}}...",
         "success": "✨ Génération terminée avec succès !",
         "error": "❌ Erreur: {{error}}",
         "selectRequired": "Veuillez sélectionner au moins une semaine, une tranche d'âge et le jour.",
-        "errorGeneric": "Une erreur est survenue pendant la génération."
+        "errorGeneric": "Une erreur est survenue pendant la génération.",
+        "themeCreated": "🏷️ Nouveau thème créé : « {{name}} ».",
+        "aliasCreated": "⚠️ Créneau déjà occupé : « {{title}} » a été rangée dans la série « {{series}} ».",
+        "textFallback": "ℹ️ Réponse de l'IA non structurée : lecture du texte en mode de secours.",
+        "saved": "« {{title}} » enregistrée ({{age}} - {{day}})",
+        "nothingCreated": "❌ Aucune histoire n'a été créée.",
+        "summary": "✨ Terminé : {{created}} histoire(s) créée(s), {{failed}} échec(s), {{skipped}} ignorée(s)."
       },
       "theme": "Thème Hebdomadaire",
       "title": "Générateur d'Histoires IA",
-      "weekNumber": "Numéro de Semaine"
+      "weekNumber": "Numéro de Semaine",
+      "untitled": "Histoire générée",
+      "weeklyThemeDescription": "Thème hebdomadaire",
+      "progress": "Progression de la génération",
+      "allWeek": "Toute la semaine",
+      "report": {
+        "title": "{{count}} histoire(s) créée(s)",
+        "issues": "{{failed}} échec(s) et {{skipped}} élément(s) ignoré(s) : voir le journal ci-dessus.",
+        "openLibrary": "Voir dans la bibliothèque"
+      },
+      "selectWeeks": "Choisir les semaines",
+      "selectAges": "Choisir les tranches d'âge",
+      "selectedCount": "{{count}} sélectionné(s)",
+      "selectAll": "Tout sélectionner",
+      "clearSelection": "Tout désélectionner"
     },
     "illustrate": {
       "aiDisclaimer": "Propulsé par Google Gemini. Les images sont générées par IA.",
@@ -110,13 +143,17 @@
       "createIllustration": "Créer une illustration",
       "error": {
         "failedToRead": "Impossible de lire le fichier image",
-        "imageTooLarge": "Image trop volumineuse. Taille maximale : 5 Mo"
+        "imageTooLarge": "Image trop volumineuse. Taille maximale : 5 Mo",
+        "missingStory": "Histoire introuvable : impossible d'ajouter l'illustration.",
+        "deleteFailed": "Impossible de supprimer l'illustration.",
+        "reorderFailed": "Impossible de changer l'ordre des illustrations."
       },
       "generateButton": "Générer",
       "savedIllustrations": "Illustrations enregistrées ({{count}})",
       "smartSuggestions": "Suggestions Intelligentes",
       "success": {
-        "imageUploaded": "Image téléchargée avec succès"
+        "imageUploaded": "Image téléchargée avec succès",
+        "imageDeleted": "Illustration supprimée"
       },
       "uploadButton": "Télécharger",
       "uploadImage": "Télécharger une image"
@@ -285,7 +322,15 @@
     "tableOfContents": "Inclure une table des matières",
     "themeBook": "Une collection d'histoires sur le thème {{theme}}",
     "title": "Exporter les histoires en PDF",
-    "tocTitle": "Table des matières"
+    "tocTitle": "Table des matières",
+    "filtersApplied": "Filtres appliqués",
+    "filtersAppliedDesc": "{{count}} histoire(s) sélectionnée(s) selon vos filtres.",
+    "noStories": "Aucune histoire sélectionnée",
+    "pleaseSelectStories": "Sélectionnez au moins une histoire à exporter.",
+    "readyToDownload": "Votre PDF est prêt à être téléchargé.",
+    "unknownError": "Erreur inconnue pendant la création du PDF.",
+    "exportDate": "Exporté le",
+    "invalidResponse": "Réponse invalide du serveur pendant la création du PDF."
   },
   "series": {
     "createSuccess": "Série créée avec succès",
@@ -519,6 +564,17 @@
     "restoreSuccess": "Version restaurée avec succès",
     "restoreVersion": "Restaurer la version",
     "savedIllustrations": "Illustrations enregistrées",
+    "illustrationPrompt": "Prompt d'illustration (IA)",
+    "illustrationPromptHint": "Description proposée par l'IA pour créer l'illustration de cette histoire.",
+    "copyPrompt": "Copier le prompt",
+    "promptCopied": "Prompt copié dans le presse-papiers",
+    "coverIllustrationHint": "La première illustration sert de couverture (carte et PDF). Utilisez les flèches pour changer l'ordre.",
+    "moveIllustrationBefore": "Déplacer avant",
+    "moveIllustrationAfter": "Déplacer après",
+    "deleteIllustrationTitle": "Supprimer cette illustration ?",
+    "deleteIllustrationDesc": "L'image sera retirée de l'histoire. Cette action est définitive.",
+    "invalidImageType": "Format non accepté : utilisez une image JPEG, PNG, GIF ou WebP.",
+    "imageTooLarge": "Image trop lourde (5 Mo maximum).",
     "years": "ans",
     "searchPlaceholder": "Rechercher une histoire...",
     "searchStories": "Rechercher des histoires",
@@ -546,7 +602,27 @@
       "gemini": "Gemini (Cloud)",
       "ollama": "Ollama (Local)",
       "editedByHuman": "(modifiée)"
-    }
+    },
+    "deleteConfirmDesc": "L'histoire « {{title}} » sera supprimée définitivement, avec ses illustrations et son audio.",
+    "audio": {
+      "generate": "Générer l'audio",
+      "regenerate": "Régénérer l'audio",
+      "generating": "Génération de l'audio…",
+      "generatingDesc": "Cela peut prendre quelques secondes.",
+      "generated": "Audio généré !",
+      "generatedDesc": "Vous pouvez maintenant écouter l'histoire.",
+      "error": "Impossible de générer l'audio",
+      "errorDesc": "Vérifiez la clé API ou réessayez.",
+      "unsupported": "Votre navigateur ne supporte pas la lecture audio.",
+      "willBeDeleted": "Cette histoire a un audio : il sera supprimé à l'enregistrement et devra être régénéré."
+    },
+    "aliasCreated": "Créneau déjà occupé : l'histoire a été rangée dans la série « {{series}} ».",
+    "illustrationsSavedImmediately": "Les illustrations sont enregistrées dès l'envoi ou la suppression, sans attendre le bouton Enregistrer.",
+    "restoreConfirmTitle": "Restaurer la version {{version}} ?",
+    "restoreConfirmDesc": "Le contenu actuel sera remplacé par cette version. Il reste disponible dans l'historique et pourra être restauré.",
+    "restoreUnsavedWarning": "Les modifications non enregistrées seront perdues.",
+    "loadError": "Impossible de charger l'histoire.",
+    "contentPlaceholder": "Écrivez votre histoire…"
   },
   "success": {
     "title": "Succès",
@@ -672,7 +748,68 @@
     "sortAZ": "A-Z",
     "sortZA": "Z-A",
     "sortAsc": "- +",
-    "sortDesc": "+ -"
+    "sortDesc": "+ -",
+    "deleteInUseError": "Impossible de supprimer ce thème : il est peut-être utilisé par des histoires.",
+    "pageTitle": "Thèmes",
+    "pageSubtitle": "Organisez les thèmes de vos histoires et choisissez le thème de chaque semaine.",
+    "tabs": {
+      "themes": "Thèmes",
+      "calendar": "Calendrier hebdo"
+    },
+    "actions": "Actions pour « {{name}} »",
+    "addToStory": "Ajouter un thème",
+    "alreadyExists": "Le thème « {{name}} » existe déjà : il a été réutilisé.",
+    "chooseReplacement": "Choisir un thème de remplacement",
+    "clearFilters": "Effacer les filtres",
+    "color": "Couleur",
+    "colorCode": "Code couleur",
+    "customColor": "Couleur personnalisée",
+    "createNamed": "Créer « {{name}} »",
+    "deleteUnusedDesc": "Ce thème n'est utilisé par aucune histoire. Il sera supprimé définitivement.",
+    "deleteUsedDesc": "Ce thème est utilisé par {{count}} histoire(s). Choisissez le thème qui le remplacera dans ces histoires.",
+    "deletedAndMoved": "Thème supprimé : {{count}} histoire(s) déplacée(s) vers le thème de remplacement.",
+    "description": "Description",
+    "duplicatesBanner": "{{count}} groupe(s) de thèmes semblent être des doublons.",
+    "duplicatesTitle": "Doublons possibles",
+    "duplicatesDesc": "Ces thèmes ont des noms très proches. Choisissez celui à garder : les histoires, versions et semaines des autres lui seront rattachées.",
+    "noDuplicates": "Aucun doublon détecté.",
+    "filters": {
+      "all": "Tous",
+      "review": "À revoir",
+      "unused": "Inutilisés"
+    },
+    "quickFilters": "Filtres rapides",
+    "formDescription": "Le nom est unique : les majuscules, accents et articles (le, la, les…) sont ignorés.",
+    "icon": "Icône",
+    "noIcon": "Sans icône",
+    "keepTheme": "Thème à garder",
+    "makePrimary": "Définir comme thème principal",
+    "primary": "Thème principal",
+    "primaryHint": "L'étoile marque le thème principal : il s'affiche en premier sur les cartes et dans la timeline.",
+    "mergeTitle": "Fusionner dans un autre thème",
+    "mergeDesc": "Les {{count}} histoire(s) de ce thème, ses versions et ses semaines seront rattachées au thème choisi, puis ce thème sera supprimé.",
+    "mergeInto": "Fusionner avec « {{name}} »",
+    "mergeIntoOther": "Fusionner dans…",
+    "mergePreview": "{{count}} histoire(s) seront rattachées au thème gardé.",
+    "mergedInto": "Fusionné dans « {{name}} » ({{count}} histoire(s) déplacée(s)).",
+    "moveAndDelete": "Déplacer et supprimer",
+    "name": "Nom",
+    "nameConflict": "Un autre thème s'appelle déjà « {{name}} ».",
+    "needsReview": "IA · à revoir",
+    "needsReviewHint": "Créé par la génération IA. Modifiez-le (ou fusionnez-le) pour le valider.",
+    "removeFromStory": "Retirer « {{name}} »",
+    "replacement": "Thème de remplacement",
+    "reviewDuplicates": "Revoir",
+    "similarExists": "Thème proche déjà existant : {{names}}",
+    "sortOptions": {
+      "name": "Nom (A → Z)",
+      "usage": "Plus utilisés",
+      "recent": "Modifiés récemment"
+    },
+    "storyCount": "{{count}} histoire(s)",
+    "unusedLabel": "Aucune histoire",
+    "thisWeek": "Cette semaine",
+    "weekTheme": "Thème de la semaine"
   },
   "errors": {
     "addThemeFailed": "Échec de l'ajout du thème",
@@ -711,6 +848,25 @@
     "title": "Semaine"
   },
   "weeklyThemes": {
-    "week": "Semaine"
+    "week": "Semaine",
+    "chooseTheme": "Choisir un thème",
+    "clearWeek": "Retirer le thème de la semaine {{week}}",
+    "current": "En cours",
+    "hint": "Chaque semaine reçoit un thème, enregistré dès qu'il est choisi. Il s'applique à la même semaine chaque année et sert de thème principal aux histoires générées.",
+    "nextYear": "Année suivante",
+    "previousYear": "Année précédente",
+    "progress": "{{done}} / {{total}} semaines avec un thème",
+    "saved": "Semaine {{week}} enregistrée",
+    "thisYear": "Cette année",
+    "weekStories": "Histoires de la semaine {{week}}"
+  },
+  "validation": {
+    "titleRequired": "Le titre est obligatoire.",
+    "contentRequired": "Le contenu est obligatoire.",
+    "themeRequired": "Choisissez au moins un thème.",
+    "ageGroupRequired": "Choisissez une tranche d'âge.",
+    "languageRequired": "Choisissez une langue (français ou anglais).",
+    "dayRequired": "Choisissez un jour de la semaine.",
+    "weekRequired": "Choisissez une semaine (1 à 53)."
   }
 }

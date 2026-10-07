@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { i18n } from '@/lib/i18n';
 import useDarkMode from '@/hooks/useDarkMode';
 
@@ -39,7 +40,7 @@ const StoryContent = ({ story }: StoryContentProps) => {
             );
         }
 
-        return <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left" dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+        return <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />;
     } else {
         // Plain Text Logic (Legacy)
         return (

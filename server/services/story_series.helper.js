@@ -32,18 +32,34 @@ class StorySeriesHelper {
     /**
      * Detects collisions and handles branching/aliasing logic.
      * @param {Object} connection - DB connection.
-     * @param {Object} storySlot - { weekNumber, dayOrder, ageGroup, locale, seriesId }
+     * @param {Object} storySlot - { weekNumber, dayOrder, ageGroup, locale, seriesId, excludeStoryId }
+     *   excludeStoryId: story being updated, so it never collides with itself.
      * @param {string} seriesName - Current series name for alias naming.
      * @returns {Promise<string|null>} Output series ID (branched if necessary).
      */
-    async handleCollisions(connection, { weekNumber, dayOrder, ageGroup, locale, seriesId }, seriesName) {
+    async handleCollisions(connection, slot, seriesName) {
+        return (await this.resolveSlot(connection, slot, seriesName)).seriesId;
+    }
+
+    /**
+     * Same as handleCollisions, but also tells whether the story was moved to an alias series,
+     * so the client can warn the user.
+     * A story collides only with stories of the same series (no series = only stories without series).
+     * @returns {Promise<{seriesId: string|null, alias: {id: string, name: string}|null}>}
+     */
+    async resolveSlot(connection, { weekNumber, dayOrder, ageGroup, locale, seriesId, excludeStoryId = null }, seriesName) {
         let finalSeriesId = seriesId;
         
         let collisionQuery = 'SELECT id, series_id FROM stories WHERE week_number = ? AND day_order = ? AND age_group = ? AND locale = ?';
         let collisionParams = [weekNumber, dayOrder, ageGroup, locale];
+
+        if (excludeStoryId) {
+            collisionQuery += ' AND id <> ?';
+            collisionParams.push(excludeStoryId);
+        }
         
         if (finalSeriesId) {
-            collisionQuery += ' AND (series_id = ? OR series_id IS NULL)';
+            collisionQuery += ' AND series_id = ?';
             collisionParams.push(finalSeriesId);
         } else {
             collisionQuery += ' AND series_id IS NULL';
@@ -59,17 +75,18 @@ class StorySeriesHelper {
             
             let aliasCounter = 1;
             let resolvedSeriesId = null;
+            let aliasName = null;
             
             while (!resolvedSeriesId) {
-                const aliasName = `${baseSeriesName} (Alias ${aliasCounter})`;
+                aliasName = `${baseSeriesName} (Alias ${aliasCounter})`;
                 
                 const [aliasSeries] = await connection.query('SELECT id FROM story_series WHERE name = ?', [aliasName]);
                 
                 if (aliasSeries.length > 0) {
                     const existingAliasId = aliasSeries[0].id;
                     const [aliasCollision] = await connection.query(
-                         'SELECT id FROM stories WHERE week_number = ? AND day_order = ? AND age_group = ? AND locale = ? AND series_id = ?',
-                         [weekNumber, dayOrder, ageGroup, locale, existingAliasId]
+                         'SELECT id FROM stories WHERE week_number = ? AND day_order = ? AND age_group = ? AND locale = ? AND series_id = ? AND id <> ?',
+                         [weekNumber, dayOrder, ageGroup, locale, existingAliasId, excludeStoryId || '']
                     );
                     
                     if (aliasCollision.length === 0) {
@@ -86,10 +103,10 @@ class StorySeriesHelper {
                     );
                 }
             }
-            return resolvedSeriesId;
+            return { seriesId: resolvedSeriesId, alias: { id: resolvedSeriesId, name: aliasName } };
         }
 
-        return finalSeriesId;
+        return { seriesId: finalSeriesId, alias: null };
     }
 }
 

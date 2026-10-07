@@ -54,7 +54,19 @@ export const APP_ROUTES = {
     EDIT_STORY: (id: string) => `/edit/${id}`,
     SERIES_MANAGEMENT: '/series-management',
     SETTINGS: '/settings',
-    WEEKLY_THEMES: '/weekly-themes',
     TIMELINE: '/timeline',
-    THEMES: '/theme',
+    // Themes page: "themes" tab, and the weekly calendar with ?tab=calendar
+    THEMES: '/themes',
 } as const;
+
+// Must match the server whitelist (server/config/upload.config.js)
+export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+// AI generation
+// Stories are generated in French only (prompt and output format are French)
+export const GENERATION_LOCALE = 'fr';
+// "Whole week" day value: understood by the server prompt helper (server/services/helpers/prompt.helper.js)
+export const ALL_WEEK = 'Toute la semaine';
+// Day values sent to the prompt, in week order
+export const GENERATION_DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;

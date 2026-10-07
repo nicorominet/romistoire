@@ -1,219 +1,260 @@
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { ConflictError, NotFoundError, ValidationError } from '../middleware/error.middleware.js';
+import { normalizeThemeName, groupSimilarThemes } from './helpers/theme_name.helper.js';
+import { mergeThemesOnConnection } from './helpers/theme_merge.helper.js';
+
+const NAME_MAX_LENGTH = 100;
+const ICON_MAX_LENGTH = 16;
+const COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const DEFAULT_COLOR = '#6366f1';
+const SORTS = {
+  name: 't.name ASC',
+  usage: 'storyCount DESC, t.name ASC',
+  recent: 'COALESCE(t.updated_at, t.created_at) DESC, t.name ASC'
+};
+
+const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+const THEME_SELECT = `
+  SELECT t.id, t.name, t.description, t.icon, t.color, t.source, t.needs_review, t.created_at, t.updated_at,
+         (SELECT COUNT(*) FROM story_themes st WHERE st.theme_id = t.id) AS storyCount
+  FROM themes t`;
+
+/** DB row -> API object. */
+const toTheme = (row) => row && ({
+  id: row.id,
+  name: row.name,
+  description: row.description ?? '',
+  icon: row.icon || null,
+  color: row.color || DEFAULT_COLOR,
+  source: row.source || 'manual',
+  needsReview: Number(row.needs_review) === 1,
+  storyCount: Number(row.storyCount || 0),
+  created_at: row.created_at,
+  updated_at: row.updated_at || null
+});
 
 /**
- * Service for managing themes.
+ * Validates and cleans theme fields. Only the provided fields are returned (partial updates).
+ * @throws {ValidationError}
+ */
+const cleanThemeInput = (data, { requireName }) => {
+  const clean = {};
+  if (data.name !== undefined || requireName) {
+    const name = String(data.name ?? '').trim().replace(/\s+/g, ' ');
+    if (!name) throw new ValidationError('Theme name is required');
+    if (name.length > NAME_MAX_LENGTH) throw new ValidationError(`Theme name is limited to ${NAME_MAX_LENGTH} characters`);
+    if (!normalizeThemeName(name)) throw new ValidationError('Theme name must contain letters or digits');
+    clean.name = name;
+  }
+  if (data.description !== undefined) clean.description = String(data.description ?? '').trim();
+  if (data.color !== undefined) {
+    if (data.color && !COLOR_PATTERN.test(data.color)) throw new ValidationError('Color must be a hex code like #4CAF50');
+    clean.color = data.color || DEFAULT_COLOR;
+  }
+  if (data.icon !== undefined) {
+    const icon = String(data.icon ?? '').trim();
+    if ([...icon].length > ICON_MAX_LENGTH) throw new ValidationError('Icon is too long');
+    clean.icon = icon || null;
+  }
+  return clean;
+};
+
+/**
+ * Service for managing themes. All theme rules (uniqueness, merge, delete) live here.
  */
 class ThemeService {
   constructor() {
     this.cache = null;
   }
 
-  /**
-   * Fetch all themes with optional filters.
-   * Uses caching for non-filtered requests.
-   * @param {string} [locale='fr'] - Locale filters (not directly applied in query logic currently but used for cache key).
-   * @param {Object} [filters={}] - Filtering options.
-   * @param {string} [filters.age_group] - Filter by age group.
-   * @param {string} [filters.series_id] - Filter by series ID.
-   * @param {string} [filters.search] - Search term.
-   * @returns {Promise<Array>} List of themes with story counts.
-   */
-  async findAll(locale = 'fr', filters = {}) {
-    const { age_group, series_id, search } = filters;
-    let params = [];
-    let whereClauses = [];
-    let joinStories = false;
-
-    if (age_group || series_id) {
-        joinStories = true;
-    }
-
-    let sql = `
-        SELECT t.*, COUNT(DISTINCT st.story_id) as storyCount 
-        FROM themes t 
-        LEFT JOIN story_themes st ON t.id = st.theme_id 
-    `;
-
-    if (joinStories) {
-        sql += ` LEFT JOIN stories s ON st.story_id = s.id `;
-    }
-
-    if (search) {
-        whereClauses.push(`(t.name LIKE ? OR t.description LIKE ?)`);
-        params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (age_group) {
-        whereClauses.push(`s.age_group = ?`);
-        params.push(age_group);
-    }
-
-    if (series_id) {
-        whereClauses.push(`s.series_id = ?`);
-        params.push(series_id);
-    }
-
-    if (whereClauses.length > 0) {
-        sql += ` WHERE ${whereClauses.join(' AND ')} `;
-    }
-
-    sql += ` GROUP BY t.id `;
-    sql += ` ORDER BY t.name ASC`;
-
-    // Cache strategy: only cache if no filters (except default locale)
-    const isCacheable = !search && !age_group && !series_id;
-    
-    if (isCacheable && this.cache && this.cache.locale === locale) {
-        return this.cache.data;
-    }
-
-    const results = await query(sql, params);
-
-    if (isCacheable) {
-        this.cache = {
-            locale,
-            data: results,
-            timestamp: Date.now()
-        };
-    }
-
-    return results;
+  invalidateCache() {
+    this.cache = null;
   }
 
   /**
-   * Get all stories associated with a theme.
-   * @param {string} themeId - Theme ID.
-   * @returns {Promise<Array>} List of stories.
+   * List themes with their story count.
+   * @param {Object} [filters]
+   * @param {string} [filters.search] - Matches name or description (accents and case ignored on the name).
+   * @param {'name'|'usage'|'recent'} [filters.sort='name']
+   * @param {boolean} [filters.needsReview] - Only AI themes not reviewed yet.
+   * @param {boolean} [filters.unused] - Only themes without stories.
+   */
+  async findAll({ search, sort = 'name', needsReview = false, unused = false } = {}) {
+    const isDefault = !search && sort === 'name' && !needsReview && !unused;
+    if (isDefault && this.cache) return this.cache;
+
+    const where = [];
+    const params = [];
+    if (search && String(search).trim()) {
+      const term = String(search).trim();
+      where.push('(t.normalized_name LIKE ? OR t.name LIKE ? OR t.description LIKE ?)');
+      params.push(`%${normalizeThemeName(term) || term}%`, `%${term}%`, `%${term}%`);
+    }
+    if (needsReview) where.push('t.needs_review = TRUE');
+
+    let sql = THEME_SELECT;
+    if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
+    if (unused) sql += ' HAVING storyCount = 0';
+    sql += ` ORDER BY ${SORTS[sort] || SORTS.name}`;
+
+    const themes = (await query(sql, params)).map(toTheme);
+    if (isDefault) this.cache = themes;
+    return themes;
+  }
+
+  async findById(id, connection = null) {
+    const sql = `${THEME_SELECT} WHERE t.id = ?`;
+    const rows = connection ? (await connection.query(sql, [id]))[0] : await query(sql, [id]);
+    return toTheme(rows[0]) || null;
+  }
+
+  async _findByNormalizedName(normalizedName, connection = null) {
+    const sql = `${THEME_SELECT} WHERE t.normalized_name = ?`;
+    const rows = connection ? (await connection.query(sql, [normalizedName]))[0] : await query(sql, [normalizedName]);
+    return toTheme(rows[0]) || null;
+  }
+
+  /**
+   * Stories linked to a theme.
    */
   async getStories(themeId) {
-      const sql = `
-        SELECT s.* 
-        FROM stories s
-        JOIN story_themes st ON s.id = st.story_id
-        WHERE st.theme_id = ?
-        ORDER BY s.title ASC
-      `;
-      return await query(sql, [themeId]);
+    return await query(
+      `SELECT s.* FROM stories s JOIN story_themes st ON s.id = st.story_id WHERE st.theme_id = ? ORDER BY s.week_number, s.day_order, s.title`,
+      [themeId]
+    );
   }
 
   /**
-   * Create a new theme.
-   * @param {Object} themeData - Theme data.
-   * @returns {Promise<Object>} The created theme.
+   * Create a theme, or return the existing one with the same name (accents, case and articles ignored).
+   * @param {Object} data - { name, description?, color?, icon?, source?: 'manual'|'ai' }
+   * @param {Object} [connection] - Optional connection (inside a transaction).
+   * @returns {Promise<{theme: Object, existing: boolean}>}
    */
-  async create(themeData) {
-      const { name, description, color, icon } = themeData;
-      const existing = await query('SELECT * FROM themes WHERE name = ?', [name]);
-      if (existing.length > 0) return existing[0]; // Return existing if duplicate name
+  async create(data, connection = null) {
+    const clean = cleanThemeInput(data, { requireName: true });
+    const normalizedName = normalizeThemeName(clean.name);
 
-      const id = uuidv4();
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      
-      await query(
-        'INSERT INTO themes (id, name, description, color, icon, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, name, description, color, icon || null, now]
-      );
-      this.invalidateCache();
-      return { id, name, description, color, icon, created_at: now };
+    const existing = await this._findByNormalizedName(normalizedName, connection);
+    if (existing) return { theme: existing, existing: true };
+
+    const id = uuidv4();
+    const source = data.source === 'ai' ? 'ai' : 'manual';
+    const params = [id, clean.name, normalizedName, clean.description ?? '', clean.color ?? DEFAULT_COLOR, clean.icon ?? null, source, source === 'ai', now()];
+    const sql = 'INSERT INTO themes (id, name, normalized_name, description, color, icon, source, needs_review, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    try {
+      if (connection) await connection.query(sql, params);
+      else await query(sql, params);
+    } catch (error) {
+      // Created concurrently (unique index on normalized_name)
+      if (error.code === 'ER_DUP_ENTRY') {
+        return { theme: await this._findByNormalizedName(normalizedName, connection), existing: true };
+      }
+      throw error;
+    }
+    this.invalidateCache();
+    return { theme: await this.findById(id, connection), existing: false };
   }
 
   /**
-   * Invalidate the theme cache.
+   * Partial update. A human edit marks the theme as reviewed.
+   * @throws {NotFoundError} Unknown theme.
+   * @throws {ConflictError} Another theme already has this name ({ conflictWith }).
    */
-  invalidateCache() {
-      this.cache = null;
+  async update(id, patch) {
+    const current = await this.findById(id);
+    if (!current) throw new NotFoundError('Theme not found');
+
+    const clean = cleanThemeInput(patch, { requireName: false });
+    const sets = [];
+    const params = [];
+
+    if (clean.name !== undefined) {
+      const normalizedName = normalizeThemeName(clean.name);
+      const other = await this._findByNormalizedName(normalizedName);
+      if (other && other.id !== id) {
+        throw new ConflictError('Another theme already has this name', { conflictWith: { id: other.id, name: other.name } });
+      }
+      sets.push('name = ?', 'normalized_name = ?');
+      params.push(clean.name, normalizedName);
+    }
+    for (const field of ['description', 'color', 'icon']) {
+      if (clean[field] !== undefined) {
+        sets.push(`${field} = ?`);
+        params.push(clean[field]);
+      }
+    }
+    sets.push('needs_review = FALSE', 'updated_at = ?');
+    params.push(now(), id);
+
+    await query(`UPDATE themes SET ${sets.join(', ')} WHERE id = ?`, params);
+    this.invalidateCache();
+    return await this.findById(id);
   }
 
   /**
-   * Update an existing theme.
-   * @param {string} id - Theme ID.
-   * @param {Object} data - Update data.
-   * @returns {Promise<Object>} The updated theme.
+   * Delete a theme. A theme used by stories needs a replacement theme (`reassignTo`).
+   * @throws {NotFoundError|ConflictError|ValidationError}
    */
-  async update(id, { name, description, color }) {
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      await query(
-           'UPDATE themes SET name = ?, description = ?, color = ?, created_at = ? WHERE id = ?',
-          [name, description, color, now, id]
-      );
-      this.invalidateCache();
-      return { id, name, description, color, created_at: now };
-  }
-
-  /**
-   * Delete a theme.
-   * @param {string} id - Theme ID.
-   * @returns {Promise<boolean>} True on success.
-   * @throws {Error} If theme is associated with stories.
-   */
-  async delete(id) {
-    // Check for VALID stories using this theme
-    const storiesUsingTheme = await query(`
-        SELECT COUNT(DISTINCT s.id) as count 
-        FROM story_themes st
-        JOIN stories s ON st.story_id = s.id
-        WHERE st.theme_id = ?
-    `, [id]);
-
-    if (storiesUsingTheme[0].count > 0) {
-        throw new Error('Cannot delete theme. It is used by one or more active stories.');
+  async delete(id, { reassignTo = null } = {}) {
+    const theme = await this.findById(id);
+    if (!theme) throw new NotFoundError('Theme not found');
+    if (theme.storyCount > 0 && !reassignTo) {
+      throw new ConflictError('Theme is used by stories', { storyCount: theme.storyCount });
+    }
+    if (reassignTo) {
+      await this.mergeThemes([id], reassignTo);
+      return { deleted: true, movedStories: theme.storyCount };
     }
 
-    // Checking for ORPHANS (entries in story_themes where story doesn't exist)
-    // If we are here, it means 'valid' count is 0. 
-    // We can safely clean up story_themes for this theme ID before deleting the theme.
-    await query('DELETE FROM story_themes WHERE theme_id = ?', [id]);
-    
-    await query('DELETE FROM themes WHERE id = ?', [id]);
+    await this._inTransaction(async (connection) => {
+      await connection.query('UPDATE weekly_themes SET theme_id = NULL WHERE theme_id = ?', [id]);
+      await connection.query('DELETE FROM themes WHERE id = ?', [id]);
+    });
     this.invalidateCache();
-    return true;
+    return { deleted: true, movedStories: 0 };
   }
 
   /**
-   * Merge duplicate themes based on name.
-   * @returns {Promise<{message: string}>} Result message.
+   * Merge themes into one. Story and version links, primary flags and weekly themes are kept.
+   * @throws {ValidationError|NotFoundError}
    */
-  async mergeDuplicates() {
-      const duplicates = await query(`SELECT name, COUNT(*) as count FROM themes GROUP BY name HAVING count > 1`);
-      if (duplicates.length === 0) return { message: 'No duplicate themes found' };
-      
-      let mergedCount = 0;
-      for (const row of duplicates) {
-          const themes = await query('SELECT * FROM themes WHERE name = ?', [row.name]);
-          if (themes.length > 1) {
-              const [primary, ...others] = themes;
-              for (const other of others) {
-                  await query('UPDATE story_themes SET theme_id = ? WHERE theme_id = ?', [primary.id, other.id]);
-                  await query('DELETE FROM themes WHERE id = ?', [other.id]);
-              }
-              mergedCount++;
-          }
-      }
-      if (mergedCount > 0) this.invalidateCache();
-      return { message: `Merged ${mergedCount} duplicate groups` };
+  async mergeThemes(sourceIds, targetId) {
+    const sources = [...new Set((sourceIds || []).filter(Boolean))].filter(sourceId => sourceId !== targetId);
+    if (!targetId || sources.length === 0) throw new ValidationError('A target theme and at least one other theme are required');
+
+    const target = await this.findById(targetId);
+    if (!target) throw new NotFoundError('Target theme not found');
+
+    const result = await this._inTransaction(connection => mergeThemesOnConnection(connection, sources, targetId));
+    this.invalidateCache();
+    return { ...result, target: await this.findById(targetId) };
   }
 
   /**
-   * Update stories to replace an old theme ID with a new one.
-   * @param {string} oldThemeId - Old Theme ID.
-   * @param {string} newThemeId - New Theme ID.
-   * @returns {Promise<boolean>} True on success.
+   * Groups of themes that look like duplicates ("Océan" / "les océans"), most used first.
    */
-  async updateStoriesTheme(oldThemeId, newThemeId) {
-      const connection = await getConnection();
-      try {
-          await connection.beginTransaction();
-          // The theme_id is in story_themes table, not stories
-          await connection.query('UPDATE story_themes SET theme_id = ? WHERE theme_id = ?', [newThemeId, oldThemeId]);
-          await connection.commit();
-          return true;
-      } catch (error) {
-          await connection.rollback();
-          throw error;
-      } finally {
-          connection.release();
-      }
+  async findDuplicateGroups() {
+    const themes = (await query(THEME_SELECT)).map(toTheme);
+    return groupSimilarThemes(themes)
+      .map(group => group.sort((a, b) => b.storyCount - a.storyCount || a.name.localeCompare(b.name)));
+  }
+
+  async _inTransaction(work) {
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await work(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 }
+
 export const themeService = new ThemeService();

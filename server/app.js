@@ -40,7 +40,12 @@ app.use((req, res, next) => {
 });
 
 // Serve Uploads
-app.use('/uploads', express.static(ENV_CONFIG.UPLOADS_DIR));
+// nosniff: browsers must not reinterpret an uploaded file as HTML/script
+app.use('/uploads', express.static(ENV_CONFIG.UPLOADS_DIR, {
+  setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
+}));
+// Audio generated before the move to uploads/audio
+app.use('/audio', express.static(path.join(ENV_CONFIG.PROJECT_ROOT, 'public', 'audio')));
 
 // API Routes
 app.use('/api/stories', storyRoutes);

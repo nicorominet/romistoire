@@ -42,17 +42,25 @@ export const getDayLabel = (day: string): string => {
 
 /**
  * Maps French day name to English day name.
+ * Tolerant to AI output variations: case, accents, surrounding punctuation ("lundi.", "**Mardi**").
  */
 export const mapFrToEnDay = (frDay: string): string => {
   const map: Record<string, string> = {
-    "Lundi": "Monday",
-    "Mardi": "Tuesday",
-    "Mercredi": "Wednesday",
-    "Jeudi": "Thursday",
-    "Vendredi": "Friday",
-    "Samedi": "Saturday",
-    "Dimanche": "Sunday",
-    "Toute la semaine": "Monday" // Default for batches
+    "lundi": "Monday",
+    "mardi": "Tuesday",
+    "mercredi": "Wednesday",
+    "jeudi": "Thursday",
+    "vendredi": "Friday",
+    "samedi": "Saturday",
+    "dimanche": "Sunday",
+    "toute la semaine": "Monday" // Default for batches
   };
-  return map[frDay] || frDay;
+  if (!frDay) return frDay;
+  const normalized = frDay
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[*[\]().,;:!]/g, "")
+    .trim()
+    .toLowerCase();
+  const englishDay = DAY_NAMES_EN.find(day => day.toLowerCase() === normalized);
+  return map[normalized] || englishDay || frDay;
 };

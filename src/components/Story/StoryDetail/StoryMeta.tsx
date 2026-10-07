@@ -2,11 +2,15 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, BookOpen, User, Sparkles, Cpu } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { formatDate } from '@/lib/utils';
+import { ThemeLike } from '@/types/Theme';
+import { ThemeBadge } from '@/components/Theme/ThemeBadge';
+import { DAY_NAMES_EN, getDayLabel } from '@/utils/dayUtils';
 
 interface StoryMetaProps {
   ageGroup: string;
 
-  weeklyTheme?: string;
+  /** Theme of the story's week (linked theme, or the week's label) */
+  weeklyTheme?: ThemeLike | null;
   seriesName?: string;
   createdAt?: string;
   weekNumber?: number;
@@ -20,7 +24,6 @@ interface StoryMetaProps {
 const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale, source, is_manually_edited }: StoryMetaProps) => {
   const { t } = i18n;
 
-  const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
   return (
     <div className="flex flex-col items-center gap-6 mt-8 p-6 bg-secondary/10 rounded-xl border border-secondary/20 max-w-3xl mx-auto">
@@ -60,7 +63,7 @@ const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, d
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('story.day')}</span>
                 <div className="flex items-center gap-2 font-medium">
                     <Calendar className="h-4 w-4 text-primary" />
-                    {days[dayOrder - 1] || dayOrder}
+                    {DAY_NAMES_EN[dayOrder - 1] ? getDayLabel(DAY_NAMES_EN[dayOrder - 1]) : dayOrder}
                 </div>
             </div>
         )}
@@ -102,15 +105,17 @@ const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, d
       {(weeklyTheme || seriesName) && (
           <div className="flex flex-wrap justify-center gap-3 pt-4 border-t border-border/50 w-full">
             {weeklyTheme && (
-                <Badge variant="outline" className="gap-2 py-1.5 px-3">
-                    <BookOpen className="h-3 w-3" />
-                    <span className="opacity-70">{t('story.theme', 'Thème')}:</span> {weeklyTheme}
-                </Badge>
+                <span className="inline-flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">{t('themes.weekTheme')} :</span>
+                    {weeklyTheme.id
+                      ? <ThemeBadge theme={weeklyTheme} linkToStories size="md" />
+                      : <Badge variant="outline">{weeklyTheme.name}</Badge>}
+                </span>
             )}
             {seriesName && (
                 <Badge variant="outline" className="gap-2 py-1.5 px-3">
                     <BookOpen className="h-3 w-3" />
-                    <span className="opacity-70">{t('story.series', 'Série')}:</span> {seriesName}
+                    <span className="opacity-70">{t('story.series')}:</span> {seriesName}
                 </Badge>
             )}
           </div>

@@ -25,10 +25,14 @@ vi.mock('../controllers/system.controller.js', () => ({
   getLogs: vi.fn((req, res) => res.json(['log1.log'])),
   getLogDetails: vi.fn((req, res) => res.json({ logs: [] })),
   serveImage: vi.fn((req, res) => res.send('image-data')),
+  getLogConfig: vi.fn((req, res) => res.json({ level: 'info' })),
+  updateLogConfig: vi.fn((req, res) => res.json({ success: true })),
 }));
 
 // Mock Upload Middleware
 vi.mock('../config/upload.config.js', () => ({
+    IMAGE_EXTENSIONS: { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' },
+    InvalidFileTypeError: class InvalidFileTypeError extends Error {},
   upload: {
       single: () => (req, res, next) => {
           req.file = { path: 'mock-path', filename: 'mock-file' };

@@ -13,18 +13,14 @@ import { Story } from "@/types/Story";
 import { BookOpen, Clock, Calendar, ListOrdered, FileText, Sparkles, Cpu, User } from "lucide-react";
 import { getAgeGroupColor, formatDate, truncateText } from "@/lib/utils";
 import SafeImage from "@/components/ui/SafeImage";
-
-interface ThemeColorsMap {
-  [themeId: string]: string;
-}
+import { ThemeBadgeList } from "@/components/Theme/ThemeBadgeList";
 
 interface StoryCardProps {
   story: Story;
-  themeColors?: ThemeColorsMap;
 }
 
 
-const StoryCard = ({ story, themeColors = {} }: StoryCardProps) => {
+const StoryCard = ({ story }: StoryCardProps) => {
   const { t } = i18n;
 
   // Format date utilitaire
@@ -62,16 +58,6 @@ const StoryCard = ({ story, themeColors = {} }: StoryCardProps) => {
     return days[dayOrder - 1] || days[0];
   };
 
-  // Gestion de la couleur du badge thème
-  const getThemeBadgeStyle = (themeId: string, fallback?: string) => {
-    const color = themeColors[themeId] || fallback || "#ccc";
-    return {
-      backgroundColor: color,
-      color: "#fff",
-      border: "none",
-    };
-  };
-
   return (
     <Link to={`/stories/${story.id}`}>
       <Card className="story-card hover-scale h-full transition-all duration-300 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-white/50 dark:border-white/10 hover:bg-white/90 dark:hover:bg-slate-800/80 hover:shadow-xl shadow-sm">
@@ -80,23 +66,8 @@ const StoryCard = ({ story, themeColors = {} }: StoryCardProps) => {
             {story.title}
           </CardTitle>
           <div className="flex flex-wrap gap-2 mt-2">
-            {/* Badges multi-thèmes colorés */}
-            {Array.isArray(story.themes) &&
-              story.themes.map(
-                (themeObj: {
-                  id: string;
-                  name?: string;
-                  color?: string;
-                }) => (
-                  <Badge
-                    key={themeObj.id}
-                    variant="outline"
-                    style={getThemeBadgeStyle(themeObj.id, themeObj.color)}
-                  >
-                    {themeObj.name || themeObj.id}
-                  </Badge>
-                )
-              )}
+            {/* The card is a link: theme badges are not links here */}
+            <ThemeBadgeList themes={story.themes} variant="solid" max={3} />
             <Badge className={getAgeGroupColor(story.age_group)}>
               {t(`ages.${story.age_group}`)}
             </Badge>

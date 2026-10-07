@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AgeGroup, AGE_GROUPS } from "@/types/Story";
 import { Series } from "@/types/Series";
+import { Theme } from "@/types/Theme";
+import { ThemeSelect } from "@/components/Theme/ThemeSelect";
 
 interface StoriesSearchProps {
   searchTerm: string;
@@ -14,9 +16,9 @@ interface StoriesSearchProps {
   handleSearch: () => void;
   selectedTheme: string;
   handleThemeChange: (theme: string) => void;
-  themes: { id: string; name: string }[];
-  weeklyThemeId: string | null;
-  weeklyThemeName: string | null;
+  themes: Theme[];
+  /** Theme of the current week, pinned on top of the theme filter */
+  currentWeekThemeId?: string | null;
   weeklyThemesMap: { [week: number]: string };
   selectedAgeGroup: AgeGroup | 'all';
   handleAgeGroupChange: (ageGroup: AgeGroup | 'all') => void;
@@ -46,8 +48,7 @@ const StoriesSearch = ({
   selectedTheme,
   handleThemeChange,
   themes,
-  weeklyThemeId,
-  weeklyThemeName,
+  currentWeekThemeId = null,
   weeklyThemesMap,
   selectedAgeGroup,
   handleAgeGroupChange,
@@ -147,22 +148,15 @@ const StoriesSearch = ({
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showFilters ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
             <div className="pt-2 border-t border-white/20 dark:border-white/10 mt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Select value={selectedTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-full bg-white/50 dark:bg-slate-800/50">
-                  <SelectValue placeholder={t('stories.allThemes')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('stories.allThemes')}</SelectItem>
-                  {weeklyThemeId && weeklyThemeName && (
-                     <SelectItem value={weeklyThemeId} className="font-bold text-story-purple-800 border-b">
-                       ⭐ {weeklyThemeName}
-                     </SelectItem>
-                  )}
-                  {themes.map((theme: any) => (
-                    <SelectItem key={theme.id} value={theme.id}>{theme.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ThemeSelect
+                themes={themes}
+                value={selectedTheme && selectedTheme !== 'all' ? selectedTheme : null}
+                onChange={(themeId) => handleThemeChange(themeId ?? 'all')}
+                placeholder={t('stories.allThemes')}
+                clearLabel={t('stories.allThemes')}
+                pinned={currentWeekThemeId ? [{ themeId: currentWeekThemeId, label: t('themes.thisWeek') }] : []}
+                className="bg-white/50 dark:bg-slate-800/50"
+              />
 
               <Select value={selectedAgeGroup} onValueChange={handleAgeGroupChange}>
                 <SelectTrigger className="w-full bg-white/50 dark:bg-slate-800/50">

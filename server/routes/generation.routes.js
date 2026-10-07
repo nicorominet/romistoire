@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateAIStory } from '../controllers/story.controller.js';
+import { generateAIStory, getOllamaModels } from '../controllers/story.controller.js';
 
 const router = express.Router();
 
@@ -11,5 +11,8 @@ const router = express.Router();
  * @returns {Object} The generated story object.
  */
 router.post('/story', generateAIStory);
+
+// Route: /api/generate/ollama/models
+router.get('/ollama/models', getOllamaModels);
 
 export default router;

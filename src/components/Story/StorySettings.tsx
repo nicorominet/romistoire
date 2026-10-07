@@ -1,29 +1,22 @@
 import { useFormContext } from "react-hook-form";
+import { toast } from "sonner";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { getAgeGroupColor, formatDate } from "@/lib/utils";
 import { i18n } from "@/lib/i18n";
+import { getApiError } from "@/lib/apiError";
 import { Story, AGE_GROUPS } from "@/types/Story";
-import { useEffect, useState, useMemo } from "react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { Theme, WeeklyTheme } from "@/types/Theme";
 import { Series } from "@/types/Series";
 import { SeriesSelector } from "@/components/Story/SeriesSelector";
+import { ThemeMultiSelect, SelectedTheme } from "@/components/Theme/ThemeSelect";
+import { useThemeMutations } from "@/hooks/useThemes";
 
-interface Theme {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  created_at: string;
-}
+const STORY_LANGUAGES = ["fr", "en"] as const;
 
 interface StorySettingsProps {
   availableThemes: Theme[];
-  setAvailableThemes: React.Dispatch<React.SetStateAction<Theme[]>>;
-  weeklyThemes: { week_number: number; theme_name: string }[];
+  weeklyThemes: WeeklyTheme[];
   sortedDayOfWeekOptions: { value: string; label: string }[];
   story: Story;
   availableSeries: Series[];
@@ -31,7 +24,6 @@ interface StorySettingsProps {
 
 const StorySettings: React.FC<StorySettingsProps> = ({
   availableThemes,
-  setAvailableThemes,
   weeklyThemes,
   sortedDayOfWeekOptions,
   story,
@@ -39,25 +31,20 @@ const StorySettings: React.FC<StorySettingsProps> = ({
 }) => {
   const { t } = i18n;
   const { control, setValue, watch } = useFormContext();
-  const selectedThemeIds = watch("themes") || [];
-  const [searchTheme, setSearchTheme] = useState("");
+  const { createTheme } = useThemeMutations();
 
-  const filteredThemes = useMemo(() => {
-    return availableThemes.filter(theme =>
-    theme.name.toLowerCase().includes(searchTheme.toLowerCase()) &&
-    !selectedThemeIds.includes(theme.id)
-  );
-  }, [availableThemes, searchTheme, selectedThemeIds]);
+  // Theme of the selected week: pinned on top of the theme picker
+  const weekTheme = weeklyThemes.find(week => String(week.week_number) === String(watch("weekNumber")));
+  const pinned = weekTheme?.theme_id ? [{ themeId: weekTheme.theme_id, label: t("themes.weekTheme") }] : [];
 
-  const handleThemeRemove = (themeId: string) => {
-    const newThemes = selectedThemeIds.filter((id: string) => id !== themeId);
-    setValue("themes", newThemes);
-  };
-
-  const handleThemeSelect = (themeId: string) => {
-    const newThemes = [...selectedThemeIds, themeId];
-    setValue("themes", newThemes);
-    setSearchTheme("");
+  const handleCreateTheme = async (name: string): Promise<Theme | void> => {
+    try {
+      const theme = await createTheme.mutateAsync({ name });
+      if (theme.existing) toast.info(t("themes.alreadyExists", { name: theme.name }));
+      return theme;
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    }
   };
 
   return (
@@ -88,52 +75,15 @@ const StorySettings: React.FC<StorySettingsProps> = ({
         render={({ field }) => (
           <FormItem>
             <FormLabel className="text-gray-900 dark:text-gray-100">{t("story.themes")}</FormLabel>
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedThemeIds.map((themeId: string) => {
-                  const theme = availableThemes.find(t => t.id === themeId);
-                  if (!theme) return null;
-                  return (
-                    <Badge
-                      key={theme.id}
-                      style={{ backgroundColor: theme.color }}
-                      className="flex items-center gap-1"
-                    >
-                      {theme.name}
-                      <button
-                        type="button"
-                        onClick={() => handleThemeRemove(theme.id)}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  );
-                })}
-              </div>
-              <Command className="border rounded-md">
-                <CommandInput
-                  placeholder={t("story.searchThemes")}
-                  value={searchTheme}
-                  onValueChange={setSearchTheme}
-                  className="bg-white dark:bg-gray-700"
-                />
-                <CommandEmpty>{t("story.noThemesFound")}</CommandEmpty>
-                <CommandGroup className="max-h-48 overflow-auto">
-                  {filteredThemes.map((theme) => (
-                    <CommandItem
-                      key={theme.id}
-                      value={theme.name}
-                      onSelect={() => handleThemeSelect(theme.id)}
-                    >
-                      <Badge style={{ backgroundColor: theme.color }}>
-                        {theme.name}
-                      </Badge>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </div>
+            <FormControl>
+              <ThemeMultiSelect
+                themes={availableThemes}
+                value={(field.value || []) as SelectedTheme[]}
+                onChange={(value) => setValue("themes", value, { shouldDirty: true, shouldValidate: true })}
+                onCreate={handleCreateTheme}
+                pinned={pinned}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )}
@@ -177,15 +127,24 @@ const StorySettings: React.FC<StorySettingsProps> = ({
           <FormItem>
             <FormLabel className="text-gray-900 dark:text-gray-100">{t("story.language")}</FormLabel>
             <FormControl>
-              <Input
-                placeholder={t("story.languagePlaceholder")}
-                {...field}
-                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                onChange={(e) => {
-                  setValue("language", e.target.value);
-                  field.onChange(e);
+              <Select
+                value={field.value}
+                onValueChange={(value) => {
+                  setValue("language", value as "fr" | "en");
+                  field.onChange(value);
                 }}
-              />
+              >
+                <SelectTrigger ref={field.ref} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                  <SelectValue placeholder={t("story.languagePlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {STORY_LANGUAGES.map((language) => (
+                    <SelectItem key={language} value={language}>
+                      {t(`languages.${language}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormControl>
             <FormMessage />
           </FormItem>

@@ -25,12 +25,15 @@ import StoryContent from "@/components/Story/StoryEditor/StoryContent";
 import RestoreVersionCard from "@/components/Story/EditStory/RestoreVersionCard";
 import { Theme } from "@/types/Theme";
 import { Series } from "@/types/Series";
-import { Story } from "@/types/Story";
+import { Story, AgeGroup } from "@/types/Story";
 import { themeApi } from "@/api/themes.api";
 import { storyApi } from "@/api/stories.api";
 import { useThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
 import { getDayOrder } from "@/utils/dayUtils";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { withOnePrimary } from "@/components/Theme/ThemeSelect";
+import { StoryTheme } from "@/types/Theme";
 
 const EditStoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,6 +48,7 @@ const EditStoryPage: React.FC = () => {
     weeklyThemes,
     addIllustrationToBackend,
     deleteIllustration,
+    reorderIllustrations,
   } = useStoryData({ id });
 
   const { data: availableThemes = [] } = useThemes();
@@ -62,9 +66,6 @@ const EditStoryPage: React.FC = () => {
     { value: "Sunday", label: t("days.sunday") },
   ]);
   const [formInitialised, setFormInitialised] = useState(false);
-  const [darkMode, setDarkMode] = useState<boolean>(
-    document.documentElement.classList.contains("dark")
-  );
   const [versions, setVersions] = useState<any[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
 
@@ -75,13 +76,15 @@ const EditStoryPage: React.FC = () => {
       content: "",
       themes: [],
       ageGroup: "4-6",
-      language: "",
+      language: "fr",
       dayOfWeek: "",
       weekNumber: "1",
       seriesName: "",
       version: 1,
     },
   });
+
+  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(form.formState.isDirty && !saving);
 
   const fetchVersions = useCallback(async () => {
     try {
@@ -92,18 +95,6 @@ const EditStoryPage: React.FC = () => {
       toast.error(t("common.errors.failedToLoadVersions"));
     }
   }, [id, t]);
-
-  useEffect(() => {
-    const handleDarkModeChange = () => {
-      setDarkMode(document.documentElement.classList.contains("dark"));
-    };
-
-    window.addEventListener("darkModeChanged", handleDarkModeChange);
-
-    return () => {
-      window.removeEventListener("darkModeChanged", handleDarkModeChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (id) {
@@ -127,9 +118,10 @@ const EditStoryPage: React.FC = () => {
       form.reset({
         title: story.title,
         content: story.content,
-        themes: story.themes.map((theme) => theme.id),
-        ageGroup: story.age_group as "2-3" | "4-6" | "7-9" | "10-12",
-        language: story.locale,
+        themes: withOnePrimary(story.themes.map((theme) => ({ id: theme.id, isPrimary: Boolean((theme as StoryTheme).isPrimary) }))),
+        ageGroup: story.age_group as AgeGroup,
+        // Legacy free-text locales ("fr-FR", typos) fall back to French; the select only offers fr / en
+        language: story.locale === "en" ? "en" : "fr",
         dayOfWeek: dayOfWeekValue,
         weekNumber: story.week_number.toString(),
         seriesName: story.series_name || "",
@@ -166,7 +158,6 @@ const EditStoryPage: React.FC = () => {
 
     setSaving(true);
     try {
-      const updatedVersion = story.version + 1;
 
       const dayOrder = getDayOrder(values.dayOfWeek);
       if (dayOrder < 1 || dayOrder > 7) {
@@ -176,23 +167,20 @@ const EditStoryPage: React.FC = () => {
       const payload: Partial<Story> = {
         title: values.title,
         content: values.content,
-        themes: values.themes.map((themeId) => ({
-          id: themeId,
-          isPrimary: values.themes[0] === themeId,
-        } as unknown as Theme)),
+        themes: values.themes.map(({ id, isPrimary }) => ({ id, isPrimary } as unknown as Theme)),
         age_group: values.ageGroup,
         locale: values.language,
         day_order: dayOrder,
         week_number: parseInt(values.weekNumber, 10),
         series_name: values.seriesName,
-        version: updatedVersion,
       };
 
-      const updateRes = await storyApi.update(id!, payload);
+      const updatedStory = await storyApi.update(id!, payload);
 
-      const updatedStory = updateRes;
       toast.success(t("story.updateSuccess"));
-      navigate(`/stories/${id}`);
+      if (updatedStory?.aliasSeries) toast.warning(t("story.aliasCreated", { series: updatedStory.aliasSeries.name }));
+      allowNavigation();
+      navigate(APP_ROUTES.STORY_DETAIL(id));
     } catch (err) {
       toast.error(t("story.updateError"));
       console.error("Error updating story:", err);
@@ -213,6 +201,7 @@ const EditStoryPage: React.FC = () => {
       await storyApi.restoreVersion(id!, selectedVersion);
       
       toast.success(t("story.restoreSuccess"));
+      allowNavigation();
       navigate(APP_ROUTES.STORY_DETAIL(id!));
     } catch (err) {
       toast.error(t("story.restoreError"));
@@ -240,7 +229,7 @@ const EditStoryPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p>{error || "Unable to load story"}</p>
+              <p>{error || t("story.loadError")}</p>
             </CardContent>
             <CardFooter>
               <Button
@@ -309,10 +298,13 @@ const EditStoryPage: React.FC = () => {
                       </TabsContent>
 
                       <TabsContent value="illustrations">
+                        <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">{t("story.illustrationsSavedImmediately")}</p>
                         <StoryIllustrations
                           illustrations={illustrations}
                           addIllustrationToBackend={addIllustrationToBackend}
                           deleteIllustration={deleteIllustration}
+                          reorderIllustrations={reorderIllustrations}
+                          illustrationPrompt={story.illustration_prompt}
                         />
 
                       </TabsContent>
@@ -329,18 +321,17 @@ const EditStoryPage: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <StorySettings
-                      availableThemes={availableThemes.map((theme) => ({
-                        ...theme,
-                        created_at: theme.created_at || new Date().toISOString(),
-                      }))}
-                      setAvailableThemes={() => {}}
+                      availableThemes={availableThemes}
                       weeklyThemes={weeklyThemes}
                       sortedDayOfWeekOptions={sortedDayOfWeekOptions}
                       story={story}
                       availableSeries={availableSeries as unknown as Series[]}
                     />
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="flex flex-col gap-2">
+                    {story.audio_path && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400">{t("story.audio.willBeDeleted")}</p>
+                    )}
                     <Button
                       type="submit"
                       disabled={saving}
@@ -358,11 +349,13 @@ const EditStoryPage: React.FC = () => {
                     setSelectedVersion={setSelectedVersion}
                     handleRestoreVersion={handleRestoreVersion}
                     saving={saving}
+                    hasUnsavedChanges={form.formState.isDirty}
                 />
               </div>
             </div>
           </form>
         </FormProvider>
+        {unsavedChangesDialog}
     </PageLayout>
   );
 };

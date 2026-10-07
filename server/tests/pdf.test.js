@@ -23,6 +23,8 @@ vi.mock('../lib/pdf/index.js', () => ({
 
 // Mock Upload (as PDF route uses it)
 vi.mock('../config/upload.config.js', () => ({
+    IMAGE_EXTENSIONS: { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' },
+    InvalidFileTypeError: class InvalidFileTypeError extends Error {},
     upload: {
         single: () => (req, res, next) => next()
     },

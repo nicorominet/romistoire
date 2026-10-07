@@ -49,6 +49,7 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -74,6 +75,7 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
                 <div className="p-2">
                     <p className="text-sm text-gray-500 mb-2">{t("series.selector.noSeriesFound")}</p>
                     <Button 
+                        type="button"
                         variant="secondary" 
                         size="sm" 
                         className="w-full justify-start"

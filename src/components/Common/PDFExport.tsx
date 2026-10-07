@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ExportOptions, Story, AgeGroup, AGE_GROUPS } from "@/types/Story";
 import { i18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
@@ -23,8 +23,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Download, FileText, Filter, Book, Settings } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { systemApi } from "@/api/system.api";
+import { useThemes } from "@/hooks/useThemes";
+import { Theme } from "@/types/Theme";
+import { ThemeSelect } from "@/components/Theme/ThemeSelect";
+import { ThemeBadgeList } from "@/components/Theme/ThemeBadgeList";
 
 interface PDFExportProps {
   availableStories: Story[];
@@ -32,7 +36,6 @@ interface PDFExportProps {
 
 const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
   const { t } = i18n;
-  const { toast } = useToast();
 
   const [selectedStories, setSelectedStories] = useState<string[]>([]);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
@@ -46,7 +49,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
     orientation: "portrait",
   });
 
-  const [themes, setThemes] = useState<{ id: string; name: string }[]>([]);
+  const { data: allThemes = [] } = useThemes();
   const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -55,20 +58,13 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
   const [generating, setGenerating] = useState<boolean>(false);
   const [pdfUrl, setPdfUrl] = useState<string>("");
 
+  // The export covers the loaded stories: only offer their themes (with full theme data for the picker)
+  const themes: Theme[] = useMemo(() => {
+    const ids = new Set(availableStories.flatMap((story) => (story.themes || []).map((theme) => theme.id)));
+    return allThemes.filter((theme) => ids.has(theme.id));
+  }, [availableStories, allThemes]);
+
   useEffect(() => {
-    const uniqueThemesMap = new Map<string, string>();
-    availableStories.forEach((story) => {
-      if (Array.isArray(story.themes)) {
-        story.themes.forEach((theme) => {
-          if (theme && theme.id) uniqueThemesMap.set(theme.id, theme.name);
-        });
-      }
-    });
-    const uniqueThemes: { id: string; name: string }[] = Array.from(
-      uniqueThemesMap,
-      ([id, name]) => ({ id, name })
-    );
-    setThemes(uniqueThemes);
     const uniqueWeeks = [
       ...new Set(availableStories.map((story) => story.week_number)),
     ];
@@ -148,21 +144,12 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
       weekNumbers: selectedWeeks.length > 0 ? selectedWeeks : undefined,
     }));
 
-    toast({
-      title: "Filters Applied",
-      description: `Selected ${filteredIds.length} stories based on your filters.`,
-      duration: 3000,
-    });
+    toast.success(t("pdf.filtersApplied"), { description: t("pdf.filtersAppliedDesc", { count: String(filteredIds.length) }), duration: 3000 });
   };
 
   const generatePDF = async () => {
     if (selectedStories.length === 0) {
-      toast({
-        title: t("pdf.noStories"),
-        description: t("pdf.pleaseSelectStories"),
-        variant: "destructive",
-        duration: 3000,
-      });
+      toast.error(t("pdf.noStories"), { description: t("pdf.pleaseSelectStories"), duration: 3000 });
       return;
     }
 
@@ -186,20 +173,10 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
       }
 
       setPdfUrl(data.url);
-      toast({
-        title: t("pdf.success"),
-        description: t("pdf.readyToDownload"),
-        duration: 5000,
-      });
+      toast.success(t("pdf.success"), { description: t("pdf.readyToDownload"), duration: 5000 });
     } catch (error) {
       console.error("PDF generation error:", error);
-      toast({
-        title: t("pdf.error"),
-        description:
-          error instanceof Error ? error.message : t("pdf.unknownError"),
-        variant: "destructive",
-        duration: 5000,
-      });
+      toast.error(t("pdf.error"), { description: error instanceof Error ? error.message : t("pdf.unknownError"), duration: 5000 });
     } finally {
       setGenerating(false);
     }
@@ -262,16 +239,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
                     >
                       <span className="font-medium">{story.title}</span>
                       <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
-                        {Array.isArray(story.themes) &&
-                          story.themes.map((theme) => (
-                            <span
-                              key={theme.id}
-                              className="px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: theme.color, color: "#fff" }}
-                            >
-                              {theme.name}
-                            </span>
-                          ))}
+                        <ThemeBadgeList themes={story.themes} max={3} />
                         <span>•</span>
                         <span>{t(`ages.${story.age_group}`)}</span>
                         <span>•</span>
@@ -470,22 +438,14 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
               <AccordionItem value="theme">
                 <AccordionTrigger>{t("pdf.filterByTheme")}</AccordionTrigger>
                 <AccordionContent>
-                  <Select
-                    value={selectedTheme || "default"}
-                    onValueChange={setSelectedTheme}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("pdf.selectTheme")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">{t("stories.allThemes")}</SelectItem>
-                      {themes.map((theme) => (
-                        <SelectItem key={theme.id} value={theme.id}>
-                          {theme.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ThemeSelect
+                    themes={themes}
+                    value={selectedTheme && selectedTheme !== "default" ? selectedTheme : null}
+                    onChange={(themeId) => setSelectedTheme(themeId ?? "default")}
+                    placeholder={t("pdf.selectTheme")}
+                    clearLabel={t("stories.allThemes")}
+                    showCounts={false}
+                  />
                 </AccordionContent>
               </AccordionItem>
 

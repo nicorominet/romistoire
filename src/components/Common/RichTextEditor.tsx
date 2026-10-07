@@ -155,7 +155,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
         
         <div className="h-6 w-px bg-gray-300 mx-1" />
 
-        <Button
+        <Button type="button"
           size="sm"
           variant="ghost"
           onClick={addImage}
@@ -165,7 +165,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
         </Button>
 
         {onImageAdd && (
-            <Button
+            <Button type="button"
             size="sm"
             variant="ghost"
             onClick={handleUploadClick}

@@ -3,15 +3,16 @@ import { ArrowLeft, Edit, Trash2, Calendar, BookOpen, Clock, Tag, Headphones, Vo
 import { i18n } from '@/lib/i18n';
 import PageLayout from '@/components/Layout/PageLayout';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader'; 
 import StoryNavigation from '@/components/Story/StoryDetail/StoryNavigation';
 import StoryContent from '@/components/Story/StoryDetail/StoryContent';
 import { APP_ROUTES } from '@/constants';
 import { WeeklyTheme } from '@/types/Theme';
 import StoryMeta from '@/components/Story/StoryDetail/StoryMeta';
+import IllustrationPromptCard from '@/components/Story/IllustrationPromptCard';
+import { ThemeBadgeList } from '@/components/Theme/ThemeBadgeList';
 import { StoryDetailSkeleton } from '@/components/Story/StorySkeleton';
 import {
   AlertDialog,
@@ -35,56 +36,45 @@ const { t } = i18n;
 const StoryDetailPage = (): JSX.Element => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+
+  // Back to where the user came from (library with its filters), or to the library on a direct visit
+  const goBack = () => {
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else navigate(APP_ROUTES.STORIES);
+  };
 
   const { data: story, isLoading, error } = useStory(id || '');
   const { data: neighbors } = useStoryNeighbors(id || '');
   const { deleteStory, generateAudio } = useStoryMutations();
   const { data: weeklyThemes } = useWeeklyThemes();
 
-  // Determine weekly theme name
-  const weeklyThemeName = useMemo(() => {
-     if (!story || !weeklyThemes) return '';
-     const theme = (weeklyThemes as WeeklyTheme[]).find((wt) => wt.week_number === story.week_number);
-     return theme ? theme.theme_name : '';
+  // Theme of the story's week (a linked theme, or the week's label for weeks not linked yet)
+  const weekTheme = useMemo(() => {
+     if (!story || !weeklyThemes) return null;
+     const week = (weeklyThemes as WeeklyTheme[]).find((wt) => wt.week_number === story.week_number);
+     if (!week) return null;
+     return { id: week.theme_id ?? '', name: week.theme_name, color: week.color ?? undefined, icon: week.icon };
   }, [story, weeklyThemes]);
 
   const handleDelete = async () => {
     if (!id) return;
     try {
       await deleteStory.mutateAsync(id);
-      toast({
-        title: t('common.success'),
-        description: t('story.deleteSuccess'),
-      });
-      navigate(APP_ROUTES.HOME);
+      toast.success(t('story.deleteSuccess'));
+      navigate(APP_ROUTES.STORIES, { replace: true });
     } catch (error) {
-      toast({
-        title: t('common.error'),
-        description: t('story.deleteError'),
-        variant: "destructive",
-      });
+      toast.error(t('story.deleteError'));
     }
   };
 
   const handleGenerateAudio = async () => {
       if (!id) return;
       try {
-          toast({
-              title: "Génération en cours...",
-              description: "L'audio est en train d'être généré, cela peut prendre quelques secondes.",
-          });
+          toast.info(t('story.audio.generating'), { description: t('story.audio.generatingDesc') });
           await generateAudio.mutateAsync(id);
-          toast({
-              title: "Audio généré !",
-              description: "Vous pouvez maintenant écouter l'histoire.",
-          });
+          toast.success(t('story.audio.generated'), { description: t('story.audio.generatedDesc') });
       } catch (error) {
-          toast({
-              title: "Erreur",
-              description: "Impossible de générer l'audio. Vérifiez la clé API ou réessayez.",
-              variant: "destructive"
-          });
+          toast.error(t('story.audio.error'), { description: (error as any)?.response?.data?.error || t('story.audio.errorDesc') });
       }
   };
 
@@ -105,7 +95,7 @@ const StoryDetailPage = (): JSX.Element => {
       <PageLayout>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-red-600 mb-4">{t('common.error')}</h2>
-          <Button onClick={() => navigate(APP_ROUTES.HOME)} variant="outline">
+          <Button onClick={() => navigate(APP_ROUTES.STORIES)} variant="outline">
             {t('common.back')}
           </Button>
         </div>
@@ -121,7 +111,7 @@ const StoryDetailPage = (): JSX.Element => {
           <Button 
             variant="ghost" 
             className="gap-2 hover:bg-white/50 dark:hover:bg-gray-800/50"
-            onClick={() => navigate(APP_ROUTES.HOME)}
+            onClick={goBack}
           >
             <ArrowLeft className="h-4 w-4" />
             {t('common.back')}
@@ -136,7 +126,7 @@ const StoryDetailPage = (): JSX.Element => {
                 disabled={generateAudio.isPending}
             >
                 {generateAudio.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Headphones className="h-4 w-4" />}
-                {story.audio_path ? 'Régénérer Audio' : 'Générer Audio'}
+                {story.audio_path ? t('story.audio.regenerate') : t('story.audio.generate')}
             </Button>
 
             <Button
@@ -164,7 +154,7 @@ const StoryDetailPage = (): JSX.Element => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>{t('common.deleteConfirmTitle')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {t('common.deleteConfirmDesc')}
+                    {t('story.deleteConfirmDesc', { title: story.title })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -184,22 +174,8 @@ const StoryDetailPage = (): JSX.Element => {
                 {story.title}
             </h1>
             
-            <div className="flex flex-wrap justify-center gap-2">
-                {story.themes && story.themes.map((theme) => (
-                    <Badge 
-                        key={theme.id}
-                        variant="secondary" 
-                        className="text-xs px-2 py-0.5"
-                        style={{ 
-                            backgroundColor: theme.color ? `${theme.color}15` : undefined,
-                            color: theme.color,
-                            borderColor: theme.color ? `${theme.color}30` : undefined
-                        }}
-                    >
-                        {theme.name}
-                    </Badge>
-                ))}
-            </div>
+            {/* Each badge opens the library filtered on its theme */}
+            <ThemeBadgeList themes={story.themes} linkToStories size="md" className="justify-center" />
 
             {story.audio_path && (
                 <div className="flex justify-center my-4 animate-in fade-in slide-in-from-top-2">
@@ -207,9 +183,10 @@ const StoryDetailPage = (): JSX.Element => {
                          <div className="bg-story-purple text-white p-2 rounded-full">
                              <Volume2 className="h-4 w-4" />
                          </div>
-                         <audio controls className="h-8 w-48 md:w-64 bg-transparent">
-                             <source src={story.audio_path} type="audio/mpeg" />
-                             Votre navigateur ne supporte pas l'élément audio.
+                         {/* No hardcoded type: files can be wav, mp3... the browser sniffs it. key reloads a regenerated file */}
+                         <audio key={story.audio_path} controls className="h-8 w-48 md:w-64 bg-transparent">
+                             <source src={story.audio_path} />
+                             {t('story.audio.unsupported')}
                          </audio>
                     </div>
                 </div>
@@ -219,7 +196,7 @@ const StoryDetailPage = (): JSX.Element => {
                 <StoryMeta 
                     ageGroup={story.age_group}
 
-                    weeklyTheme={weeklyThemeName}
+                    weeklyTheme={weekTheme}
                     seriesName={story.series_name}
                     createdAt={story.created_at}
                     weekNumber={story.week_number}
@@ -237,6 +214,9 @@ const StoryDetailPage = (): JSX.Element => {
         <div className="w-full bg-white/70 dark:bg-slate-900/60 backdrop-blur-md rounded-xl border border-white/50 dark:border-white/10 shadow-lg p-6 md:p-10">
              <StoryContent story={story} />
         </div>
+
+        {/* AI illustration prompt, useful until an illustration has been added */}
+        {!story.illustrations?.length && <IllustrationPromptCard prompt={story.illustration_prompt} />}
 
         {/* Navigation Footer */}
         <StoryNavigation 

@@ -11,7 +11,6 @@ interface StoriesGridProps {
   error: string | null;
   stories: Story[];
   groupedStories: { [key: string]: Story[] };
-  themeColors: { [themeId: string]: string };
   observerRef: React.RefObject<HTMLDivElement>;
   hasMore: boolean;
   handleCreateStory: () => void;
@@ -22,7 +21,6 @@ const StoriesListGrid = ({
   error,
   stories,
   groupedStories,
-  themeColors,
   observerRef,
   hasMore,
   handleCreateStory
@@ -52,7 +50,6 @@ const StoriesListGrid = ({
                   <StoryGrid
                     stories={groupedStories[locale]}
                     locale={locale}
-                    themeColors={themeColors}
                   />
                 </div>
               ))}

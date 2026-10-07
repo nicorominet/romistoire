@@ -1,6 +1,7 @@
 import { i18n } from '../../i18n.js';
 import fs from 'fs';
 import path from 'path';
+import { ENV_CONFIG } from '../../../config/env.config.js';
 
 /**
  * Adds a story page to the PDF document.
@@ -59,12 +60,14 @@ export function addStoryPage(doc, story, options) {
           let fileType = primaryImage.file_type || primaryImage.fileType || 'JPEG';
           if (!primaryImage.image_path) throw new Error('No image_path');
           
-          const absPath = path.join(process.cwd(), primaryImage.image_path);
+          const absPath = path.join(ENV_CONFIG.PROJECT_ROOT, primaryImage.image_path.replace(/\\/g, '/'));
           if (fs.existsSync(absPath)) {
               const fileBuffer = fs.readFileSync(absPath);
               const ext = path.extname(absPath).toLowerCase();
               if (ext === '.png') fileType = 'PNG';
               else if (ext === '.jpg' || ext === '.jpeg') fileType = 'JPEG';
+              else if (ext === '.gif') fileType = 'GIF';
+              else if (ext === '.webp') fileType = 'WEBP';
               
               const imageData = `data:image/${fileType.toLowerCase()};base64,${fileBuffer.toString('base64')}`;
 

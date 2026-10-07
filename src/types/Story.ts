@@ -37,7 +37,11 @@ export interface Story {
   source: 'manual' | 'gemini' | 'ollama';
   is_manually_edited: boolean;
   audio_path?: string;
+  /** AI-suggested description used to create the illustration */
+  illustration_prompt?: string | null;
   illustrations: Illustration[];
+  /** Set by create/update when the slot was taken and the story was moved to an alias series */
+  aliasSeries?: { id: string; name: string } | null;
 }
 
 /**

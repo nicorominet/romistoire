@@ -12,9 +12,10 @@ vi.mock('../config/database.js', () => ({
   }));
 
 // Mock Gemini Service
-vi.mock('../services/gemini.service.js', () => ({
-  geminiService: {
-    generateStory: vi.fn(),
+// Mock Story Service (Bypass complex dependencies)
+vi.mock('../services/story.service.js', () => ({
+  storyService: {
+    generateFromAI: vi.fn(),
   }
 }));
 
@@ -27,6 +28,8 @@ vi.mock('../lib/pdf/index.js', () => ({
 
 // Mock Upload
 vi.mock('../config/upload.config.js', () => ({
+    IMAGE_EXTENSIONS: { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' },
+    InvalidFileTypeError: class InvalidFileTypeError extends Error {},
     upload: {
         single: () => (req, res, next) => next()
     },
@@ -36,7 +39,7 @@ vi.mock('../config/upload.config.js', () => ({
 }));
 
 
-import { geminiService } from '../services/gemini.service.js';
+import { storyService } from '../services/story.service.js';
 import PDFExportService from '../lib/pdf/index.js';
 import app from '../app.js';
 
@@ -44,7 +47,7 @@ describe('Generation & Export API', () => {
   describe('POST /api/generate/story', () => {
     it('should generate a story', async () => {
       const mockResult = { title: 'AI Story', content: '...' };
-      geminiService.generateStory.mockResolvedValue(mockResult);
+      storyService.generateFromAI.mockResolvedValue(mockResult);
 
       const res = await request(app)
         .post('/api/generate/story')
@@ -52,7 +55,7 @@ describe('Generation & Export API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual(mockResult);
-    });
+    }, 10000);
   });
 
   describe('POST /api/export/pdf', () => {

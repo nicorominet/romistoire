@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
+import { migrateThemes } from './theme.migration.js';
 
 dotenv.config();
 
@@ -213,6 +214,17 @@ export async function initializeDatabase() {
         `);
         console.log('Migration: is_manually_edited column added to story_versions.');
       }
+
+      const [illustrationPromptColumns] = await pool.query('SHOW COLUMNS FROM stories LIKE "illustration_prompt"');
+      if (illustrationPromptColumns.length === 0) {
+        await pool.query(`
+          ALTER TABLE stories
+          ADD COLUMN illustration_prompt TEXT NULL AFTER audio_path
+        `);
+        console.log('Migration: illustration_prompt column added to stories.');
+      }
+
+      await migrateThemes(pool);
     } catch (migError) {
        console.error("Migration Failed:", migError);
        fs.writeFileSync(path.join(__dirname, '../../migration_debug.log'), `Migration Error: ${migError.message}\n${migError.stack}`);

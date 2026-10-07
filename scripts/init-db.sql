@@ -7,10 +7,17 @@ USE imagitales;
 CREATE TABLE themes (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  -- Comparison key: lowercase, no accents, no leading article (see server/services/helpers/theme_name.helper.js)
+  normalized_name VARCHAR(100) NOT NULL,
   description TEXT,
-  icon VARCHAR(10),
+  icon VARCHAR(16),
   color VARCHAR(20),
-  created_at DATETIME NOT NULL
+  source ENUM('manual', 'ai') NOT NULL DEFAULT 'manual',
+  -- AI-created themes stay "to review" until a human edits them
+  needs_review BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NULL,
+  UNIQUE INDEX uq_themes_normalized_name (normalized_name)
 );
 
 -- Create story_series table
@@ -18,7 +25,11 @@ CREATE TABLE story_series (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  parent_series_id VARCHAR(36) NULL,
+  locale VARCHAR(5) NULL DEFAULT 'fr',
+  INDEX idx_series_locale (locale),
+  CONSTRAINT fk_series_parent FOREIGN KEY (parent_series_id) REFERENCES story_series(id) ON DELETE SET NULL
 );
 
 -- Create stories table
@@ -33,9 +44,12 @@ CREATE TABLE stories (
   modified_at DATETIME NOT NULL,
   version INT NOT NULL DEFAULT 1,
   locale VARCHAR(5) NOT NULL DEFAULT 'en',
+  source ENUM('manual', 'gemini', 'ollama') DEFAULT 'manual',
+  is_manually_edited BOOLEAN DEFAULT FALSE,
   audio_path VARCHAR(255) NULL,
+  illustration_prompt TEXT NULL,
   series_id VARCHAR(36) NULL,
-  FOREIGN KEY (series_id) REFERENCES story_series(id) ON DELETE SET NULL
+  CONSTRAINT fk_stories_series FOREIGN KEY (series_id) REFERENCES story_series(id) ON DELETE SET NULL
 );
 
 -- Create story_themes junction table
@@ -59,6 +73,7 @@ CREATE TABLE story_versions (
   age_group ENUM('2-3', '4-6', '7-9', '10-12', '13-15', '16-18') NOT NULL,
   created_at DATETIME NOT NULL,
   version INT NOT NULL,
+  is_manually_edited BOOLEAN DEFAULT FALSE,
   FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
 );
 
@@ -89,9 +104,12 @@ CREATE TABLE illustrations (
 -- Create weekly_themes table
 CREATE TABLE weekly_themes (
   week_number INT PRIMARY KEY,
+  theme_id VARCHAR(36) NULL,
+  -- Fallback label, kept in sync with the linked theme
   theme_name VARCHAR(255) NOT NULL,
   theme_description TEXT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_weekly_themes_theme FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE SET NULL
 );
 
 -- Create indexes for performance

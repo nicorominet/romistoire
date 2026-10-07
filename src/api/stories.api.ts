@@ -120,6 +120,14 @@ export const storyApi = {
    * @returns {Promise<Illustration[]>} List of illustrations.
    */
   getIllustrations: (id: string) => client.get<Illustration[]>(`${API_ENDPOINTS.STORIES}/${id}/illustrations`),
+
+  /**
+   * Reorder the illustrations of a story (the first one is used as cover).
+   * @param {string} id - The ID of the story.
+   * @param {string[]} illustrationIds - Illustration IDs in the new order.
+   * @returns {Promise<Illustration[]>} Illustrations in their new order.
+   */
+  reorderIllustrations: (id: string, illustrationIds: string[]) => client.put<Illustration[]>(`${API_ENDPOINTS.STORIES}/${id}/illustrations/order`, { illustrationIds }),
 };
 
 export const seriesApi = {

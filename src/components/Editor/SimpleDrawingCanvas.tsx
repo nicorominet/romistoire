@@ -170,7 +170,7 @@ const SimpleDrawingCanvas = ({
             <PopoverContent className="w-48">
               <div className="grid grid-cols-5 gap-2">
                 {colors.map((c) => (
-                  <button
+                  <button type="button"
                     key={c}
                     className={`w-6 h-6 rounded-full ${
                       c === color ? "ring-2 ring-story-purple" : ""

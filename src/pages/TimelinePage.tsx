@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import PageLayout from "@/components/Layout/PageLayout";
 import { i18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import "@/App.css";
 import { getAgeGroupColor } from "@/lib/utils";
 import useDarkMode from '@/hooks/useDarkMode';
@@ -11,6 +10,8 @@ import SafeImage from "@/components/ui/SafeImage";
 import { storyApi } from "@/api/stories.api";
 import { useStoryMutations } from "@/hooks/useStory";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
+import { ThemeBadge } from "@/components/Theme/ThemeBadge";
+import { primaryStoryTheme } from "@/components/Theme/ThemeBadgeList";
 import { useSeries } from "@/hooks/useSeries";
 import StoriesSearch from "@/components/Story/StoriesList/StoriesSearch";
 import { Trash2, AlertTriangle, Sparkles, Cpu, User, PenLine } from "lucide-react";
@@ -18,10 +19,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 
 import { Story, AGE_GROUPS } from "@/types/Story";
-
-interface ThemeColors {
-  [themeId: string]: string;
-}
 
 interface WeeklyThemes {
   [weekNumber: number]: string;
@@ -61,14 +58,6 @@ const TimelinePage: React.FC = () => {
   const themesData = themesDataRaw as Theme[];
   const seriesData = seriesDataRaw as Series[];
   const weeklyData = weeklyDataRaw as WeeklyTheme[];
-
-  const themeColors = React.useMemo(() => {
-    const colors: ThemeColors = {};
-    themesData.forEach((t) => {
-      if (t.color) colors[t.id] = t.color;
-    });
-    return colors;
-  }, [themesData]);
 
   const weeklyThemes = React.useMemo(() => {
     const weeklyMap: WeeklyThemes = {};
@@ -322,16 +311,10 @@ const TimelinePage: React.FC = () => {
                   {storyForDay.title}
                 </CardTitle>
                 <div className="flex flex-wrap gap-1">
-                       {Array.isArray(storyForDay.themes) && storyForDay.themes.length > 0 && storyForDay.themes.slice(0, 1).map((themeObj: { id: string, name?: string }) => (
-                         <Badge
-                            key={themeObj.id}
-                            variant="outline"
-                            className="text-[10px] px-1 py-0 h-4"
-                             style={{ backgroundColor: themeColors[themeObj.id] || "#ccc", color: "#fff" }}
-                         >
-                           {themeObj.name || themeObj.id}
-                         </Badge>
-                       ))}
+                       {/* Primary theme only: the cell is small */}
+                       {primaryStoryTheme(storyForDay.themes) && (
+                         <ThemeBadge theme={primaryStoryTheme(storyForDay.themes)!} variant="solid" className="max-w-full px-1.5 py-0.5 text-[10px]" />
+                       )}
                     </div>
               </CardHeader>
               {storyForDay.illustrations?.[0]?.image_path && (
@@ -379,8 +362,6 @@ const TimelinePage: React.FC = () => {
             selectedTheme={selectedTheme || 'all'}
             handleThemeChange={handleThemeChange}
             themes={availableThemes}
-            weeklyThemeId={null} // Handled by weeklyThemesMap in this view
-            weeklyThemeName={null}
             weeklyThemesMap={weeklyThemes}
             selectedAgeGroup={(selectedAgeGroup as any) || 'all'}
             handleAgeGroupChange={handleAgeGroupChange}

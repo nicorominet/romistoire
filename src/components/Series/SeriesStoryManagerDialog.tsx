@@ -15,6 +15,7 @@ import { Search, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { storyApi, seriesApi } from "@/api/stories.api";
 import { getAgeGroupColor, cn } from "@/lib/utils";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
+import { Theme } from "@/types/Theme";
 import { useSeries } from "@/hooks/useSeries";
 import { AgeGroup } from "@/types/Story";
 import StoriesSearch from "@/components/Story/StoriesList/StoriesSearch";
@@ -93,7 +94,7 @@ export const SeriesStoryManagerDialog: React.FC<SeriesStoryManagerDialogProps> =
   const { data: seriesData = [] } = useSeries();
   const { data: weeklyData = [] } = useWeeklyThemes();
 
-  const availableThemes = themesData as {id: string, name: string}[];
+  const availableThemes = themesData as Theme[];
   const availableSeries = seriesData as {id: string, name: string}[];
 
   const weeklyThemesMap = React.useMemo(() => {
@@ -258,8 +259,6 @@ export const SeriesStoryManagerDialog: React.FC<SeriesStoryManagerDialogProps> =
             selectedTheme={selectedTheme}
             handleThemeChange={handleThemeChange}
             themes={availableThemes}
-            weeklyThemeId={null}
-            weeklyThemeName={null}
             weeklyThemesMap={weeklyThemesMap}
             selectedAgeGroup={selectedAgeGroup}
             handleAgeGroupChange={handleAgeGroupChange}

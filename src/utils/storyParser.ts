@@ -12,17 +12,43 @@ export interface ParsedStory {
 }
 
 /**
+ * Builds a regex matching a whole metadata line such as "**Thème Hebdomadaire :** Pluie".
+ * Anchored at line start and requiring the colon, so story sentences that merely
+ * contain the word ("Le thème du jour...") are never touched.
+ */
+const metadataLine = (label: string, flags = "gim") =>
+  new RegExp(`^[ \\t>]*\\(?\\**[ \\t]*(?:${label})[ \\t]*\\**[ \\t]*:[^\\n]*(?:\\n|$)`, flags);
+
+const TITLE_LABEL = "Titre(?:[ \\t]+de[ \\t]+l['’]Histoire)?";
+const DAY_LABEL = "Jour[ \\t]+de[ \\t]+la[ \\t]+Semaine";
+const ILLUSTRATION_LABEL = "(?:Description(?:[ \\t]+de[ \\t]+l['’]illustration)?|Illustration(?:[ \\t]+sugg[ée]r[ée]e)?)(?:[ \\t]*\\d+)?";
+
+const METADATA_LABELS = [
+  TITLE_LABEL,
+  "Th[èe]mes?(?:[ \\t]+Hebdomadaire|[ \\t]+Associ[ée]s(?:[ \\t]*\\(JSON\\))?)?",
+  "S[ée]ries?",
+  "Tranche[ \\t]+d['’][ÂA]ge",
+  DAY_LABEL,
+];
+
+/** Captures the value of a metadata line: "**Label :** value" -> "value". */
+const metadataValue = (label: string) =>
+  new RegExp(`^[ \\t>]*\\(?\\**[ \\t]*(?:${label})[ \\t]*\\**[ \\t]*:[ \\t]*\\**[ \\t]*([^\\n]*?)[ \\t]*\\**[ \\t]*\\)?[ \\t]*$`, "im");
+
+const cleanValue = (value: string) =>
+  value.replace(/^\[|\]$/g, "").replace(/\*+/g, "").replace(/[\s.,;!]+$/, "").trim();
+
+/**
  * Splits raw AI response into individual story segments.
  */
 export const splitStorySegments = (rawText: string, isWeekly: boolean): string[] => {
   if (!isWeekly) return [rawText];
 
-  // Robust Splitter: 
-  // 1. Matches **Titre de l'Histoire :
-  // 2. Matches Titre de l'Histoire : (no bold)
-  // 3. Matches **Titre :
-  const segments = rawText.split(/(?=(?:\*\*?|)?Titre(?: de l'Histoire)?\s*:)/gi).filter(s => s.trim() !== '');
-  
+  // Split before each title line (bold or not, "Titre :" or "Titre de l'Histoire :")
+  const segments = rawText
+    .split(new RegExp(`(?=^[ \\t>]*\\(?\\**[ \\t]*${TITLE_LABEL}[ \\t]*\\**[ \\t]*:)`, "gim"))
+    .filter(s => s.trim() !== '');
+
   // Clean conversational filler at the start (Gemma 3 chatter)
   const conversationalPrefix = /^(?:Okay|D'accord|Voici|Sure|Here is|Je peux|Bien s[uû]r).*?(?:\n)/is;
   if (segments.length === 1 && segments[0].match(conversationalPrefix)) {
@@ -54,13 +80,13 @@ export const splitStorySegments = (rawText: string, isWeekly: boolean): string[]
  */
 export const parseStorySegment = (segment: string): ParsedStory => {
   // 1. Extract Title
-  let titleMatch = segment.match(/(?:\*\*?)?Titre(?:\s*de\s*l['’]Histoire)?\s*:?(?:\*\*?)?\s*(.*?)(\n|$)/i);
-  let title = titleMatch ? titleMatch[1].trim() : "";
+  const titleMatch = segment.match(metadataValue(TITLE_LABEL));
+  let title = titleMatch ? cleanValue(titleMatch[1]) : "";
 
   if (!title) {
     const firstLine = segment.split('\n')[0].trim();
     if (firstLine.length > 2 && firstLine.length < 100 && !firstLine.includes(':')) {
-      title = firstLine;
+      title = firstLine.replace(/\*+/g, '').replace(/^#+\s*/, '').trim();
     } else {
       title = "Histoire Générée";
     }
@@ -68,10 +94,10 @@ export const parseStorySegment = (segment: string): ParsedStory => {
 
   // 2. Extract Themes (JSON or list)
   let associatedThemes: any[] = [];
-  let themesToRemove: string[] = [];
+  const themesToRemove: string[] = [];
 
   // Strategy 1: Header + JSON
-  const themesJsonHeaderRegex = /\*\*Thèmes Associés \(JSON\):\*\*/i;
+  const themesJsonHeaderRegex = /Th[èe]mes Associ[ée]s\s*\(JSON\)\s*:?\**/i;
   const jsonBlockRegex = /(\[[\s\S]*?\])/;
   const headerMatch = segment.match(themesJsonHeaderRegex);
   if (headerMatch) {
@@ -108,104 +134,73 @@ export const parseStorySegment = (segment: string): ParsedStory => {
     if (matches && matches.length > 0) {
       try {
         associatedThemes = JSON.parse(`[${matches.join(',')}]`);
+        themesToRemove.push(...matches);
       } catch (e) { console.warn("Failed to parse loose objects", e); }
     }
   }
 
   // Strategy 4: Text list
   if (associatedThemes.length === 0) {
-    const themesTextRegex = /\*\*Thèmes Associés :\*\* (.*?)(\n|$)/;
-    const themesTextMatch = segment.match(themesTextRegex);
+    const themesTextMatch = segment.match(metadataValue("Th[èe]mes Associ[ée]s"));
     if (themesTextMatch) {
-      associatedThemes = themesTextMatch[1].split(',').map(t => ({ name: t.trim() })).filter(t => t.name !== '');
-      themesToRemove.push(themesTextMatch[0]);
+      associatedThemes = cleanValue(themesTextMatch[1]).split(',').map(t => ({ name: t.trim() })).filter(t => t.name !== '');
     }
   }
 
-  // 3. Extract Illustration
-  const illustrationRegex = /\[\s*(?:Illustration|Description)(?:\s*\d+)?\s*:?\s*([\s\S]*?)\]/i;
-  const descriptionRegex = /(?:^|\n)\s*(?:\*\*?)?(?:Description(?:\s*de\s*l['’]illustration)?|Illustration|L['’]illustration(?:\s*doit\s*représente[r])?)\s*(?:\d+)?\s*:?(?:\*\*?)?\s*(.*?)(?:\n|$)/i;
-  
-  let illuMatch = segment.match(illustrationRegex) || segment.match(descriptionRegex);
-  let illustrationDescription = illuMatch ? illuMatch[1].trim() : '';
+  // 3. Extract Day of week (bold or not, with or without space before the colon)
+  const dayOfWeekMatch = segment.match(metadataValue(DAY_LABEL));
+  const dayOfWeek = dayOfWeekMatch ? cleanValue(dayOfWeekMatch[1]) || undefined : undefined;
 
-  // 4. Extract Day of week
-  const dayOfWeekMatch = segment.match(/\*\*Jour de la Semaine :\*\* (.*?)(\n|$)/);
-
-  // 5. Clean Content
+  // 4. Clean Content
   let content = segment;
 
-  // Strip JSON-like lines
-  content = content.replace(/\{"name":\s*"[^"]*".*?\}.*$/gm, '');
-  content = content.replace(/^\s*[\[\],{}]\s*$/gm, '');
+  // Strip theme JSON blocks first (exact strings found above)
+  themesToRemove.forEach(t => { content = content.replace(t, ''); });
+  content = content.replace(/```json\s*[\s\S]*?```/g, '');
+  content = content.replace(/\[\s*{\s*"name"[\s\S]*?\}\s*\]/g, '');
+  content = content.replace(/\{[\s\n]*"name"[\s\S]*?\}[\s\n]*/g, '');
+  content = content.replace(/^\s*"(?:name|description|icon|color)"\s*:.*$/gmi, '');
+  content = content.replace(/^\s*[\[\],{}]+\s*$/gm, '');
 
   // Strip Markdown Code Blocks
-  content = content.replace(/^```[a-z]*\s*$/gm, '').replace(/^```\s*$/gm, '');
+  content = content.replace(/^```[a-z]*\s*$/gm, '');
 
-  // Strip Metadata Headers (relaxed matching)
-  const metadataRegexes = [
-      /(?:\(?\*\*?)?Titre de l'Histoire\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Thème Hebdomadaire\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Thème\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Séries?\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Tranche d['’]Âge\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Jour de la Semaine\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?Thèmes Associés \(JSON\)\s*:?\**\)?\s*(.*?)(?:\n|$)/i,
-      /(?:\(?\*\*?)?(?:Description(?:\s*de\s*l['’]illustration)?|Illustration)\s*\d*\s*:?\**\)?\s*(.*?)(?:\n|$)/i
-  ];
+  // 5. Extract & strip ALL illustration descriptions (bracketed, labelled lines, emoji, block quotes)
+  const illustrationDescriptions: string[] = [];
+  const collect = (text: string) => {
+    const cleaned = text.replace(/\*+/g, '').trim();
+    if (cleaned) illustrationDescriptions.push(cleaned);
+  };
 
-  metadataRegexes.forEach(regex => {
-      // Use a loop to replace ALL occurrences, not just the first one
-      let match;
-      while ((match = content.match(regex)) !== null) {
-          content = content.replace(match[0], '');
-      }
+  content = content.replace(/\[\s*(?:Illustration|Description)(?:\s*\d+)?\s*:?\s*([\s\S]*?)\]/gi, (_, description) => {
+    collect(description);
+    return '';
+  });
+  content = content.replace(metadataLine(ILLUSTRATION_LABEL), (line) => {
+    collect(line.replace(new RegExp(`^[ \\t>]*\\(?\\**[ \\t]*${ILLUSTRATION_LABEL}[ \\t]*\\**[ \\t]*:`, 'i'), ''));
+    return '';
+  });
+  content = content.replace(/^[ \t]*🎨\s*(.*?)(?:\n|$)/gm, (_, description) => {
+    collect(description);
+    return '';
   });
 
-  if (titleMatch) content = content.replace(titleMatch[0], '');
-  themesToRemove.forEach(t => { content = content.replace(t, ''); });
+  // Strip Metadata Headers (whole lines only)
+  METADATA_LABELS.forEach(label => {
+      content = content.replace(metadataLine(label), '');
+  });
 
-  // Remove loose JSON objects leftovers
-  const jsonObjectRegex = /\{[\s\n]*"name"[\s\S]*?\}[\s\n]*/g;
-  content = content.replace(jsonObjectRegex, '');
-  content = content.replace(/\s*}\s*,\s*{\s*/g, ' '); 
-  content = content.replace(/\s*}\s*}\s*$/gm, '');
-  content = content.replace(/^\s*[\[\],{}]\s*$/gm, ''); 
-  content = content.replace(/^\s*},?\s*$/gm, '');
-  content = content.replace(/```json\s*[\s\S]*?```/g, '');
-  content = content.replace(/^\s*\[\s*[\s\S]*?\]\s*$/gm, '');
-  content = content.replace(/\[\s*{\s*"name"[\s\S]*?\}\s*\]/g, '');
-  content = content.replace(/^\s*"[a-z]+"\s*:\s*.*?,?\s*$/gmi, '');
-
-  // Strip Illustrations
-  const bracketMatch = content.match(illustrationRegex);
-  if (bracketMatch) content = content.replace(bracketMatch[0], '');
-
-  const descMatch = content.match(descriptionRegex);
-  if (descMatch) content = content.replace(descMatch[0], '');
-
-  const emojiIlluMatch = content.match(/🎨\s*(.*?)(?:\n|$)/s);
-  if (emojiIlluMatch) {
-      content = content.replace(emojiIlluMatch[0], '');
-      if (!illustrationDescription) illustrationDescription = emojiIlluMatch[1]; 
-  }
-
-  // Paragraph cleaning
-  content = content.replace(/^\s*\*\*Paragraphe \d+ de l'histoire:?\*\*\s*$/gm, '');
-  content = content.replace(/^\s*Paragraphe \d+ de l'histoire:?\s*$/gm, '');
+  // Paragraph placeholders echoed from the prompt template
+  content = content.replace(/^\s*\**\[?Paragraphe \d+ de l'histoire\]?:?\**\s*$/gm, '');
 
   content = content.trim();
   content = content.replace(/\n{3,}/g, '\n\n');
-
-  if (illustrationDescription) {
-      content += `\n\n> **Illustration suggérée :** ${illustrationDescription.trim()}`;
-  }
 
   return {
     title,
     content,
     associatedThemes,
-    dayOfWeek: dayOfWeekMatch ? dayOfWeekMatch[1].trim() : undefined,
-    illustrationDescription
+    dayOfWeek,
+    illustrationDescription: illustrationDescriptions.join('\n\n')
   };
 };

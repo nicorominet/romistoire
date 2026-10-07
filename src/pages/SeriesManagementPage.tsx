@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import React, { useState, useMemo } from "react";
 import { i18n } from "@/lib/i18n";
 import PageLayout from "@/components/Layout/PageLayout";
@@ -270,9 +271,9 @@ const SeriesManagementPage = () => {
                             </AlertDialogTitle>
                             <AlertDialogDescription
                               dangerouslySetInnerHTML={{
-                                __html: t("series.management.delete.description", {
+                                __html: DOMPurify.sanitize(t("series.management.delete.description", {
                                   name: s.name,
-                                }),
+                                })),
                               }}
                             />
                           </AlertDialogHeader>

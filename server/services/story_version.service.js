@@ -2,6 +2,7 @@ import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 import { themeService } from './theme.service.js';
+import { fileCleanup } from './helpers/file_cleanup.helper.js';
 class StoryVersionService {
   /**
    * Get version history for a story.
@@ -32,12 +33,22 @@ class StoryVersionService {
         const versionData = versionResult[0][0];
         const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
+        const [currentRows] = await connection.query('SELECT * FROM stories WHERE id = ?', [id]);
+        if (currentRows.length === 0) throw new Error('Story not found');
+        const [currentThemes] = await connection.query('SELECT * FROM story_themes WHERE story_id = ?', [id]);
+
+        // Restoring moves forward: the restored content gets a new version number
+        const nextVersion = await this.getNextVersionNumber(id);
+
         await connection.beginTransaction();
+
+        // Snapshot the current state first so the restore never loses it
+        await this.createSnapshot(connection, currentRows[0], currentThemes);
 
         // Restore Story Main Record
         await connection.query(
           'UPDATE stories SET title = ?, content = ?, age_group = ?, modified_at = ?, version = ?, is_manually_edited = ?, audio_path = NULL WHERE id = ?',
-          [versionData.title, versionData.content, versionData.age_group, now, versionData.version, versionData.is_manually_edited, id]
+          [versionData.title, versionData.content, versionData.age_group, now, nextVersion, versionData.is_manually_edited, id]
         );
 
         // Restore Themes
@@ -53,6 +64,8 @@ class StoryVersionService {
 
         await connection.commit();
         themeService.invalidateCache();
+        // Restoring resets the audio: delete the old file
+        await fileCleanup.removeAudioIfUnused(currentRows[0].audio_path);
         return true;
     } catch (error) {
         await connection.rollback();
@@ -132,7 +145,7 @@ class StoryVersionService {
     const placeholders = versionIds.map(() => '?').join(',');
     
     const themesResult = await query(
-      `SELECT svt.*, t.name, t.color, svt.story_version_id 
+      `SELECT svt.*, t.name, t.color, t.icon, svt.story_version_id 
        FROM story_version_themes svt 
        JOIN themes t ON svt.theme_id = t.id 
        WHERE svt.story_version_id IN (${placeholders})`,
@@ -147,7 +160,8 @@ class StoryVersionService {
           id: th.theme_id,
           name: th.name,
           color: th.color,
-          isPrimary: th.is_primary === 1
+          icon: th.icon || null,
+          isPrimary: Number(th.is_primary) === 1
         }))
     }));
   }

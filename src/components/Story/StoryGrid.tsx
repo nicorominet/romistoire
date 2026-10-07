@@ -9,13 +9,11 @@ import useDarkMode from '@/hooks/useDarkMode';
 interface StoryGridProps {
   stories: Story[];
   locale: string;
-  themeColors?: { [themeId: string]: string };
 }
 
 const StoryGrid = ({
   stories,
   locale,
-  themeColors = {},
 }: StoryGridProps) => {
   const { t } = i18n;
   const darkMode = useDarkMode();
@@ -37,7 +35,7 @@ const StoryGrid = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {stories.map((story) => (
-        <StoryCard key={story.id} story={story} themeColors={themeColors} />
+        <StoryCard key={story.id} story={story} />
       ))}
     </div>
   );

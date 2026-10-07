@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react';
 
+const isDark = () => document.documentElement.classList.contains('dark');
+
+/**
+ * Tracks dark mode, i.e. the "dark" class on <html>.
+ * Watches the class itself, so it follows every toggle (header switch, settings, other tabs via storage).
+ */
 const useDarkMode = () => {
-  const [darkMode, setDarkMode] = useState<boolean>(document.documentElement.classList.contains('dark'));
+  const [darkMode, setDarkMode] = useState<boolean>(isDark);
 
   useEffect(() => {
-    const handleDarkModeChange = () => {
-      setDarkMode(document.documentElement.classList.contains('dark'));
-    };
+    const update = () => setDarkMode(isDark());
 
-    window.addEventListener('storage', handleDarkModeChange);
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('storage', update);
 
     return () => {
-      window.removeEventListener('storage', handleDarkModeChange);
+      observer.disconnect();
+      window.removeEventListener('storage', update);
     };
   }, []);
 

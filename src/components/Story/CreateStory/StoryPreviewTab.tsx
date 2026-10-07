@@ -1,17 +1,14 @@
+import DOMPurify from "dompurify";
 import { i18n } from "@/lib/i18n";
 import { getAgeGroupColor } from "@/lib/utils";
-
-interface Theme {
-    id: string;
-    name: string;
-    description: string;
-    color: string;
-}
+import { Theme } from "@/types/Theme";
+import { ThemeBadgeList } from "@/components/Theme/ThemeBadgeList";
+import { SelectedTheme } from "@/components/Theme/ThemeSelect";
 
 interface StoryPreviewTabProps {
   title: string;
   content: string;
-  watchThemes: string[];
+  watchThemes: SelectedTheme[];
   watchAgeGroup: string;
   availableThemes: Theme[];
   illustrations: any[];
@@ -43,15 +40,13 @@ const StoryPreviewTab = ({
         {title || t("create.preview.untitledStory")}
       </h2>
       <div className="flex flex-wrap gap-2 mb-6">
-        {Array.isArray(watchThemes) && watchThemes.map((themeId: string) => {
-          const theme = availableThemes.find(t => t.id === themeId);
-          if (!theme) return null;
-          return (
-            <div key={theme.id} className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: theme.color, color: '#fff' }}>
-              {theme.name}
-            </div>
-          );
-        })}
+        <ThemeBadgeList
+          size="md"
+          themes={(watchThemes || []).flatMap(({ id, isPrimary }) => {
+            const theme = availableThemes.find(available => available.id === id);
+            return theme ? [{ ...theme, isPrimary }] : [];
+          })}
+        />
         <div
           className={`px-3 py-1 rounded-full text-sm ${getAgeGroupColor(
             watchAgeGroup
@@ -64,11 +59,11 @@ const StoryPreviewTab = ({
       <div className="prose prose-lg dark:prose-invert max-w-none">
         {content ? (
           content.trim().startsWith('<') ? (
-            <div dangerouslySetInnerHTML={{ __html: content }} />
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />
           ) : (
              <div
             dangerouslySetInnerHTML={{
-              __html: content.replace(/\n/g, "<br />"),
+              __html: DOMPurify.sanitize(content.replace(/\n/g, "<br />")),
             }}
           />
           )

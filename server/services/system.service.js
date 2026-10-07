@@ -4,7 +4,21 @@ import AdmZip from 'adm-zip';
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ENV_CONFIG } from '../config/env.config.js';
+import { IMAGE_EXTENSIONS } from '../config/upload.config.js';
+import { normalizeThemeName } from './helpers/theme_name.helper.js';
+import { themeService } from './theme.service.js';
+
+// Files an imported archive may drop into uploads/: images and generated audio only (never .html, .js...)
+const IMPORTABLE_MEDIA_EXTENSIONS = new Set([...Object.values(IMAGE_EXTENSIONS), '.jpeg', '.wav', '.mp3', '.ogg', '.webm']);
 import { logger } from '../config/logger.js';
+
+/**
+ * Converts an absolute file path to the path stored in DB: relative to the project root, with "/" separators.
+ * @param {string} absolutePath - Absolute path of a file inside the project.
+ * @returns {string} e.g. "uploads/2026-10/file.png".
+ */
+export const toStoredPath = (absolutePath) =>
+  path.relative(ENV_CONFIG.PROJECT_ROOT, absolutePath).split(path.sep).join('/');
 
 /**
  * Service for system-level operations like data import/export, file management, and logs.
@@ -51,7 +65,29 @@ class SystemService {
 
       if (!dataToImport) throw new Error('No data found to import.');
 
-      const { stories, versions, illustrations, weeklyThemes, themes, storyThemes, storySeries } = dataToImport;
+      const { stories, versions, illustrations, weeklyThemes: rawWeeklyThemes, themes: rawThemes, storyThemes: rawStoryThemes, storySeries } = dataToImport;
+
+      // Themes are unique by normalized name: an imported "Nature" reuses the local "nature",
+      // and the story / week links of the imported id are moved to the local theme.
+      const themeIdMap = new Map();
+      const themes = [];
+      const seenNames = new Map();
+      for (const theme of rawThemes || []) {
+        const normalized = normalizeThemeName(theme.name);
+        if (!normalized) continue;
+        if (seenNames.has(normalized)) { themeIdMap.set(theme.id, seenNames.get(normalized)); continue; }
+        const [local] = await query('SELECT id FROM themes WHERE normalized_name = ?', [normalized]);
+        if (local && local.id !== theme.id) {
+          themeIdMap.set(theme.id, local.id);
+          seenNames.set(normalized, local.id);
+          continue;
+        }
+        seenNames.set(normalized, theme.id);
+        themes.push({ ...theme, normalized_name: normalized });
+      }
+      const mapThemeId = (row) => (row.theme_id && themeIdMap.has(row.theme_id) ? { ...row, theme_id: themeIdMap.get(row.theme_id) } : row);
+      const storyThemes = (rawStoryThemes || []).map(mapThemeId);
+      const weeklyThemes = (rawWeeklyThemes || []).map(mapThemeId);
 
       const insertData = async (tableName, data) => {
         if (!data || data.length === 0) return;
@@ -112,9 +148,10 @@ class SystemService {
         await insertData('story_versions', versions);
         await insertData('illustrations', illustrations);
         await query('SET FOREIGN_KEY_CHECKS = 1');
+        themeService.invalidateCache();
 
         if (imagesDir && fs.existsSync(imagesDir)) {
-            const targetUploads = path.join(process.cwd(), 'uploads');
+            const targetUploads = ENV_CONFIG.UPLOADS_DIR;
             if (!fs.existsSync(targetUploads)) fs.mkdirSync(targetUploads, { recursive: true });
 
             const copyImages = (src, dest) => {
@@ -125,8 +162,10 @@ class SystemService {
                     if (entry.isDirectory()) {
                         if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
                         copyImages(srcPath, destPath);
-                    } else {
+                    } else if (IMPORTABLE_MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
                         fs.copyFileSync(srcPath, destPath);
+                    } else {
+                        console.warn(`[Import] Skipped non-media file from archive: ${entry.name}`);
                     }
                 }
             };
@@ -174,7 +213,7 @@ class SystemService {
         zip.addFile("data.json", Buffer.from(JSON.stringify(exportData, null, 2)));
         
         // Add images
-        const uploadsDir = path.join(process.cwd(), 'uploads');
+        const uploadsDir = ENV_CONFIG.UPLOADS_DIR;
         if (fs.existsSync(uploadsDir)) {
            zip.addLocalFolder(uploadsDir, "images");
         }
@@ -186,12 +225,20 @@ class SystemService {
 
   /**
    * Scan for and remove unused illustration files.
+   * @param {Object} [options]
+   * @param {number} [options.minAgeMs=0] - Only remove files older than this. Images uploaded on the
+   *   create page are unreferenced until the story is saved: the automatic purge gives them time.
    * @returns {Promise<{deletedCount: number, reclaimedSpace: number}>} Cleanup stats.
    */
-  async cleanupImages() {
+  async cleanupImages({ minAgeMs = 0 } = {}) {
     const illustrations = await query('SELECT image_path FROM illustrations');
-    const usedPaths = new Set(illustrations.map(i => i.image_path).filter(p => p).map(p => path.normalize(p)));
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const audios = await query('SELECT audio_path FROM stories WHERE audio_path IS NOT NULL');
+    // Stored paths may use "\" (legacy Windows rows) or "/", audio paths start with "/": compare in "uploads/..." form
+    const usedPaths = new Set([
+      ...illustrations.map(i => i.image_path),
+      ...audios.map(a => a.audio_path)
+    ].filter(p => p).map(p => p.replace(/\\/g, '/').replace(/^\/+/, '')));
+    const uploadsDir = ENV_CONFIG.UPLOADS_DIR;
     let deletedCount = 0;
     let reclaimedSpace = 0;
 
@@ -206,9 +253,8 @@ class SystemService {
           walkDir(filePath);
           if (fs.readdirSync(filePath).length === 0) fs.rmdirSync(filePath);
         } else {
-            const relativePath = path.relative(process.cwd(), filePath);
-            const normalizedRelative = path.normalize(relativePath);
-            if (!usedPaths.has(normalizedRelative)) {
+            const oldEnough = Date.now() - stat.mtimeMs >= minAgeMs;
+            if (oldEnough && !usedPaths.has(toStoredPath(filePath))) {
                 try {
                     const size = stat.size;
                     fs.unlinkSync(filePath);
@@ -236,6 +282,7 @@ class SystemService {
         await connection.query('DELETE FROM story_versions');
         await connection.query('DELETE FROM story_themes');
         await connection.query('DELETE FROM stories');
+        await connection.query('DELETE FROM story_series');
         await connection.query('DELETE FROM themes');
         await connection.commit();
       } catch (error) {
@@ -244,6 +291,9 @@ class SystemService {
       } finally {
         connection.release();
       }
+      themeService.invalidateCache();
+      // Nothing references the uploaded images / audio anymore: reclaim the space
+      await this.cleanupImages();
   }
 
   /**
@@ -256,9 +306,8 @@ class SystemService {
    */
   async uploadImage(file, { storyId, position = 0 }) {
       const { filename, path: filePath, mimetype } = file;
-      // path relative to root
-      const uploadsIndex = filePath.lastIndexOf('uploads');
-      const relativePath = uploadsIndex !== -1 ? filePath.substring(uploadsIndex) : filename;
+      // e.g. "uploads/2026-10/<uuid>-name.png", always with "/"
+      const relativePath = toStoredPath(filePath);
       
       if (storyId && storyId !== 'null' && storyId !== 'undefined') {
         const id = uuidv4();

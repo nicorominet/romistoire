@@ -1,10 +1,12 @@
 import { useCallback } from "react";
 import { Story, Illustration } from "@/types/Story";
 import { toast } from "sonner";
+import { i18n } from "@/lib/i18n";
 import { storyApi } from "@/api/stories.api";
-import { weeklyThemeApi, themeApi } from "@/api/themes.api"; 
 import { systemApi } from "@/api/system.api";
 import { useStory, useStoryMutations } from "@/hooks/useStory";
+import { useWeeklyThemes } from "@/hooks/useThemes";
+import { WeeklyTheme } from "@/types/Theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface UseStoryDataProps {
@@ -16,7 +18,7 @@ interface UseStoryDataResult {
   loading: boolean;
   error: string | null;
   illustrations: Illustration[];
-  weeklyThemes: { week_number: number; theme_name: string }[];
+  weeklyThemes: WeeklyTheme[];
   refetch: () => void;
   addIllustrationToBackend: (
     file: File,
@@ -24,6 +26,7 @@ interface UseStoryDataResult {
     fileType?: string
   ) => Promise<void>;
   deleteIllustration: (illustrationId: string) => Promise<void>;
+  reorderIllustrations: (orderedIds: string[]) => Promise<void>;
 }
 
 const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
@@ -34,11 +37,8 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
   
   // No need for separate illustrations query as useStory already hydrates them
 
-  // Weekly themes query
-  const { data: weeklyThemes = [], isLoading: themesLoading } = useQuery({
-      queryKey: ['weeklyThemes'],
-      queryFn: async () => (await weeklyThemeApi.getAll()) as any,
-  });
+  // Weekly themes (shared query of the theme module)
+  const { data: weeklyThemes = [], isLoading: themesLoading } = useWeeklyThemes();
 
   const { deleteIllustration: deleteIllustrationMutation } = useStoryMutations();
 
@@ -52,7 +52,7 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
     fileType?: string
   ) => {
     if (!id) {
-      toast.error("Story ID is missing.");
+      toast.error(i18n.t("create.illustrate.error.missingStory"));
       return;
     }
     try {
@@ -67,9 +67,9 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
       // Invalidate story to refresh illustrations
       queryClient.invalidateQueries({ queryKey: ['story', id] });
       
-      toast.success("Illustration added successfully.");
+      toast.success(i18n.t("create.illustrate.success.imageUploaded"));
     } catch (err) {
-      toast.error("Failed to add illustration.");
+      toast.error((err as any)?.response?.data?.error || i18n.t("create.error.failedToUploadImage"));
       console.error("Error adding illustration:", err);
     }
   };
@@ -80,9 +80,20 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
         await deleteIllustrationMutation.mutateAsync({ id, illustrationId });
         // Mutation onSuccess already invalidates queries, but ensuring story is refreshed
         queryClient.invalidateQueries({ queryKey: ['story', id] });
-        toast.success("Illustration deleted successfully");
+        toast.success(i18n.t("create.illustrate.success.imageDeleted"));
     } catch(err) {
-         toast.error("Failed to delete illustration.");
+         toast.error(i18n.t("create.illustrate.error.deleteFailed"));
+    }
+  };
+
+  const reorderIllustrations = async (orderedIds: string[]) => {
+    if (!id) return;
+    try {
+      await storyApi.reorderIllustrations(id, orderedIds);
+      queryClient.invalidateQueries({ queryKey: ['story', id] });
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+    } catch (err) {
+      toast.error(i18n.t("create.illustrate.error.reorderFailed"));
     }
   };
 
@@ -95,6 +106,7 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
     refetch,
     addIllustrationToBackend,
     deleteIllustration,
+    reorderIllustrations,
   };
 };
 

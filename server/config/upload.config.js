@@ -1,21 +1,27 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { ENV_CONFIG } from './env.config.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+// Accepted image types -> extension written on disk.
+// The extension never comes from the client file name, so an "image" can't be served as HTML.
+// Keep in sync with ACCEPTED_IMAGE_TYPES in src/constants.ts
+export const IMAGE_EXTENSIONS = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp'
+};
 
 function sanitizeFilename(filename) {
   return filename.replace(/[^a-zA-Z0-9.-]/g, '_');
 }
 
-// Uploads go to ROOT/uploads
-// context: server/config/upload.config.js -> ../ -> server -> ../ -> root
-const uploadDir = path.join(__dirname, '../../uploads');
+// Uploads go to ROOT/uploads (same directory served statically and scanned by the cleanup)
+const uploadDir = ENV_CONFIG.UPLOADS_DIR;
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -29,19 +35,22 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const sanitizedName = sanitizeFilename(path.basename(file.originalname, ext));
+    const originalExt = path.extname(file.originalname);
+    const sanitizedName = sanitizeFilename(path.basename(file.originalname, originalExt));
+    // Images get the extension of their validated type; data files (json/zip) keep a sanitized one
+    const ext = IMAGE_EXTENSIONS[file.mimetype] || sanitizeFilename(originalExt.toLowerCase());
     const uniqueName = `${uuidv4()}-${sanitizedName}${ext}`;
     cb(null, uniqueName);
   }
 });
 
+export class InvalidFileTypeError extends Error {}
+
 const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif'];
-  if (allowedMimes.includes(file.mimetype)) {
+  if (IMAGE_EXTENSIONS[file.mimetype]) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only jpeg, png, and gif are allowed.'), false);
+    cb(new InvalidFileTypeError('Invalid file type. Only jpeg, png, gif and webp are allowed.'), false);
   }
 };
 
