@@ -1,20 +1,4 @@
 {
-  "WeeklyThemesPage": {
-    "allThemesSaved": "Tous les thèmes ont été enregistrés avec succès",
-    "failedToSaveAllThemes": "Échec de l'enregistrement de tous les thèmes : {{message}}",
-    "description": "Description",
-    "outOfCalendar": "(Hors calendrier)",
-    "saveAllThemes": "Enregistrer tous les thèmes",
-    "savingAllThemes": "Enregistrement de tous les thèmes...",
-    "section": "Section",
-    "themeName": "Nom du thème",
-    "title": "Gérer les thèmes hebdomadaires",
-    "validation": {
-      "requiredDescription": "La description du thème est requise",
-      "requiredName": "Le nom du thème est requis"
-    },
-    "week": "Semaine"
-  },
   "ageGroups": {
     "subtitle": "Trouvez l'histoire parfaite pour chaque niveau de lecture.",
     "title": "Tranches d'âge"
@@ -28,37 +12,25 @@
     "7-9": "7-9 ans"
   },
   "app": {
-    "description": "Créer et gérer des histoires illustrées pour enfants",
     "title": "Romistoire"
   },
-  "calendar": {
-    "title": "Calendrier historique"
-  },
   "common": {
-    "adding": "Ajout en cours...",
     "back": "Retour",
     "cancel": "Annuler",
-    "create": "Créer",
     "delete": "Supprimer",
     "deleteWarning": "Êtes-vous sûr de vouloir supprimer {{item}} ? Cette action est irréversible.",
-    "deleteConfirmDesc": "Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.",
     "deleteConfirmTitle": "Confirmer la suppression",
     "edit": "Modifier",
     "error": "Erreur",
     "errors": {
-      "failedToLoadThemes": "Échec du chargement des thèmes",
       "failedToLoadVersions": "Échec du chargement des versions"
     },
     "loading": "Chargement...",
-    "next": "Suivant",
     "noTheme": "Aucun thème",
     "operationFailed": "Opération échouée",
-    "previous": "Précédent",
-    "reset": "Réinitialiser",
     "save": "Enregistrer",
     "saving": "Enregistrement...",
     "search": "Rechercher",
-    "success": "Succès",
     "noDaysAvailable": "Aucun jour disponible",
     "unsavedTitle": "Quitter sans enregistrer ?",
     "unsavedDesc": "Vos modifications n'ont pas été enregistrées et seront perdues.",
@@ -68,28 +40,19 @@
     "confirmDelete": "Confirmer la suppression"
   },
   "create": {
-    "ageGroup": "Tranche d'âge",
-    "content": "Contenu de l'histoire",
-    "dayOfWeek": "Jour de la semaine",
     "error": {
-      "failedToCreate": "Échec de la création de l'histoire",
       "failedToSave": "Échec de l'enregistrement de l'histoire",
       "failedToUploadImage": "Échec du téléchargement de l'image",
-      "requiredFields": "Veuillez remplir tous les champs obligatoires",
-      "requiredFieldsMessage": "Veuillez remplir tous les champs obligatoires (titre, contenu et thème)"
+      "requiredFields": "Veuillez remplir tous les champs obligatoires"
     },
     "generate": {
       "age": "Tranche d'Âge",
-      "button": "Générer l'Histoire",
       "charNames": "Noms des personnages (optionnel)",
       "charNamesPlaceholder": "Ex : Léo, Mia",
       "day": "Jour de la Semaine",
-      "loading": "Génération en cours...",
       "numCharacters": "Nombre de personnages (optionnel)",
       "numCharactersPlaceholder": "Ex : 2",
-      "subtitle": "Utilisez l'intelligence artificielle pour créer une base d'histoire éducative.",
       "projectWeek": "Semaine du Projet",
-      "holdCtrl": "(Maintenir Ctrl pour plusieurs)",
       "aiProvider": "Moteur IA",
       "provider": {
         "gemini": "Cloud (Google Gemini - Rapide & Qualitatif)",
@@ -99,42 +62,8 @@
       "model": {
         "default": "Défaut"
       },
-      "logs": {
-        "start": "🚀 Démarrage de la génération...",
-        "weekNotFound": "⚠️ Semaine {{week}} introuvable, ignorée.",
-        "segmentWithoutDay": "⚠️ Histoire « {{title}} » ignorée : jour de la semaine introuvable dans la réponse de l'IA.",
-        "truncated": "⚠️ Réponse de l'IA tronquée (limite de longueur atteinte, modèle {{model}}) : la dernière histoire peut être incomplète.",
-        "noThemesError": "Impossible de sauvegarder l'histoire sans étiquette.",
-        "generatingIterative": "⏳ Semaine {{week}} ({{day}}) - {{age}}...",
-        "generating": "⏳ Génération pour Semaine {{week}} ({{theme}}) - {{age}}...",
-        "success": "✨ Génération terminée avec succès !",
-        "error": "❌ Erreur: {{error}}",
-        "selectRequired": "Veuillez sélectionner au moins une semaine, une tranche d'âge et le jour.",
-        "errorGeneric": "Une erreur est survenue pendant la génération.",
-        "themeCreated": "🏷️ Nouvelle étiquette créée : « {{name}} ».",
-        "aliasCreated": "⚠️ Créneau déjà occupé : « {{title}} » a été rangée dans la série « {{series}} ».",
-        "textFallback": "ℹ️ Réponse de l'IA non structurée : lecture du texte en mode de secours.",
-        "saved": "« {{title}} » enregistrée ({{age}} - {{day}})",
-        "nothingCreated": "❌ Aucune histoire n'a été créée.",
-        "summary": "✨ Terminé : {{created}} histoire(s) créée(s), {{failed}} échec(s), {{skipped}} ignorée(s).",
-        "topicAsTheme": "Aucune étiquette proposée par l'IA : le sujet « {{name}} » sert d'étiquette.",
-        "pacing": "⏸️ Pause de {{seconds}} s (limite de 5 requêtes par minute de l'offre gratuite).",
-        "shortStory": "⚠️ « {{title}} » est courte : {{words}} mots (cible {{min}}-{{max}}).",
-        "weekPlan": "🧭 Plan de la semaine établi : les jours suivants le suivront.",
-        "incompleteWeek": "⚠️ Semaine incomplète : {{count}} histoire(s) sur {{total}}. Relancez la génération pour les jours manquants."
-      },
-      "theme": "Thème Hebdomadaire",
-      "title": "Générateur d'Histoires IA",
-      "weekNumber": "Numéro de Semaine",
-      "untitled": "Histoire générée",
-      "weeklyThemeDescription": "Thème hebdomadaire",
       "progress": "Progression de la génération",
       "allWeek": "Toute la semaine",
-      "report": {
-        "title": "{{count}} histoire(s) créée(s)",
-        "issues": "{{failed}} échec(s) et {{skipped}} élément(s) ignoré(s) : voir le journal ci-dessus.",
-        "openLibrary": "Voir dans la bibliothèque"
-      },
       "selectWeeks": "Choisir les semaines",
       "selectAges": "Choisir les tranches d'âge",
       "selectedCount": "{{count}} sélectionné(s)",
@@ -142,28 +71,16 @@
       "clearSelection": "Tout désélectionner"
     },
     "illustrate": {
-      "aiDisclaimer": "Propulsé par Google Gemini. Les images sont générées par IA.",
-      "aiGeneration": "Génération IA (Gemini)",
-      "aiPromptPlaceholder": "Décrivez la scène magique que vous souhaitez créer...",
-      "createIllustration": "Créer une illustration",
       "error": {
-        "failedToRead": "Impossible de lire le fichier image",
-        "imageTooLarge": "Image trop volumineuse. Taille maximale : 5 Mo",
         "missingStory": "Histoire introuvable : impossible d'ajouter l'illustration.",
         "deleteFailed": "Impossible de supprimer l'illustration.",
         "reorderFailed": "Impossible de changer l'ordre des illustrations."
       },
-      "generateButton": "Générer",
-      "savedIllustrations": "Illustrations enregistrées ({{count}})",
-      "smartSuggestions": "Suggestions Intelligentes",
       "success": {
         "imageUploaded": "Image téléchargée avec succès",
         "imageDeleted": "Illustration supprimée"
-      },
-      "uploadButton": "Télécharger",
-      "uploadImage": "Télécharger une image"
+      }
     },
-    "language": "Langue",
     "preview": {
       "illustrationAlt": "Illustration {{number}}",
       "storyContentPlaceholder": "Le contenu de l'histoire apparaîtra ici...",
@@ -171,12 +88,9 @@
     },
     "save": "Enregistrer l'histoire",
     "selectDayOfWeek": "Sélectionner le jour de la semaine",
-    "selectTheme": "Thème",
     "selectWeekNumber": "Sélectionner le numéro de semaine",
     "storyDetails": "Détails de l'histoire",
     "success": {
-      "drawingSaved": "Dessin enregistré comme illustration",
-      "generatedAndSaved": "Histoires générées et sauvegardées !",
       "storyCreated": "Histoire créée avec succès !"
     },
     "tabs": {
@@ -185,16 +99,8 @@
       "preview": "Aperçu",
       "write": "Écrire"
     },
-    "theme": {
-      "creating": "Création en cours...",
-      "enterNew": "Saisir un nouveau thème",
-      "new": "+ Créer un nouveau thème"
-    },
     "title": "Créer une nouvelle histoire",
     "weekNumber": "Numéro de semaine"
-  },
-  "database": {
-    "error": "Erreur de connexion à la base de données"
   },
   "days": {
     "friday": "Vendredi",
@@ -204,19 +110,6 @@
     "thursday": "Jeudi",
     "tuesday": "Mardi",
     "wednesday": "Mercredi"
-  },
-  "daysShort": {
-    "friday": "Ven",
-    "monday": "Lun",
-    "saturday": "Sam",
-    "sunday": "Dim",
-    "thursday": "Jeu",
-    "tuesday": "Mar",
-    "wednesday": "Mer"
-  },
-  "edit": {
-    "save": "Enregistrer les modifications",
-    "title": "Modifier l'histoire"
   },
   "features": {
     "create": {
@@ -244,47 +137,20 @@
     "subtitle": "Une plateforme éducative pour créer des histoires illustrées",
     "welcome": "Bienvenue sur Romistoire"
   },
-  "illustration": {
-    "add": "Ajouter une illustration",
-    "delete": "Supprimer l'illustration",
-    "position": "Position",
-    "save": "Enregistrer l'illustration"
-  },
   "languages": {
     "en": "Anglais",
     "fr": "Français"
   },
-  "months": {
-    "1": "Janvier",
-    "2": "Février",
-    "3": "Mars",
-    "4": "Avril",
-    "5": "Mai",
-    "6": "Juin",
-    "7": "Juillet",
-    "8": "Août",
-    "9": "Septembre",
-    "10": "Octobre",
-    "11": "Novembre",
-    "12": "Décembre"
-  },
   "nav": {
-    "calendar": "Calendrier",
     "create": "Créer",
     "home": "Accueil",
     "series": "Séries",
-    "settings": "Paramètres",
     "stories": "Mes histoires",
     "themes": "Étiquettes",
     "timeline": "Chronologie",
-    "weeklyThemes": "Thèmes hebdomadaires",
     "program": "Programme",
-    "illustrations": "Illustrations"
-  },
-  "pagination": {
-    "next": "Suivant",
-    "page": "Page {{page}}",
-    "previous": "Précédent"
+    "illustrations": "Illustrations",
+    "generation": "Génération"
   },
   "notFound": {
     "message": "Oups ! Page non trouvée",
@@ -306,7 +172,6 @@
     "filterByTheme": "Filtrer par thème",
     "filterByWeek": "Filtrer par semaine",
     "filters": "Filtres",
-    "fontFamily": "Police de caractères",
     "fontSize": "Taille de police",
     "fontSizeLarge": "Grande",
     "fontSizeMedium": "Moyenne",
@@ -320,14 +185,12 @@
     "portrait": "Portrait",
     "selectAgeGroup": "Sélectionner une tranche d'âge",
     "selectAll": "Tout sélectionner",
-    "selectFont": "Sélectionner la police",
     "selectPageSize": "Sélectionner la taille de page",
     "selectStories": "Sélectionner les histoires",
     "selectTheme": "Sélectionner un thème",
     "selectWeeks": "Sélectionner les semaines",
     "success": "PDF généré avec succès",
     "tableOfContents": "Inclure une table des matières",
-    "themeBook": "Une collection d'histoires sur le thème {{theme}}",
     "title": "Exporter les histoires en PDF",
     "tocTitle": "Table des matières",
     "filtersApplied": "Filtres appliqués",
@@ -341,7 +204,6 @@
     "illustrationFor": "Illustration de « {{title}} »",
     "storiesCount": "{{count}} histoire(s)",
     "generatedOn": "Généré le {{date}}",
-    "pageNumber": "{{page}} / {{total}}",
     "tags": "Étiquettes : {{tags}}",
     "ageGroup": "{{age}} ans",
     "weekDay": "Semaine {{week}} · {{day}}",
@@ -380,7 +242,6 @@
       "deleteError": "Erreur lors de la suppression de la série",
       "kpi": {
         "ages": "Âges",
-        "day": "Jour",
         "noStories": "Aucune histoire liée.",
         "timelineCoverage": "Couverture Chronologique",
         "totalStories": "Total Histoires",
@@ -394,14 +255,10 @@
         "description": "Ajouter ou supprimer des histoires de la série",
         "availableStories": "Histoires disponibles",
         "inSeries": "Dans la série",
-        "searchAvailable": "Rechercher des histoires...",
-        "searchInSeries": "Rechercher dans la série...",
         "addSelected": "Ajouter sélection",
         "removeSelected": "Retirer sélection",
         "noStoriesAvailable": "Aucune histoire disponible.",
-        "noStoriesInSeries": "Aucune histoire dans cette série.",
-        "successAdd": "{{count}} histoires ajoutées",
-        "successRemove": "{{count}} histoires retirées"
+        "noStoriesInSeries": "Aucune histoire dans cette série."
       },
       "noSeries": "Aucune série trouvée.",
       "rename": {
@@ -416,21 +273,26 @@
         "stories": "Histoires"
       },
       "title": "Gestion des Séries",
-      "updateError": "Erreur lors de la mise à jour de la série"
+      "updateError": "Erreur lors de la mise à jour de la série",
+      "duplicateName": "Une série porte déjà ce nom.",
+      "nameTooLong": "Le nom est limité à {{max}} caractères."
     },
     "selector": {
       "create": "Créer",
       "existingSeries": "Séries existantes",
       "noSeriesFound": "Aucune série trouvée",
-      "placeholder": "Sélectionner ou créer une série..."
+      "placeholder": "Sélectionner ou créer une série...",
+      "none": "Aucune série",
+      "createNamed": "Créer la série « {{name}} »",
+      "emptyHint": "Aucune série pour le moment : tapez un nom pour en créer une.",
+      "newBadge": "nouvelle",
+      "newHint": "Nouvelle série : elle sera créée à l'enregistrement.",
+      "searchPlaceholder": "Rechercher ou nommer une série…"
     },
     "updateSuccess": "Série mise à jour avec succès"
   },
   "settings": {
     "appearanceChanged": "Apparence modifiée avec succès.",
-    "autoSave": "Enregistrement automatique",
-    "autoSaveChanged": "Enregistrement automatique modifié avec succès.",
-    "autoSaveDescription": "Enregistrer automatiquement les modifications apportées à vos histoires.",
     "cleanup": "Nettoyer",
     "cleanupImagesDesc": "Supprimer les fichiers images qui ne sont plus liés à aucune histoire.",
     "cleanupImagesTitle": "Nettoyer les images inutilisées",
@@ -451,11 +313,9 @@
     "dataCleared": "Données effacées avec succès.",
     "dataDescription": "Exporter, importer ou supprimer les données de votre application.",
     "dataExported": "Données exportées avec succès.",
-    "dataImported": "Données importées avec succès",
     "description": "Configurer les paramètres de l'application",
     "developerMode": "Mode Développeur",
     "developerModeDescription": "Activer les fonctionnalités techniques avancées (Logs, Réseau).",
-    "exportButton": "Exporter",
     "exportData": "Exporter les données",
     "exportDescription": "Télécharger une sauvegarde de vos histoires et paramètres.",
     "exportError": "Erreur lors de l'exportation des données.",
@@ -524,19 +384,134 @@
         },
         "details": {
           "input": "Entrée (Prompt)",
-          "output": "Sortie (Réponse)",
-          "error": "Erreur"
+          "output": "Sortie (Réponse)"
         },
         "noEntries": "Aucun log IA trouvé."
       },
       "config": {
         "sql": "Log des requêtes SQL",
         "access": "Log des accès HTTP",
-        "readonly": "Ces paramètres sont définis au niveau serveur et sont en lecture seule pour le moment."
+        "minLevel": "Niveau minimum des journaux de débogage"
       }
     },
     "cleanupSuccess": "Nettoyage terminé : {{count}} fichiers supprimés ({{size}} Mo récupérés).",
-    "cleanupError": "Erreur lors du nettoyage des images."
+    "cleanupError": "Erreur lors du nettoyage des images.",
+    "importSummary": "Import terminé : {{inserted}} éléments ajoutés, {{skipped}} ignorés (déjà présents), {{failed}} en erreur.",
+    "confirmOverwriteTitle": "Écraser les données existantes ?",
+    "confirmOverwriteDesc": "En mode « écraser », les histoires, séries et thèmes déjà présents seront remplacés par ceux de la sauvegarde. Cette action est irréversible.",
+    "confirmOverwrite": "Choisir le fichier",
+    "logsLoadError": "Impossible de charger les journaux.",
+    "logConfigError": "Impossible d'enregistrer la configuration des journaux.",
+    "ai": {
+      "tab": "Génération IA",
+      "loadError": "Impossible de charger les réglages de génération.",
+      "saved": "Réglages de génération enregistrés.",
+      "saveError": "Enregistrement impossible :",
+      "providerTitle": "Fournisseur par défaut",
+      "providerDescription": "Pré-sélectionné sur la page de création et utilisé pour écrire les descriptions d'illustration.",
+      "defaultProvider": "Fournisseur",
+      "keyConfigured": "Clé API configurée",
+      "keyMissing": "Clé API absente (GEMINI_API_KEY dans .env)",
+      "geminiDescription": "Les modèles sont essayés dans l'ordre : si l'un échoue (quota, surcharge), le suivant prend le relais.",
+      "quotaNote": "Offre gratuite : environ 5 requêtes par minute pour les modèles Flash. Mettez en premier les modèles Flash Lite, plus généreux.",
+      "storyModels": "Modèles pour les histoires",
+      "audioModels": "Modèles pour la lecture audio",
+      "custom": "Personnalisé",
+      "fromEnv": "Configuration .env",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "remove": "Retirer",
+      "addModelPlaceholder": "Ajouter un modèle (ex. gemini-3.5-flash)",
+      "restoreEnv": "Revenir au .env",
+      "restoreDefault": "Valeur par défaut",
+      "codeDefaults": "Sans réglage ni variable .env, la liste intégrée de {{count}} modèles est utilisée.",
+      "pausedTitle": "Modèles en pause",
+      "noPausedModels": "Aucun modèle en pause.",
+      "pausedUntil": "jusqu'à {{time}}",
+      "ollamaTitle": "Ollama (local)",
+      "ollamaDescription": "Modèle installé sur votre machine ou votre réseau local.",
+      "ollamaUrl": "Adresse d'Ollama",
+      "testConnection": "Tester la connexion",
+      "testOk": "Connexion réussie : {{count}} modèle(s) installé(s).",
+      "testFailed": "Échec de la connexion.",
+      "ollamaModel": "Modèle par défaut",
+      "ollamaModelHint": "Testez la connexion pour voir les modèles installés. La page de création permet toujours d'en choisir un autre.",
+      "creativityTitle": "Créativité",
+      "creativityDescription": "Plus élevée : histoires plus surprenantes. Plus basse : histoires plus sages et régulières.",
+      "creativityLow": "Sage",
+      "creativityHigh": "Inventif",
+      "creativityDefault": "Par défaut",
+      "timeoutsTitle": "Délais d'attente",
+      "timeoutsDescription": "Durée maximale d'une réponse avant d'essayer le modèle suivant (en secondes).",
+      "timeoutGemini": "Gemini : une histoire",
+      "timeoutGeminiWeek": "Gemini : une semaine entière",
+      "timeoutOllama": "Ollama",
+      "timeoutsHint": "Laissez vide pour garder la valeur actuelle (affichée en gris). Minimum 10 secondes."
+    },
+    "storage": {
+      "tab": "Stockage",
+      "saved": "Réglages de stockage enregistrés.",
+      "dashboardTitle": "Espace utilisé",
+      "dashboardDescription": "Contenu de la bibliothèque et place occupée sur le disque.",
+      "statsError": "Impossible de charger les statistiques.",
+      "stories": "Histoires",
+      "versions": "Versions",
+      "illustrations": "Illustrations",
+      "series": "Séries",
+      "themes": "Thèmes",
+      "weeklyThemes": "Sujets de semaine",
+      "uploads": "Images et audio",
+      "logs": "Journaux d'accès et IA",
+      "debugLog": "Journal de débogage",
+      "backups": "Sauvegardes",
+      "files": "{{count}} fichier(s)",
+      "backupCount": "{{count}} sauvegarde(s)",
+      "lastBackup": "dernière le {{date}}",
+      "backupTitle": "Sauvegardes",
+      "backupDescription": "Archive ZIP complète (données + images), identique à l'export complet.",
+      "autoBackup": "Sauvegarde automatique",
+      "autoBackupHint": "Vérifiée toutes les heures tant que le serveur tourne.",
+      "frequency": "Fréquence",
+      "daily": "Quotidienne",
+      "weekly": "Hebdomadaire",
+      "keep": "Nombre de sauvegardes conservées",
+      "backupList": "Sauvegardes disponibles",
+      "backupNow": "Sauvegarder maintenant",
+      "backupDone": "Sauvegarde créée : {{name}}",
+      "backupError": "Sauvegarde impossible :",
+      "noBackups": "Aucune sauvegarde pour le moment.",
+      "download": "Télécharger",
+      "deleteBackup": "Supprimer",
+      "deleteBackupTitle": "Supprimer cette sauvegarde ?",
+      "backupDeleted": "Sauvegarde supprimée.",
+      "restoreHint": "Pour restaurer : téléchargez la sauvegarde puis importez-la dans l'onglet Données.",
+      "cleanupTitle": "Nettoyage automatique",
+      "cleanupDescription": "Tâches exécutées par le serveur toutes les heures.",
+      "orphanPurge": "Supprimer les images orphelines",
+      "orphanPurgeHint": "Images et audio qui ne sont rattachés à aucune histoire.",
+      "orphanAge": "Âge minimum avant suppression (heures)",
+      "logRetention": "Conservation des journaux (jours)",
+      "clearDebugLog": "Vider",
+      "debugLogCleared": "Journal de débogage vidé."
+    },
+    "quota": {
+      "title": "Utilisation des quotas",
+      "description": "Toutes les requêtes envoyées à Gemini, réussies ou non, sur les {{days}} derniers jours.",
+      "dayStart": "La journée de quota a commencé le {{time}} (minuit, heure du Pacifique).",
+      "exceeded": "Limite atteinte",
+      "withinLimits": "Dans les limites",
+      "error": "Impossible de charger l'utilisation des quotas.",
+      "empty": "Aucune requête enregistrée pour le moment.",
+      "model": "Modèle",
+      "today": "Requêtes aujourd'hui",
+      "peakToday": "Pic / minute aujourd'hui",
+      "peakPeriod": "Pic / minute ({{days}} j)",
+      "limited": "Refus 429 ({{days}} j)",
+      "limitedValue": "{{minute}} min · {{day}} jour",
+      "lastLimited": "Dernier refus : {{time}}",
+      "otherErrors": "Autres erreurs",
+      "note": "Limites indicatives de l'offre gratuite (Google peut les modifier). « Pic / minute » : le plus grand nombre de requêtes parties en 60 secondes. Un refus 429 « min » est un dépassement par minute, « jour » un quota journalier épuisé."
+    }
   },
   "stories": {
     "allAges": "Tous les âges",
@@ -549,7 +524,6 @@
     "empty": "Aucune histoire disponible. Créez-en une maintenant !",
     "noMoreStories": "Plus d'histoires à charger.",
     "noResults": "Aucun résultat",
-    "noStoriesMatchSearch": "Aucune histoire ne correspond à votre terme de recherche.",
     "searchPlaceholder": "Rechercher une histoire...",
     "searchStories": "Rechercher des histoires",
     "title": "Histoires",
@@ -566,27 +540,19 @@
     "content": "Contenu de l'histoire",
     "created": "Créée le",
     "createIllustration": "Créer une illustration",
-    "creationDate": "Date de création",
     "day": "Jour",
     "dayOfWeek": "Jour de la semaine",
-    "dayOfWeekPlaceholder": "Saisir le jour",
     "deleteError": "Erreur lors de la suppression de l'histoire",
     "deleteSuccess": "Histoire supprimée avec succès",
-    "details": "Détails de l'histoire",
     "edit": "Modifier",
     "editor": "Éditeur",
     "illustrations": "Illustrations",
-    "illustrationsComingSoon": "Illustrations à venir !",
     "language": "Langue",
     "languagePlaceholder": "Saisir la langue",
     "lastModified": "Dernière modification",
-    "metadata": "Métadonnées",
     "modified": "Dernière modification",
     "next": "Histoire suivante",
-    "noThemesFound": "Aucun thème trouvé",
     "previous": "Histoire précédente",
-    "primaryTheme": "Thème principal",
-    "readingTime": "Temps de lecture",
     "restore": "Restaurer",
     "restoreError": "Erreur lors de la restauration de la version",
     "restoreSuccess": "Version restaurée avec succès",
@@ -604,16 +570,11 @@
     "invalidImageType": "Format non accepté : utilisez une image JPEG, PNG, GIF ou WebP.",
     "imageTooLarge": "Image trop lourde (5 Mo maximum).",
     "years": "ans",
-    "searchPlaceholder": "Rechercher une histoire...",
-    "searchStories": "Rechercher des histoires",
-    "searchThemes": "Rechercher des thèmes...",
-    "secondaryThemes": "Thèmes secondaires",
     "selectAgeGroup": "Sélectionner une tranche d'âge",
     "selectVersion": "Sélectionner la version",
     "settings": "Paramètres",
     "theme": "Thème",
     "themes": "Thèmes",
-    "themesPlaceholder": "Sélectionnez un ou plusieurs thèmes",
     "title": "Titre",
     "titlePlaceholder": "Saisir le titre",
     "updateError": "Erreur lors de la mise à jour de l'histoire",
@@ -621,7 +582,6 @@
     "uploadImage": "Télécharger une image",
     "version": "Version",
     "weekNumber": "Semaine {{number}}",
-    "weekNumberPlaceholder": "Saisir le numéro de semaine",
     "week": "Semaine",
     "weeklyTheme": "Thème de la semaine",
     "source": {
@@ -652,26 +612,11 @@
     "loadError": "Impossible de charger l'histoire.",
     "contentPlaceholder": "Écrivez votre histoire…"
   },
-  "success": {
-    "title": "Succès",
-    "create": "Histoire créée avec succès",
-    "delete": "Histoire supprimée avec succès",
-    "restore": "Version restaurée avec succès",
-    "update": "Histoire mise à jour avec succès"
-  },
   "filters": {
     "title": "Filtres",
     "reset": "Réinitialiser",
-    "allThemes": "Tous les thèmes",
-    "allSeries": "Toutes les séries",
     "allAges": "Tous les âges",
     "allWeeks": "Toutes les semaines",
-    "allDays": "Tous les jours",
-    "hasImage": "Avec image",
-    "hasAudio": "Avec audio",
-    "onlyImages": "Images uniquement",
-    "onlyAudio": "Audio uniquement",
-    "source": "Source",
     "allSources": "Toutes les sources",
     "status": "Statut",
     "allStatus": "Tous les statuts",
@@ -680,104 +625,30 @@
   },
   "themes": {
     "addNewTheme": "Ajouter un nouveau thème",
-    "addTheme": "Ajouter un thème",
-    "ageGroups": "Groupes d'âges",
-    "allAges": "Tous les âges",
-    "allWeeks": "Toutes les semaines",
-    "animals": "Animaux",
-    "cancel": "Annuler",
     "clearSearch": "Effacer la recherche",
-    "colorPlaceholder": "Couleur du thème",
-    "confirmDeleteThemeDescription": "Êtes-vous sûr de vouloir supprimer ce thème ? Cette action est irréversible.",
     "createFirstTheme": "Créez votre premier thème pour commencer.",
     "createFirstThemeDescription": "Créez votre premier thème pour commencer à organiser vos histoires.",
-    "createIllustration": "Créer une illustration",
-    "createdAt": "Créé le",
-    "creationDate": "Date de création",
-    "dataImported": "Données importées avec succès",
-    "deleteButton": "Supprimer",
     "deleteTheme": "Supprimer le thème",
     "descriptionPlaceholder": "Décrivez ce thème...",
-    "dinosaurs": "Dinosaures",
-    "duplicatesMerged": "Thèmes dupliqués fusionnés avec succès",
     "editTheme": "Modifier le thème",
-    "editThemeDescription": "Modifiez les détails du thème sélectionné.",
-    "error": {
-      "failedToDelete": "Échec de la suppression du thème",
-      "invalidData": "Données invalides rencontrées.",
-      "nullData": "Les données sont nulles ou non définies. Veuillez vérifier la source.",
-      "loadingError": "Erreur lors du chargement des thèmes"
-    },
-    "filterNamePlaceholder": "Filtrer par nom de thème",
-    "filterSelectTheme": "Filtrer par thème sélectionné",
-    "found": "trouvé(s)",
-    "friendship": "Amitié",
-    "grid": {
-      "clearFilter": "Effacer la recherche",
-      "found": "trouvé(s)",
-      "theme_one": "thème",
-      "theme_other": "thèmes",
-      "total": "au total"
-    },
     "iconPlaceholder": "Icône du thème",
-    "illustrationAlt": "Texte alternatif de l'illustration",
-    "imageNumber": "Numéro de l'image",
-    "importError": "Erreur lors de l'importation des données",
-    "importNoFile": "Veuillez sélectionner un fichier à importer",
-    "manageThemes": "Gérer les thèmes",
-    "manageThemesDescription": "Créez, modifiez et gérez les thèmes des histoires pour enrichir vos narrations",
-    "matchedNoResults": "n'a pas trouvé de correspondance avec les thèmes",
     "merge": "Fusionner",
-    "mergeFailed": "Échec de la fusion",
     "namePlaceholder": "ex: Forêt Magique",
-    "nature": "Nature",
     "newTheme": "Nouveau thème",
-    "newThemePlaceholder": "Nom du thème",
-    "nextTheme": "Thème suivant",
     "noDescription": "Aucune description",
     "noResults": "Aucun résultat",
-    "noThemesFound": "Aucun thème trouvé.",
-    "ocean": "Océan",
-    "precaching": {
-      "missingResource": "Ressource introuvable dans le précache : {{url}}",
-      "noRoute": "Aucune route trouvée pour : {{url}}"
-    },
-    "previousTheme": "Thème précédent",
-    "removeTheme": "Supprimer le thème",
-    "save": "Enregistrer",
-    "saveTheme": "Enregistrer le thème",
     "search": "Rechercher",
     "searchThemes": "Rechercher des thèmes...",
-    "selectAgeGroup": "Sélectionner un groupe d'âges",
-    "selectWeek": "Sélectionner une semaine",
     "sortBy": "Trier par",
-    "sortByName": "Nom (A-Z)",
-    "sortByCount": "Nombre d'histoires",
     "sort": "Trier",
-    "space": "Espace",
-    "success": {
-      "imageDeleted": "Thème supprimé avec succès"
-    },
     "themeAddedSuccess": "Thème ajouté avec succès",
     "themeDeletedSuccess": "Thème supprimé avec succès!",
     "themeUpdatedSuccess": "Thème mis à jour avec succès",
-    "themesCount": "Nombre total de thèmes",
-    "timeline": "Chronologie",
-    "total": "Total",
-    "tryAdjustingFilter": "Essayez d'ajuster vos filtres de recherche",
-    "updatedAt": "Mis à jour le",
     "validation": {
       "colorRequired": "Couleur valide requise",
-      "descriptionRequired": "La description est requise",
-      "descriptionTooLong": "Description trop longue",
       "nameRequired": "Le nom est requis",
       "nameTooLong": "Nom trop long"
     },
-    "sortAZ": "A-Z",
-    "sortZA": "Z-A",
-    "sortAsc": "- +",
-    "sortDesc": "+ -",
-    "deleteInUseError": "Impossible de supprimer ce thème : il est peut-être utilisé par des histoires.",
     "pageTitle": "Étiquettes d'histoire",
     "pageSubtitle": "Les étiquettes décrivent les thèmes d'une histoire (Amitié, Océans…). Une histoire peut en avoir plusieurs ; l'étoile marque la principale.",
     "actions": "Actions pour « {{name}} »",
@@ -851,29 +722,11 @@
       "skipped": "{{count}} étiquette(s) conservée(s) : elles sont maintenant utilisées par une histoire."
     }
   },
-  "errors": {
-    "addThemeFailed": "Échec de l'ajout du thème",
-    "editThemeFailed": "Échec de la modification du thème",
-    "removeThemeFailed": "Échec de la suppression du thème",
-    "themeInUse": "Ce thème est utilisé par des histoires"
-  },
   "timeline": {
     "thisStory": "cette histoire",
-    "allAges": "Tous les âges",
-    "allWeeks": "Toutes les semaines",
-    "exploreStories": "Explorez les histoires dans une vue chronologique",
-    "filterAllThemes": "Tous les thèmes",
-    "filterSelectTheme": "Sélectionner un thème",
     "manageWeeklyThemes": "Histoires chronologiques",
-    "selectAgeGroup": "Sélectionner une tranche d'âge",
-    "selectWeek": "Sélectionner un numéro de semaine",
     "noMoreStories": "Plus d'histoires à charger.",
     "weekNumber": "Semaine {{number}}"
-  },
-  "version": {
-    "current": "Version actuelle",
-    "history": "Historique des versions",
-    "restore": "Restaurer cette version"
   },
   "week": {
     "day": {
@@ -992,5 +845,99 @@
       "download": "Télécharger",
       "openGemini": "Ouvrir Gemini"
     }
+  },
+  "generation": {
+    "title": "Génération en masse",
+    "description": "Les générations tournent sur le serveur : vous pouvez quitter la page ou fermer l'onglet, elles continuent et reprennent après un redémarrage.",
+    "open": "Ouvrir la page Génération",
+    "createTabHint": "La génération par IA se lance désormais depuis la page Génération : plusieurs semaines et âges d'un coup, en arrière-plan, avec reprise et relance des échecs.",
+    "indicator": "Génération en cours : {{percent}} %",
+    "tabs": {
+      "new": "Nouvelle génération",
+      "jobs": "Tâches",
+      "coverage": "Couverture"
+    },
+    "form": {
+      "launched": "Génération lancée sur le serveur.",
+      "skipExisting": "Ignorer ce qui existe déjà",
+      "skipExistingHint": "Les semaines déjà écrites pour un âge sont sautées ; une semaine incomplète n'est complétée que des jours manquants.",
+      "estimating": "Estimation…",
+      "estimate": "{{units}} semaine(s) × âge à générer : environ {{requests}} requêtes, {{duration}}.",
+      "skippedCells": "{{count}} case(s) ignorée(s) (déjà écrites ou sans sujet).",
+      "missingTopics": "Semaines sans sujet au programme, ignorées : {{weeks}}.",
+      "quotaWarning": "Au-delà d'environ 20 requêtes par jour, l'offre gratuite épuise chaque modèle Flash : les modèles de repli prennent le relais, puis la génération peut s'arrêter jusqu'au lendemain (les échecs se relancent ensuite).",
+      "launch": "Lancer la génération"
+    },
+    "status": {
+      "queued": "En attente",
+      "running": "En cours",
+      "paused": "En pause",
+      "cancelled": "Annulée",
+      "done": "Terminée",
+      "failed": "Échec",
+      "pending": "À faire",
+      "skipped": "Ignorée"
+    },
+    "actions": {
+      "pause": "Mettre en pause",
+      "resume": "Reprendre",
+      "cancel": "Annuler"
+    },
+    "detail": {
+      "retrying": "Relance des échecs en cours.",
+      "validated": "{{count}} histoire(s) validée(s).",
+      "deleted": "{{count}} histoire(s) supprimée(s).",
+      "retryFailed": "Relancer les échecs ({{count}})",
+      "openStories": "Voir les histoires",
+      "validateAll": "Tout valider",
+      "deleteStories": "Supprimer les histoires",
+      "deleteTitle": "Supprimer les {{count}} histoire(s) de ce lot ?",
+      "deleteDescription": "Les histoires écrites par cette génération (et leurs illustrations et audio) seront définitivement supprimées. L'historique de la tâche est conservé.",
+      "week": "Semaine",
+      "status": "Statut",
+      "stories": "Histoires",
+      "info": "Détails",
+      "attempts": "{{count}} essais",
+      "log": "Journal"
+    },
+    "jobs": {
+      "empty": "Aucune génération pour le moment.",
+      "summary": "Semaines {{weeks}} · {{ages}}",
+      "counts": "{{created}} histoire(s) créée(s), {{failed}} échec(s), {{skipped}} ignorée(s)",
+      "current": "en cours : {{label}}"
+    },
+    "coverage": {
+      "error": "Impossible de charger la couverture.",
+      "summary": "{{complete}} semaines complètes sur {{total}} cases (semaine × âge). Cliquez sur des cases, une ligne ou une colonne pour préparer une génération.",
+      "suggestTopics": "Proposer les sujets manquants ({{count}})",
+      "generateSelection": "Générer la sélection ({{count}})",
+      "legendComplete": "Semaine complète",
+      "legendPartial": "Incomplète",
+      "legendEmpty": "Vide",
+      "legendNoTopic": "Sans sujet",
+      "selectColumn": "Sélectionner toute la colonne",
+      "noTopic": "sans sujet",
+      "cellLabel": "Semaine {{week}}, {{age}} : {{days}} jour(s) écrit(s)"
+    },
+    "topics": {
+      "title": "Sujets proposés par l'IA",
+      "description": "Cochez les sujets à ajouter au programme. Ils restent modifiables ensuite dans la page Programme.",
+      "saved": "{{count}} sujet(s) ajouté(s) au programme.",
+      "loading": "L'IA réfléchit aux sujets…",
+      "save": "Ajouter au programme ({{count}})"
+    },
+    "library": {
+      "jobFilter": "Affichage limité aux histoires d'une génération.",
+      "openJob": "Voir la tâche",
+      "clearJob": "Tout afficher"
+    }
+  },
+  "review": {
+    "filter": "Relecture",
+    "all": "Toutes (relecture)",
+    "toReview": "À relire",
+    "validated": "Validées",
+    "validate": "Valider",
+    "validatedToast": "Histoire marquée comme relue."
   }
 }

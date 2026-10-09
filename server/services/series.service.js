@@ -1,5 +1,19 @@
-import { query, getConnection } from '../config/database.js';
+import { query } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { ConflictError, NotFoundError, ValidationError } from '../middleware/error.middleware.js';
+
+const NAME_MAX = 255;
+
+/**
+ * Cleans a series name: trimmed, inner spaces collapsed.
+ * @throws {ValidationError} Empty or too long.
+ */
+export const cleanSeriesName = (name) => {
+  const clean = String(name ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) throw new ValidationError('A series name is required');
+  if (clean.length > NAME_MAX) throw new ValidationError(`A series name is limited to ${NAME_MAX} characters`);
+  return clean;
+};
 
 /**
  * Service for managing story series.
@@ -57,10 +71,31 @@ class SeriesService {
    * @returns {Promise<Object>} The created series object.
    */
   async create({ name, description, locale = 'fr' }) {
+      const cleanName = cleanSeriesName(name);
+      await this._assertNameFree(cleanName);
       const id = uuidv4();
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      await query('INSERT INTO story_series (id, name, description, locale, created_at) VALUES (?, ?, ?, ?, ?)', [id, name, description || null, locale, now]);
-      return { id, name, description, locale, created_at: now, storyCount: 0 };
+      await query('INSERT INTO story_series (id, name, description, locale, created_at) VALUES (?, ?, ?, ?, ?)', [id, cleanName, description || null, locale, now]);
+      return { id, name: cleanName, description, locale, created_at: now, storyCount: 0 };
+  }
+
+  /**
+   * Series names are unique: stories are attached to a series by name (create page, mass generation).
+   * The comparison ignores case and accents (column collation utf8mb4_0900_ai_ci).
+   * @param {string} name - Cleaned name.
+   * @param {string} [exceptId] - Series being renamed.
+   * @throws {ConflictError}
+   */
+  async _assertNameFree(name, exceptId = null) {
+      const rows = await query('SELECT id FROM story_series WHERE name = ?', [name]);
+      if ((rows || []).some(row => row.id !== exceptId)) {
+          throw new ConflictError('A series already has this name', { conflict: 'name' });
+      }
+  }
+
+  async _require(id) {
+      const rows = await query('SELECT id FROM story_series WHERE id = ?', [id]);
+      if (!rows || rows.length === 0) throw new NotFoundError('Series not found');
   }
 
   /**
@@ -72,8 +107,11 @@ class SeriesService {
    * @returns {Promise<Object>} The updated series object.
    */
   async update(id, { name, description }) {
-      await query('UPDATE story_series SET name = ?, description = ? WHERE id = ?', [name, description, id]);
-      return { id, name, description };
+      const cleanName = cleanSeriesName(name);
+      await this._require(id);
+      await this._assertNameFree(cleanName, id);
+      await query('UPDATE story_series SET name = ?, description = ? WHERE id = ?', [cleanName, description ?? null, id]);
+      return { id, name: cleanName, description };
   }
 
   /**
@@ -82,6 +120,7 @@ class SeriesService {
    * @returns {Promise<boolean>} True on success.
    */
   async delete(id) {
+      await this._require(id);
       await query('DELETE FROM story_series WHERE id = ?', [id]);
       return true;
   }

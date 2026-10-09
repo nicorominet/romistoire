@@ -1,23 +1,35 @@
+import { useSyncExternalStore } from "react";
+import en from "@/locales/en.json";
+import fr from "@/locales/fr.json";
+import obf from "@/locales/obf.json";
+import { STORAGE_KEYS } from "@/constants";
 
-let translations = null;
-let initialLocale = "fr";
+// Bundled at build time: a runtime fetch of /src/locales only works with the Vite dev server
+const translations = { en, fr, obf };
+const DEFAULT_LOCALE = "fr";
+
+const readStoredLocale = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOCALE);
+    return stored && translations[stored] ? stored : DEFAULT_LOCALE;
+  } catch (e) {
+    return DEFAULT_LOCALE;
+  }
+};
+
+let currentLocale = readStoredLocale();
+const listeners = new Set();
 
 const i18n = {
   t: (key, params = {}) => {
-    if (!translations) {
-      console.warn('Translations not loaded yet');
-      return key;
-    }
-    const locale = i18n.getCurrentLocale();
-    
     const get = (obj, path) => {
         if (!obj) return undefined;
         const nested = path.split('.').reduce((acc, part) => acc && acc[part], obj);
         if (nested) return nested;
         return obj[path];
     };
-    
-    let text = get(translations[locale], key) || get(translations["en"], key) || key;
+
+    let text = get(translations[currentLocale], key) || get(translations["en"], key) || key;
 
     Object.entries(params).forEach(([paramKey, value]) => {
       text = text.replace(`{{${paramKey}}}`, value);
@@ -26,63 +38,49 @@ const i18n = {
     return text;
   },
 
+  /**
+   * Switches the UI language, persists it and notifies subscribers (re-renders the app).
+   * @param {string} locale - "fr", "en" or "obf".
+   * @returns {boolean} false if the locale is unknown.
+   */
   changeLocale: (locale) => {
-    if (translations?.[locale]) {
-      initialLocale = locale;
-      return true;
+    if (!translations[locale]) {
+      console.error(`Locale '${locale}' is not supported`);
+      return false;
     }
-    console.error(`Locale '${locale}' is not supported`);
-    return false;
+    currentLocale = locale;
+    try { localStorage.setItem(STORAGE_KEYS.LOCALE, locale); } catch (e) { /* storage unavailable */ }
+    document.documentElement.lang = locale === "obf" ? DEFAULT_LOCALE : locale;
+    listeners.forEach((listener) => listener());
+    return true;
   },
 
-  getCurrentLocale: () => initialLocale,
+  getCurrentLocale: () => currentLocale,
 
-  getAvailableLocales: () => Object.keys(translations || {}),
+  getAvailableLocales: () => Object.keys(translations),
 
-  isLoaded: () => translations !== null
+  /**
+   * @param {() => void} listener - Called after every locale change.
+   * @returns {() => void} Unsubscribe function.
+   */
+  subscribe: (listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+
+  isLoaded: () => true
 };
 
-async function loadLocales() {
-  try {
-      // Browser environment only
-      const [enResponse, frResponse, obfResponse] = await Promise.all([
-        fetch('/src/locales/en.json', { headers: { 'Accept': 'application/json' } }),
-        fetch('/src/locales/fr.json', { headers: { 'Accept': 'application/json' } }),
-        fetch('/src/locales/obf.json', { headers: { 'Accept': 'application/json' } })
-      ]);
+/**
+ * Current locale as React state: the calling component re-renders (with its children) on change.
+ * @returns {string} Current locale.
+ */
+const useLocale = () => useSyncExternalStore(i18n.subscribe, i18n.getCurrentLocale);
 
-      if (!enResponse.ok || !frResponse.ok || !obfResponse.ok) {
-        throw new Error('Failed to load one or more locale files');
-      }
-
-      const [en, fr, obf] = await Promise.all([
-        enResponse.json(),
-        frResponse.json(),
-        obfResponse.json()
-      ]);
-
-      translations = {
-        en,
-        fr,
-        obf,
-      };
-
-      return true;
-  } catch (err) {
-    console.error("Failed to load locales:", err);
-    translations = { 
-      en: {},
-      fr: {},
-      obf: {}
-    };
-    return false;
-  }
-}
-
-// Initialize translations
+// Kept async for the bootstrap in main.tsx
 const init = async () => {
-  await loadLocales();
+  document.documentElement.lang = currentLocale === "obf" ? DEFAULT_LOCALE : currentLocale;
   return i18n;
 };
 
-export { i18n, init };
+export { i18n, init, useLocale };

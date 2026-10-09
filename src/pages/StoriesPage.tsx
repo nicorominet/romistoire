@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { i18n } from '@/lib/i18n';
 import { Story, AgeGroup } from '@/types/Story';
 import { Theme, WeeklyTheme } from '@/types/Theme';
@@ -49,6 +49,9 @@ const StoriesPage = (): JSX.Element => {
   const hasAudio = filterParam('hasAudio');
   const selectedSource = filterParam('source');
   const selectedEditStatus = filterParam('editStatus');
+  const selectedReviewStatus = filterParam('reviewStatus');
+  // Stories of one mass generation job (link from the Generation page)
+  const generationJobId = searchParams.get('generationJobId') || '';
   const debouncedSearchTerm = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState<string>(debouncedSearchTerm);
 
@@ -65,15 +68,16 @@ const StoriesPage = (): JSX.Element => {
       seriesId: selectedSeries !== 'all' ? selectedSeries : '',
       source: selectedSource !== 'all' ? selectedSource : '',
       editStatus: selectedEditStatus !== 'all' ? selectedEditStatus : '',
+      reviewStatus: selectedReviewStatus !== 'all' ? selectedReviewStatus : '',
+      generationJobId,
       search: debouncedSearchTerm
-  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, selectedSource, selectedEditStatus, debouncedSearchTerm]);
+  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, selectedSource, selectedEditStatus, selectedReviewStatus, generationJobId, debouncedSearchTerm]);
 
   // React Query Hooks
   const { 
       data: storiesData, 
       fetchNextPage, 
       hasNextPage, 
-      isFetching, 
       isFetchingNextPage, 
       isLoading: isStoriesLoading,
       error: storiesError
@@ -149,6 +153,7 @@ const StoriesPage = (): JSX.Element => {
   const handleSeriesChange = (value: string) => setFilter('seriesId', value);
   const handleSourceChange = (value: string) => setFilter('source', value);
   const handleEditStatusChange = (value: string) => setFilter('editStatus', value);
+  const handleReviewStatusChange = (value: string) => setFilter('reviewStatus', value);
   const handleSearch = () => setFilter('search', searchTerm.trim() || null);
   
   const handleResetFilters = () => {
@@ -169,9 +174,6 @@ const StoriesPage = (): JSX.Element => {
     }, {} as { [key: string]: Story[] });
   }, [stories]);
 
-  const loading = isStoriesLoading || isFetching; // Or mostly just initial load? 'isFetching' is true on background refetch too.
-  // We probably want 'isStoriesLoading' (initial) or 'isFetchingNextPage' for load more.
-  // But StoriesListGrid uses 'loading' to show spinner.
   
   return (
     <PageLayout>
@@ -205,8 +207,19 @@ const StoriesPage = (): JSX.Element => {
             handleSourceChange={handleSourceChange}
             selectedEditStatus={selectedEditStatus}
             handleEditStatusChange={handleEditStatusChange}
+            selectedReviewStatus={selectedReviewStatus}
+            handleReviewStatusChange={handleReviewStatusChange}
             handleResetFilters={handleResetFilters}
           />
+          {generationJobId && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <span>{t('generation.library.jobFilter')}</span>
+              <span className="flex gap-3">
+                <Link to={`${APP_ROUTES.GENERATION}?tab=jobs&job=${generationJobId}`} className="underline">{t('generation.library.openJob')}</Link>
+                <button type="button" className="underline" onClick={() => setFilter('generationJobId', null)}>{t('generation.library.clearJob')}</button>
+              </span>
+            </div>
+          )}
           <Tabs defaultValue="grid" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="grid" className="flex items-center gap-1">

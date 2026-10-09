@@ -9,21 +9,53 @@ const __dirname = path.dirname(__filename);
 
 const LOG_DIR = path.join(__dirname, '../debug');
 const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
+// Persisted settings (Settings > Network > Config): read at startup, rewritten on every update
+const CONFIG_FILE = path.join(__dirname, 'log-config.json');
 
-// Default Configuration
-let config = {
+// From least to most severe: entries below config.minLevel are dropped
+const LEVELS = ['INFO', 'WARN', 'ERROR'];
+
+const DEFAULT_CONFIG = {
     enableSqlLogging: true,
     enableAccessLogging: true,
     minLevel: 'INFO'
 };
 
 /**
- * Updates the logger configuration.
- * @param {Object} newConfig - New configuration values.
+ * Keeps only the known config keys, with the expected types.
+ * @param {Object} values - Raw values (request body, file content).
+ * @returns {Object} Partial config.
+ */
+const pickConfig = (values = {}) => {
+    const picked = {};
+    if (typeof values.enableSqlLogging === 'boolean') picked.enableSqlLogging = values.enableSqlLogging;
+    if (typeof values.enableAccessLogging === 'boolean') picked.enableAccessLogging = values.enableAccessLogging;
+    if (LEVELS.includes(values.minLevel)) picked.minLevel = values.minLevel;
+    return picked;
+};
+
+const loadConfig = () => {
+    try {
+        return { ...DEFAULT_CONFIG, ...pickConfig(JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))) };
+    } catch (e) {
+        return { ...DEFAULT_CONFIG };
+    }
+};
+
+let config = loadConfig();
+
+/**
+ * Updates the logger configuration and persists it.
+ * @param {Object} newConfig - New configuration values (unknown keys are ignored).
  * @returns {Object} Current configuration.
  */
 export function updateLoggerConfig(newConfig) {
-    config = { ...config, ...newConfig };
+    config = { ...config, ...pickConfig(newConfig) };
+    try {
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    } catch (err) {
+        console.error('Failed to write log config:', err);
+    }
     return config;
 }
 
@@ -46,6 +78,7 @@ export function log(category, message, data = {}, level = 'INFO') {
     // Filter based on configuration
     if (category === 'DB' && !config.enableSqlLogging) return;
     if ((category === 'API' || category === 'ACCESS') && !config.enableAccessLogging) return;
+    if (LEVELS.indexOf(level) < LEVELS.indexOf(config.minLevel)) return;
 
     const timestamp = new Date().toISOString();
     const entry = {

@@ -147,5 +147,3 @@ export const ThemeFormDialog = ({ open, onOpenChange, theme, onSaved, onMergeReq
     </Dialog>
   );
 };
-
-export default ThemeFormDialog;

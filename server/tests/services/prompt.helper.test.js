@@ -21,10 +21,6 @@ describe('PromptHelper', () => {
             expect(profile.wordCount).toContain('900-1100 mots');
             expect(profile.illustrationStyle).toContain('Young Adult');
         });
-
-        it('should keep getStyleByAge as an alias', () => {
-            expect(PromptHelper.getStyleByAge('7-9')).toEqual(PromptHelper.getAgeProfile('7-9'));
-        });
     });
 
     describe('buildSystemInstruction', () => {
@@ -165,7 +161,9 @@ describe('PromptHelper', () => {
             expect(continuity).toContain('rappelle en une phrase où en était l\'aventure la veille, en nommant le personnage principal');
             expect(continuity).toContain('Les 7 débuts sont tous différents');
             expect(continuity).toContain('Le vendredi résout tous les mystères');
-            expect(week).toContain('au moins 300 mots (environ 300-450 mots) pour chacune des 7 histoires');
+            expect(week).toContain('au moins 7 paragraphes (7 à 9 paragraphes de 3 à 4 phrases), soit au moins 300 mots (environ 300-450 mots) pour chacune des 7 histoires');
+            // Length comes from developed scenes, never from filler paragraphs
+            expect(week).toContain('jamais en ajoutant des paragraphes de remplissage');
         });
 
         it('should forbid opening with the reminder of the previous day, in both modes', () => {
@@ -208,9 +206,8 @@ describe('PromptHelper', () => {
             expect(prompt).toContain('exactement comme dans la fiche PERSONNAGES');
         });
 
-        it('should ask for a minimum length and know the paragraphs of each age', () => {
+        it('should ask for a minimum length', () => {
             expect(PromptHelper.buildStoryPrompt(baseParams)).toContain('au moins 500 mots');
-            expect(PromptHelper.getTargetParagraphs('4-6')).toEqual({ min: 5, max: 8 });
         });
 
         it('should tie the suspense to the plan and close every mystery on Friday', () => {
@@ -257,11 +254,17 @@ describe('PromptHelper', () => {
             expect(PromptHelper.getTargetWords('2-3 ans')).toEqual({ min: 150, max: 250 });
         });
 
-        it('should list existing tags to reuse', () => {
-            const prompt = PromptHelper.buildStoryPrompt({ ...baseParams, existingThemes: ['Nature', 'Amitié', 'Nature', ''] });
+        it('should list the titles already used in the series', () => {
+            const prompt = PromptHelper.buildStoryPrompt({ ...baseParams, avoidTitles: ['Le festin des oiseaux', 'Le festin des oiseaux', ''] });
+            expect(prompt).toContain('Titres déjà utilisés dans cette série, à ne pas reprendre ni imiter de près : « Le festin des oiseaux ».');
+            expect(PromptHelper.buildStoryPrompt(baseParams)).not.toContain('Titres déjà utilisés');
+        });
+
+        it('should list existing tags to reuse, without the vague ones', () => {
+            const prompt = PromptHelper.buildStoryPrompt({ ...baseParams, existingThemes: ['Nature', 'Amitié', 'Champignons', 'Nature', 'curiosite', ''] });
             expect(prompt).toContain('## ÉTIQUETTES');
             expect(prompt).toContain('ÉTIQUETTES EXISTANTES');
-            expect(prompt).toContain('« Nature », « Amitié ».');
+            expect(prompt).toContain('« Amitié », « Champignons ».');
         });
 
         it('should cap the existing themes list', () => {
@@ -271,10 +274,19 @@ describe('PromptHelper', () => {
             expect(prompt).not.toContain('« Thème 80 »');
         });
 
-        it('should ask for short general names when the library is empty', () => {
+        it('should ask for 2 or 3 tags: the precise subject first, then values, never vague ones', () => {
             const prompt = PromptHelper.buildStoryPrompt(baseParams);
+            const tags = prompt.slice(prompt.indexOf('## ÉTIQUETTES'), prompt.indexOf('## FORMAT DE SORTIE'));
             expect(prompt).not.toContain('ÉTIQUETTES EXISTANTES');
-            expect(prompt).toContain('noms courts et généraux');
+            expect(tags).toContain('2 ou 3 étiquettes');
+            expect(tags).toContain("d'abord sa notion ou son univers précis");
+            expect(tags).toContain('Pas d\'étiquette vague');
+            // The former examples anchored every story on them
+            expect(tags).not.toContain('ex. « Nature »');
+            expect(tags).not.toContain('noms courts et généraux');
+            // A week varies its values from day to day
+            expect(PromptHelper.buildStoryPrompt({ ...baseParams, day: 'Toute la semaine' })).toContain('les valeurs changent');
+            expect(tags).not.toContain('les valeurs changent');
         });
 
         it('should describe the JSON output format', () => {

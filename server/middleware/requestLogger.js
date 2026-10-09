@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ENV_CONFIG } from '../config/env.config.js';
+import { logger } from '../config/logger.js';
 
 const LOGS_DIR = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
 
@@ -16,18 +17,8 @@ export const requestLogger = (req, res, next) => {
   const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
   const logFile = path.join(LOGS_DIR, `access-${dateStr}.log`);
 
-  // Check config
-  try {
-      const configPath = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'config', 'log-config.json');
-      if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.enableAccessLogging === false) {
-              return next();
-          }
-      }
-  } catch (e) {
-      // ignore
-  }
+  // Settings > Network > Config (kept in memory by the logger, persisted in log-config.json)
+  if (logger.getConfig().enableAccessLogging === false) return next();
 
   // Hook into response finish to calculate duration and status
   res.on('finish', () => {

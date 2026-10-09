@@ -59,5 +59,3 @@ export const ThemeStoriesList = ({ themeId, storyCount }: ThemeStoriesListProps)
     </div>
   );
 };
-
-export default ThemeStoriesList;

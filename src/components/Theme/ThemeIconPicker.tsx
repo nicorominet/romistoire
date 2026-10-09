@@ -53,5 +53,3 @@ export const ThemeIconPicker = ({ value, onChange, id }: ThemeIconPickerProps) =
     </div>
   );
 };
-
-export default ThemeIconPicker;

@@ -3,6 +3,8 @@ import { logger } from './logger.service.js';
 import { PromptHelper, ALL_WEEK } from './helpers/prompt.helper.js';
 import { geminiResponseSchema } from './helpers/story_schema.js';
 import { COOLDOWN_MS, ModelCooldowns, msUntilPacificMidnight, parseRateLimit } from './helpers/model_cooldown.helper.js';
+import { settingsService } from './settings.service.js';
+import { aiUsageService } from './ai_usage.service.js';
 dotenv.config();
 
 // Models configuration with fallback priority (override with GEMINI_MODELS="model-a,model-b").
@@ -26,7 +28,7 @@ export const DEFAULT_MODELS = [
 ];
 
 // Models that support Audio Generation (override with GEMINI_AUDIO_MODELS)
-const DEFAULT_AUDIO_MODELS = [
+export const DEFAULT_AUDIO_MODELS = [
   'gemini-2.5-flash-preview-tts', // Specialized TTS model (raw 24 kHz PCM)
   'gemini-3.8-flash-tts',
   'gemini-3.1-flash-tts-preview',
@@ -38,6 +40,7 @@ const parseModelList = (value, fallback) => {
   return models.length > 0 ? models : fallback;
 };
 
+// Configuration from .env (or the code defaults): Settings > AI generation overrides it, read on every call
 export const MODELS = parseModelList(process.env.GEMINI_MODELS, DEFAULT_MODELS);
 export const AUDIO_MODELS = parseModelList(process.env.GEMINI_AUDIO_MODELS, DEFAULT_AUDIO_MODELS);
 
@@ -45,6 +48,25 @@ export const AUDIO_MODELS = parseModelList(process.env.GEMINI_AUDIO_MODELS, DEFA
 const REQUEST_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 120000;
 // A whole week in one answer (young ages) is about 7 times longer to write
 const WEEK_REQUEST_TIMEOUT_MS = Number(process.env.GEMINI_WEEK_TIMEOUT_MS) || 240000;
+
+// Temperatures when no creativity is set: stories are freer than short helper texts
+const STORY_TEMPERATURE = 0.9;
+const TEXT_TEMPERATURE = 0.7;
+
+/**
+ * Configuration in use: settings page first, then .env, then code defaults.
+ * @returns {{models: string[], audioModels: string[], timeoutMs: number, weekTimeoutMs: number, creativity: number|null}}
+ */
+export const geminiConfig = () => {
+  const ai = settingsService.ai;
+  return {
+    models: ai.geminiModels ?? MODELS,
+    audioModels: ai.geminiAudioModels ?? AUDIO_MODELS,
+    timeoutMs: ai.geminiTimeoutMs ?? REQUEST_TIMEOUT_MS,
+    weekTimeoutMs: ai.geminiWeekTimeoutMs ?? WEEK_REQUEST_TIMEOUT_MS,
+    creativity: ai.creativity
+  };
+};
 // A whole week in one answer: exactly one story per day
 const WEEK_STORY_COUNT = 7;
 // One more try on the same model for transient errors, then the next model
@@ -116,7 +138,7 @@ export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutpu
       role: 'user',
       parts: [{ text: capabilities.systemInstruction ? prompt : `${systemInstruction}\n\n${prompt}` }]
     }],
-    generationConfig: { maxOutputTokens, temperature: 0.9 }
+    generationConfig: { maxOutputTokens, temperature: geminiConfig().creativity ?? STORY_TEMPERATURE }
   };
   if (thinking && capabilities.thinkingConfig) {
     body.generationConfig.thinkingConfig = { ...capabilities.thinkingConfig };
@@ -240,11 +262,13 @@ class GeminiService {
    * @param {string[]} models - Models in priority order.
    * @param {Object|Function} body - generateContent request body, or a function (model, { thinking }) => body.
    * @param {string} label - Label for logs.
-   * @param {{timeoutMs?: number}} [options] - timeoutMs: per-request timeout (default REQUEST_TIMEOUT_MS).
+   * @param {{timeoutMs?: number, nextModelOn400?: boolean}} [options] - timeoutMs: per-request timeout (default: the configured
+   *   one-story timeout); nextModelOn400: a 400 skips the model (1 h) and tries the next one instead of failing (audio models
+   *   do not all accept the same request).
    * @returns {Promise<{result: Object, model: string, skipped: {model: string, reason: string}[]}>}
    *   Parsed JSON response, the model that answered and the models skipped or failed before it.
    */
-  async _generateWithFallback(models, body, label, { timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  async _generateWithFallback(models, body, label, { timeoutMs = geminiConfig().timeoutMs, nextModelOn400 = false } = {}) {
     const { models: candidates, skipped } = modelCooldowns.filter(models);
     const failures = skipped.map(({ model, reason }) => ({ model, reason: `skipped (${reason})` }));
     if (skipped.length > 0) {
@@ -255,6 +279,11 @@ class GeminiService {
         let thinkingRetried = false;
         for (let attempt = 0; attempt <= MAX_RETRIES_PER_MODEL; attempt++) {
             const thinking = !this.noThinking.has(model);
+            // Every request sent is recorded for the quota statistics
+            const startedAt = new Date();
+            const track = (outcome, httpStatus = null) => aiUsageService.record({
+                at: startedAt, model, label, outcome, httpStatus, durationMs: Date.now() - startedAt.getTime()
+            });
             let response;
             try {
                 console.log(`[Gemini] ${label}: model ${model} (attempt ${attempt + 1})`);
@@ -269,15 +298,22 @@ class GeminiService {
                 const reason = isTimeout ? `timeout after ${timeoutMs}ms` : error.message;
                 console.error(`[Gemini] ${label}: network error on ${model}: ${reason}`);
                 if (isTimeout) modelCooldowns.skip(model, COOLDOWN_MS.timeout, 'timeout');
+                track(isTimeout ? 'timeout' : 'error');
                 failures.push({ model, reason });
                 break; // next model
             }
 
             if (response.ok) {
+                track('ok', response.status);
                 return { result: await response.json(), model, skipped: failures };
             }
 
             const errorText = await response.text().catch(() => '');
+            track(
+                response.status === 429 ? (parseRateLimit(errorText).daily ? 'daily_quota' : 'rate_limit')
+                    : response.status === 503 ? 'overloaded' : 'error',
+                response.status
+            );
             let apiMessage = errorText;
             try { apiMessage = JSON.parse(errorText)?.error?.message || errorText; } catch (e) { /* plain text */ }
             console.warn(`[Gemini] ${label}: error ${response.status} on ${model}: ${apiMessage}`);
@@ -288,6 +324,12 @@ class GeminiService {
                 thinkingRetried = true;
                 attempt--;
                 continue;
+            }
+
+            if (response.status === 400 && nextModelOn400) {
+                modelCooldowns.skip(model, COOLDOWN_MS.notFound, 'invalid request');
+                failures.push({ model, reason: `400 ${apiMessage}` });
+                break; // next model
             }
 
             if (FATAL_STATUSES.includes(response.status)) {
@@ -356,14 +398,15 @@ class GeminiService {
     const isWeek = day === ALL_WEEK;
     const maxOutputTokens = isWeek ? MAX_OUTPUT_TOKENS_WEEK : MAX_OUTPUT_TOKENS_SINGLE;
     const withWeekPlan = PromptHelper.wantsWeekPlan(params);
+    const config = geminiConfig();
 
     const startTime = Date.now();
     try {
         const { result, model, skipped } = await this._generateWithFallback(
-            modelsForAge(MODELS, age),
+            modelsForAge(config.models, age),
             (model, options) => buildStoryRequestBody(model, systemInstruction, prompt, maxOutputTokens, { ...options, withWeekPlan, storyCount: isWeek ? WEEK_STORY_COUNT : 0 }),
             'Story',
-            { timeoutMs: isWeek ? WEEK_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS }
+            { timeoutMs: isWeek ? config.weekTimeoutMs : config.timeoutMs }
         );
 
         const blockReason = result.promptFeedback?.blockReason;
@@ -403,11 +446,11 @@ class GeminiService {
     if (!this.apiKey) throw new Error("Gemini API Key not configured.");
     const startTime = Date.now();
     try {
-      const { result, model, skipped } = await this._generateWithFallback(MODELS, (model, { thinking }) => {
+      const { result, model, skipped } = await this._generateWithFallback(geminiConfig().models, (model, { thinking }) => {
         const capabilities = getModelCapabilities(model);
         const body = {
           contents: [{ role: 'user', parts: [{ text: capabilities.systemInstruction ? prompt : `${systemInstruction}\n\n${prompt}` }] }],
-          generationConfig: { maxOutputTokens, temperature: 0.7 }
+          generationConfig: { maxOutputTokens, temperature: geminiConfig().creativity ?? TEXT_TEMPERATURE }
         };
         if (thinking && capabilities.thinkingConfig) body.generationConfig.thinkingConfig = { ...capabilities.thinkingConfig };
         if (capabilities.systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
@@ -438,7 +481,7 @@ class GeminiService {
 
     const startTime = Date.now();
     try {
-        const { result, model } = await this._generateWithFallback(AUDIO_MODELS, {
+        const { result, model } = await this._generateWithFallback(geminiConfig().audioModels, {
             contents: [{
                 role: "user",
                 parts: [{ text: `Please read the following story aloud with a narrator's voice suitable for children:\n\n${text}` }]
@@ -446,7 +489,7 @@ class GeminiService {
             generationConfig: {
                 responseModalities: ["AUDIO"]
             }
-        }, 'Audio');
+        }, 'Audio', { nextModelOn400: true });
 
         const audioPart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
 

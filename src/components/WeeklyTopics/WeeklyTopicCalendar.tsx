@@ -145,5 +145,3 @@ const InvalidWeeks = ({ weeks }: { weeks: WeeklyTheme[] }) => {
     </details>
   );
 };
-
-export default WeeklyTopicCalendar;

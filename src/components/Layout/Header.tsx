@@ -1,32 +1,23 @@
 import { i18n } from "@/lib/i18n";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Book, PenLine, Settings, GlobeIcon, Columns3, Clock, Palette } from "lucide-react";
-import { useState, useEffect } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Book, PenLine, Settings, GlobeIcon } from "lucide-react";
+import { useState } from "react";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { STORAGE_KEYS } from "@/constants";
-import useDarkMode from '@/hooks/useDarkMode';
+import { GenerationIndicator } from "@/components/Generation/GenerationIndicator";
+
+// Each language in its own name, readable whatever the current language
+const LOCALE_NAMES: Record<string, string> = { en: "English", fr: "Français" };
 
 const Header = () => {
   const [locale, setLocale] = useState(i18n.getCurrentLocale());
   const [showLanguageDialog, setShowLanguageDialog] = useState(false);
-  const darkMode = useDarkMode();
 
-  useEffect(() => {
-    const storedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    document.documentElement.classList.toggle('dark', storedTheme === 'dark');  }, []);
-
-
-  const { t, changeLocale, getCurrentLocale, getAvailableLocales } = i18n;
+  const { t, changeLocale, getAvailableLocales } = i18n;
   const currentLocale = locale || 'fr';
-  const availableLocales = getAvailableLocales();
+  // The obfuscated locale is a debug tool: only offered in Settings > Language (developer mode)
+  const availableLocales = getAvailableLocales().filter((l) => l !== 'obf');
 
   const handleLocaleSelection = (newLocale: string) => {
     changeLocale(newLocale);
@@ -80,9 +71,13 @@ const Header = () => {
           <Link to="/illustrations" className={getNavLinkClass("/illustrations")}>
                {t("nav.illustrations")}
           </Link>
+          <Link to="/generation" className={getNavLinkClass("/generation")}>
+               {t("nav.generation")}
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
+          <GenerationIndicator />
           <Link to="/create">
             <Button className="hidden sm:flex rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md shadow-indigo-500/20 px-6">
               <PenLine className="mr-2 h-4 w-4" />
@@ -109,7 +104,7 @@ const Header = () => {
                     className={`w-full ${locale === currentLocale ? 'bg-indigo-600 text-white' : 'bg-transparent'}`}
                     onClick={() => handleLocaleSelection(locale)}
                   >
-                    {locale === "en" ? "English" : "Français"}
+                    {LOCALE_NAMES[locale] ?? locale}
                   </Button>
                 ))}
               </div>

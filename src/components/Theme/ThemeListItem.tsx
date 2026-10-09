@@ -93,5 +93,3 @@ export const ThemeListItem = ({ theme, onEdit, onMerge, onDelete, selected = fal
     </li>
   );
 };
-
-export default ThemeListItem;

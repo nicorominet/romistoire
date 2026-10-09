@@ -41,7 +41,6 @@ export default defineConfig({
       ]
     }
   },
-  assetsInclude: ['**/*.json'],
   test: {
     globals: true,
     environment: 'jsdom',

@@ -8,14 +8,56 @@ import { storyQueryHelper } from './story_query.helper.js';
 import { storySeriesHelper } from './story_series.helper.js';
 import { geminiService } from './gemini.service.js';
 import { localLLMService } from './local_llm.service.js';
+import { defaultProvider } from './settings.service.js';
 import { fileCleanup, AUDIO_DIR } from './helpers/file_cleanup.helper.js';
-import { assignWeekDays, countRepetitiveOpenings, extractWeekContext, parseStoryOutput, removeRepeatedOpening } from './helpers/story_output.helper.js';
+import { assignWeekDays, countRepetitiveOpenings, extractWeekContext, parseStoryOutput, removeRepeatedOpening, splitParagraphsForAge } from './helpers/story_output.helper.js';
 import { ALL_WEEK, FORBIDDEN_OPENINGS, PromptHelper } from './helpers/prompt.helper.js';
 import { STORY_DAYS } from './helpers/story_schema.js';
+import { SHORT_STORY_RATIO } from './helpers/generation_plan.helper.js';
 import { logger } from './logger.service.js';
+import { NotFoundError, ValidationError } from '../middleware/error.middleware.js';
 
-/** A single story (or a week whose median story) under this share of the minimum length of its age is asked once more. */
-const SHORT_STORY_RATIO = 0.6;
+// A single story (or a week whose median story) under SHORT_STORY_RATIO of the minimum length of its age
+// is asked once more (one more request at most).
+
+const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
+const LOCALES = ['fr', 'en'];
+const TITLE_MAX = 255;
+const DAY_ORDERS = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
+
+/** Text of a story content without its HTML ("<p></p>" is empty). */
+const plainText = (html) => String(html ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+
+/**
+ * Checks a story payload (camelCase or snake_case fields, as sent by the pages and the generation worker).
+ * @param {Object} data
+ * @param {{partial?: boolean}} [options] - partial: only the fields present are checked (update).
+ * @throws {ValidationError} With every invalid field ({ fields }).
+ */
+export const validateStoryInput = (data = {}, { partial = false } = {}) => {
+  const errors = [];
+  const check = (present, valid, message) => {
+    if ((present || !partial) && !valid) errors.push(message);
+  };
+  const title = data.title;
+  check(title !== undefined, typeof title === 'string' && title.trim() !== '' && title.trim().length <= TITLE_MAX, `title is required (${TITLE_MAX} characters max)`);
+  check(data.content !== undefined, plainText(data.content) !== '', 'content must contain text');
+
+  const age = data.ageGroup ?? data.age_group;
+  check(age !== undefined, AGE_GROUPS.includes(age), `ageGroup must be one of ${AGE_GROUPS.join(', ')}`);
+
+  const week = data.weekNumber ?? data.week_number;
+  check(week !== undefined, Number.isInteger(Number(week)) && Number(week) >= 1 && Number(week) <= 53, 'weekNumber must be between 1 and 53');
+
+  // The day is optional (defaults to Monday on creation)
+  const day = data.day_order ?? (data.dayOfWeek !== undefined ? (DAY_ORDERS[data.dayOfWeek] ?? 0) : undefined);
+  if (day !== undefined && !(Number.isInteger(Number(day)) && Number(day) >= 1 && Number(day) <= 7)) {
+    errors.push('day must be a day of the week');
+  }
+  if (data.locale !== undefined && !LOCALES.includes(data.locale)) errors.push(`locale must be one of ${LOCALES.join(', ')}`);
+
+  if (errors.length > 0) throw new ValidationError('Invalid story', { fields: errors });
+};
 
 /**
  * Whether a second answer is better than the first: more complete first (up to the expected number of stories),
@@ -81,13 +123,15 @@ class StoryService {
 
   /**
    * Generate a story using AI (Gemini or Local).
+   * @param {Object} params - Prompt parameters (see PromptHelper.buildStoryPrompt).
+   * @param {'gemini'|'local'|null} [providerOverride]
+   * @param {{beforeRequest?: () => Promise<void>}} [options] - beforeRequest: awaited before every AI request
+   *   (the length retry included), e.g. the pacing of a mass generation.
    * @returns {Promise<{text: string, model: string, truncated: boolean, stories: Object[]|null}>}
    *   `stories` holds the parsed JSON answer, or null when the client must fall back to the text parser.
    */
-  async generateFromAI(params, providerOverride = null) {
-      // Priority: Param > Env > Default 'gemini'
-      const envProvider = process.env.AI_PROVIDER;
-      const aiProvider = providerOverride || envProvider || 'gemini';
+  async generateFromAI(params, providerOverride = null, { beforeRequest } = {}) {
+      const aiProvider = providerOverride || defaultProvider();
       
       console.log(`[StoryService] Generating story using provider: ${aiProvider}`);
       
@@ -99,6 +143,7 @@ class StoryService {
       const isWeek = params.day === ALL_WEEK;
       const expectedStories = isWeek ? STORY_DAYS.length : 1;
 
+      if (beforeRequest) await beforeRequest();
       let attempt = await this._generateOnce(aiProvider, promptParams);
 
       // Ask once more when the answer is incomplete (a week with fewer than 7 stories) or far below the length
@@ -119,6 +164,7 @@ class StoryService {
             : `Votre précédente version faisait ${firstWords} mots : écrivez au moins ${targetWords.min} mots, en développant les scènes, les dialogues et les sensations.`);
         }
         try {
+          if (beforeRequest) await beforeRequest();
           const retry = await this._generateOnce(aiProvider, { ...promptParams, lengthHint: hints.join(' ') });
           lengthRetry = { before: firstWords, after: typicalLength(retry.words), storiesBefore: firstCount, storiesAfter: retry.words.length };
           if (isBetterAnswer(retry.words, attempt.words, expectedStories)) {
@@ -188,6 +234,9 @@ class StoryService {
           return { ...story, paragraphs };
         });
       }
+
+      // Paragraphs sized for the age group (no change to the text)
+      if (stories) stories = stories.map(story => ({ ...story, paragraphs: splitParagraphsForAge(story.paragraphs, promptParams.age) }));
 
       // First day of a week generated day by day: the plan and the characters the following days will follow
       const { weekPlan, characters } = extractWeekContext(result.text);
@@ -333,6 +382,7 @@ class StoryService {
    * Create a new story.
    */
   async create(storyData) {
+    validateStoryInput(storyData);
     const connection = await getConnection();
     try {
       const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -356,10 +406,15 @@ class StoryService {
       seriesId = slot.seriesId;
 
       // Insert Story
+      const source = storyData.source || 'manual';
+      // AI stories wait for a human review (indicative status); manual ones are reviewed by definition
+      const reviewStatus = ['to_review', 'validated'].includes(storyData.reviewStatus)
+        ? storyData.reviewStatus
+        : (source === 'manual' ? 'validated' : 'to_review');
       await connection.query(
-        `INSERT INTO stories (id, title, content, age_group, week_number, day_order, created_at, modified_at, version, locale, source, is_manually_edited, series_id, illustration_prompt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, storyData.title, storyData.content, storyData.ageGroup || storyData.age_group, storyData.weekNumber || storyData.week_number, dayOrder, now, now, 1, storyData.locale, storyData.source || 'manual', false, seriesId, storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null]
+        `INSERT INTO stories (id, title, content, age_group, week_number, day_order, created_at, modified_at, version, locale, source, is_manually_edited, series_id, illustration_prompt, generation_job_id, review_status, summary)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, storyData.title.trim(), storyData.content, storyData.ageGroup || storyData.age_group, storyData.weekNumber || storyData.week_number, dayOrder, now, now, 1, storyData.locale || 'fr', source, false, seriesId, storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null, storyData.generationJobId ?? null, reviewStatus, storyData.summary ? String(storyData.summary).trim() : null]
       );
 
       // Link Themes
@@ -392,14 +447,37 @@ class StoryService {
   }
 
   /**
+   * Sets the review status (indicative) of one or several stories. Not a content change: no new version.
+   * @param {string[]} ids
+   * @param {'to_review'|'validated'} status
+   * @returns {Promise<number>} Stories updated.
+   */
+  async setReviewStatus(ids, status) {
+    if (!['to_review', 'validated'].includes(status)) throw new ValidationError('Invalid review status');
+    const list = (Array.isArray(ids) ? ids : []).filter(id => typeof id === 'string' && id);
+    if (list.length === 0) return 0;
+    const result = await query(
+      `UPDATE stories SET review_status = ? WHERE id IN (${list.map(() => '?').join(',')})`,
+      [status, ...list]
+    );
+    return result?.affectedRows ?? 0;
+  }
+
+  /**
    * Update an existing story with versioning.
    */
   async update(id, storyData) {
+    validateStoryInput(storyData, { partial: true });
     const connection = await getConnection();
     try {
       const [existing] = await connection.query('SELECT * FROM stories WHERE id = ?', [id]);
-      if (existing.length === 0) throw new Error('Story not found');
+      if (existing.length === 0) throw new NotFoundError('Story not found');
       const oldStory = existing[0];
+      // Fields not sent keep their value
+      const title = storyData.title !== undefined ? storyData.title.trim() : oldStory.title;
+      const content = storyData.content !== undefined ? storyData.content : oldStory.content;
+      // The audio reads the title and the text: it is kept unless one of them changed
+      const textChanged = title !== oldStory.title || content !== oldStory.content;
       
       const [oldThemes] = await connection.query('SELECT * FROM story_themes WHERE story_id = ?', [id]);
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -459,18 +537,21 @@ class StoryService {
         ? (storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null)
         : (oldStory.illustration_prompt ?? null);
 
+      // Saved from the edit page: a person read the story, so it counts as reviewed
       await connection.query(
-           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, series_id = ?, illustration_prompt = ?, audio_path = NULL WHERE id = ?`,
-           [storyData.title, storyData.content, ageGroup, weekNumber, dayOrder, now, locale, nextVersion, !isCurrentlyManual, seriesId, illustrationPrompt, id]
+           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, series_id = ?, illustration_prompt = ?, review_status = 'validated', audio_path = ? WHERE id = ?`,
+           [title, content, ageGroup, weekNumber, dayOrder, now, locale, nextVersion, !isCurrentlyManual, seriesId, illustrationPrompt, textChanged ? null : oldStory.audio_path, id]
       );
 
-      // Refresh Themes
-      await connection.query('DELETE FROM story_themes WHERE story_id = ?', [id]);
-      for (const theme of normalizeStoryThemes(storyData.themes)) {
-          await connection.query(
-              'INSERT INTO story_themes (id, story_id, theme_id, is_primary, created_at) VALUES (?, ?, ?, ?, ?)',
-              [uuidv4(), id, theme.id, theme.isPrimary, now]
-          );
+      // Refresh Themes (only when sent: a partial update keeps them)
+      if (Array.isArray(storyData.themes)) {
+        await connection.query('DELETE FROM story_themes WHERE story_id = ?', [id]);
+        for (const theme of normalizeStoryThemes(storyData.themes)) {
+            await connection.query(
+                'INSERT INTO story_themes (id, story_id, theme_id, is_primary, created_at) VALUES (?, ?, ?, ?, ?)',
+                [uuidv4(), id, theme.id, theme.isPrimary, now]
+            );
+        }
       }
 
       // Refresh Illustrations
@@ -490,9 +571,9 @@ class StoryService {
 
       await connection.commit();
       themeService.invalidateCache();
-      // Saving resets the audio (content may have changed): delete the old file
-      await fileCleanup.removeAudioIfUnused(oldStory.audio_path);
-      return { id, ...storyData, series_id: seriesId, modified_at: now, aliasSeries };
+      // A new text makes the audio wrong: delete the old file
+      if (textChanged) await fileCleanup.removeAudioIfUnused(oldStory.audio_path);
+      return { id, ...storyData, title, content, series_id: seriesId, modified_at: now, review_status: 'validated', audio_path: textChanged ? null : oldStory.audio_path, aliasSeries };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -603,9 +684,6 @@ class StoryService {
      );
      return { next: nextR[0] || null, prev: prevR[0] || null };
   }
-
-  async getNext(id) { return (await this.getNeighbors(id)).next; }
-  async getPrevious(id) { return (await this.getNeighbors(id)).prev; }
 
   // --- Private Helpers ---
 

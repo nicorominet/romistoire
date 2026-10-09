@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from '../middleware/error.middleware.j
 import { storyQueryHelper } from './story_query.helper.js';
 import { geminiService } from './gemini.service.js';
 import { localLLMService } from './local_llm.service.js';
+import { settingsService } from './settings.service.js';
 import {
   imageCode, buildImagePrompt, cleanIllustrationPrompt, buildIllustrationRequest,
   buildPromptsText, buildPromptsJson, ILLUSTRATION_PROMPT_SYSTEM
@@ -75,14 +76,15 @@ class IllustrationService {
   }
 
   /**
-   * Writes the illustration description of a story with the AI (Gemini, or Ollama without Gemini key).
+   * Writes the illustration description of a story with the AI: Gemini, unless Ollama is chosen
+   * in Settings > AI generation or Gemini has no key.
    * @param {string} storyId
    * @returns {Promise<{id: string, illustration_prompt: string, imagePrompt: string}>}
    */
   async generatePrompt(storyId) {
     const story = await this._findStory(storyId);
     const request = buildIllustrationRequest(story);
-    const ai = geminiService.apiKey ? geminiService : localLLMService;
+    const ai = settingsService.ai.defaultProvider !== 'local' && geminiService.apiKey ? geminiService : localLLMService;
     const { text } = await ai.generateText(ILLUSTRATION_PROMPT_SYSTEM, request, 'IllustrationPrompt');
     const prompt = cleanIllustrationPrompt(text).slice(0, PROMPT_MAX);
     if (!prompt) throw new Error('The AI returned an empty description.');

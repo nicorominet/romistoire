@@ -30,6 +30,13 @@ describe("formSchema", () => {
     expect(formSchema.safeParse({ ...validValues, language: "fra" }).success).toBe(false);
   });
 
+  it("rejects the empty editor content", () => {
+    for (const content of ["", "<p></p>", "<p> &nbsp; </p><p><br></p>"]) {
+      expect(formSchema.safeParse({ ...validValues, content }).success).toBe(false);
+    }
+    expect(formSchema.safeParse({ ...validValues, content: "<p>Il était une fois</p>" }).success).toBe(true);
+  });
+
   it("uses i18n keys as messages", () => {
     const result = formSchema.safeParse({ ...validValues, title: "  " });
     expect(result.success).toBe(false);

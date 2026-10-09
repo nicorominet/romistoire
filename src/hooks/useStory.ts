@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { storyApi } from '../api/stories.api';
+import { storyApi, storyReviewApi } from '../api/stories.api';
 
 export const useStory = (id: string) => {
   return useQuery({
@@ -43,9 +43,6 @@ export const useStoryMutations = () => {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stories'] })
     });
 
-    const generateAI = useMutation({
-        mutationFn: async (data: any) => (await storyApi.generateAI(data)) as any,
-    });
     
     const restoreVersion = useMutation({
         mutationFn: async ({ id, versionId }: { id: string, versionId: string }) => (await storyApi.restoreVersion(id, versionId)) as any,
@@ -69,16 +66,13 @@ export const useStoryMutations = () => {
         }
     });
 
-    return { createStory, updateStory, deleteStory, generateAI, restoreVersion, deleteIllustration, generateAudio };
-};
-
-
-export const useStoryVersions = (id: string) => {
-    return useQuery({
-        queryKey: ['storyVersions', id],
-        queryFn: async () => (await storyApi.getVersions(id)) as any,
-        enabled: !!id,
-        staleTime: 0,
-        gcTime: 0
+    const validateStory = useMutation({
+        mutationFn: (id: string) => storyReviewApi.setReviewStatus([id], 'validated'),
+        onSuccess: (data, id) => {
+             queryClient.invalidateQueries({ queryKey: ['story', id] });
+             queryClient.invalidateQueries({ queryKey: ['stories'] });
+        }
     });
+
+    return { createStory, updateStory, deleteStory, restoreVersion, deleteIllustration, generateAudio, validateStory };
 };

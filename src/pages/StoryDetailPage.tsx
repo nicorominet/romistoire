@@ -1,11 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, Calendar, BookOpen, Clock, Tag, Headphones, Volume2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Headphones, Volume2, Loader2, CheckCircle2 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import PageLayout from '@/components/Layout/PageLayout';
 import { Button } from '@/components/ui/button';
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader'; 
 import StoryNavigation from '@/components/Story/StoryDetail/StoryNavigation';
 import StoryContent from '@/components/Story/StoryDetail/StoryContent';
 import { APP_ROUTES } from '@/constants';
@@ -45,7 +43,7 @@ const StoryDetailPage = (): JSX.Element => {
 
   const { data: story, isLoading, error } = useStory(id || '');
   const { data: neighbors } = useStoryNeighbors(id || '');
-  const { deleteStory, generateAudio } = useStoryMutations();
+  const { deleteStory, generateAudio, validateStory } = useStoryMutations();
   const { data: weeklyThemes } = useWeeklyThemes();
 
   // Topic of the story's week (free text, not a story theme)
@@ -116,6 +114,21 @@ const StoryDetailPage = (): JSX.Element => {
           </Button>
           
           <div className="flex gap-2">
+            {story.review_status === 'to_review' && (
+              <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                  onClick={() => validateStory.mutate(story.id, {
+                    onSuccess: () => toast.success(t('review.validatedToast')),
+                    onError: (error) => toast.error((error as Error).message),
+                  })}
+                  disabled={validateStory.isPending}
+              >
+                  {validateStory.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />}
+                  {t('review.validate')}
+              </Button>
+            )}
             <Button
                 variant="outline"
                 size="sm"

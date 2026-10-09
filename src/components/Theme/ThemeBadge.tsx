@@ -77,5 +77,3 @@ export const ThemeBadge = ({
     </span>
   );
 };
-
-export default ThemeBadge;

@@ -67,6 +67,16 @@ export class ModelCooldowns {
     return available.length > 0 ? { models: available, skipped } : { models: [...models], skipped: [] };
   }
 
+  /**
+   * Models paused right now, for display (Settings > AI generation).
+   * @returns {{model: string, reason: string, until: string}[]} `until` as an ISO date.
+   */
+  status() {
+    return [...this.entries.keys()]
+      .filter(model => this.reason(model))
+      .map(model => ({ model, reason: this.entries.get(model).reason, until: new Date(this.entries.get(model).until).toISOString() }));
+  }
+
   clear() {
     this.entries.clear();
   }

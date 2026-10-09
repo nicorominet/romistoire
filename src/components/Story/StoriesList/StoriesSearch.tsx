@@ -36,6 +36,9 @@ interface StoriesSearchProps {
   handleSourceChange: (source: string) => void;
   selectedEditStatus: string;
   handleEditStatusChange: (status: string) => void;
+  /** Review filter: shown only when the page handles it */
+  selectedReviewStatus?: string;
+  handleReviewStatusChange?: (status: string) => void;
   handleResetFilters: () => void;
   disableSeriesFilter?: boolean;
 }
@@ -65,6 +68,8 @@ const StoriesSearch = ({
   handleSourceChange,
   selectedEditStatus,
   handleEditStatusChange,
+  selectedReviewStatus = 'all',
+  handleReviewStatusChange,
   handleResetFilters,
   disableSeriesFilter = false
 }: StoriesSearchProps) => {
@@ -81,7 +86,8 @@ const StoriesSearch = ({
     hasImage !== 'all' || 
     hasAudio !== 'all' || 
     selectedSource !== 'all' || 
-    selectedEditStatus !== 'all';
+    selectedEditStatus !== 'all' ||
+    selectedReviewStatus !== 'all';
 
   return (
     <Card className="w-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
@@ -266,6 +272,19 @@ const StoriesSearch = ({
                   <SelectItem value="edited">{t('filters.edited')}</SelectItem>
                 </SelectContent>
               </Select>
+
+              {handleReviewStatusChange && (
+              <Select value={selectedReviewStatus} onValueChange={handleReviewStatusChange}>
+                <SelectTrigger className="w-full bg-white/50 dark:bg-slate-800/50" aria-label={t('review.filter')}>
+                  <SelectValue placeholder={t('review.filter')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('review.all')}</SelectItem>
+                  <SelectItem value="to_review">{t('review.toReview')}</SelectItem>
+                  <SelectItem value="validated">{t('review.validated')}</SelectItem>
+                </SelectContent>
+              </Select>
+              )}
             </div>
           </div>
         </div>

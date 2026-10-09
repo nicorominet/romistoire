@@ -19,6 +19,13 @@ router.post('/', weeklyThemeController.updateWeeklyThemes);
  * PUT /api/weekly-themes/:week
  * Set the topic of a week (1-53): { name, description? }.
  */
+/**
+ * POST /api/weekly-themes/suggest
+ * AI topic suggestions for the given weeks (not saved).
+ * @param {number[]} req.body.weeks
+ */
+router.post('/suggest', weeklyThemeController.suggestWeekThemes);
+
 router.put('/:week', weeklyThemeController.setWeekTheme);
 
 /**

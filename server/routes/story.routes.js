@@ -25,23 +25,15 @@ router.get('/available-weeks', storyController.getAvailableWeeks);
  * @param {string} req.params.id - Story ID.
  * @returns {Object} The story object.
  */
+/**
+ * PUT /api/stories/review
+ * Set the review status of several stories.
+ * @param {string[]} req.body.ids - Story IDs.
+ * @param {'to_review'|'validated'} req.body.status
+ */
+router.put('/review', storyController.setReviewStatus);
+
 router.get('/:id', storyController.getStoryById);
-
-/**
- * GET /api/stories/:id/next
- * Get the next story in the sequence.
- * @param {string} req.params.id - Current Story ID.
- * @returns {Object} The next story object.
- */
-router.get('/:id/next', storyController.getNextStory);
-
-/**
- * GET /api/stories/:id/previous
- * Get the previous story in the sequence.
- * @param {string} req.params.id - Current Story ID.
- * @returns {Object} The previous story object.
- */
-router.get('/:id/previous', storyController.getPreviousStory);
 
 /**
  * GET /api/stories/:id/neighbors
@@ -101,14 +93,6 @@ router.post('/:id/versions/:versionId', storyController.restoreStoryVersion);
  * @returns {Object} Success status.
  */
 router.delete('/:id/illustrations/:illustrationId', storyController.deleteIllustration);
-
-/**
- * GET /api/stories/:id/illustrations
- * Get all illustrations for a story.
- * @param {string} req.params.id - Story ID.
- * @returns {Array} List of illustrations.
- */
-router.get('/:id/illustrations', storyController.getStoryIllustrations);
 
 /**
  * PUT /api/stories/:id/illustrations/order

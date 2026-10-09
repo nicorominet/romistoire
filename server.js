@@ -1,23 +1,18 @@
 import app from './server/app.js';
 import { initializeDatabase, testConnection } from './server/config/database.js';
 import { logger } from './server/services/logger.service.js';
-import { systemService } from './server/services/system.service.js';
+import { maintenanceService } from './server/services/maintenance.service.js';
+import { generationWorker } from './server/services/generation_worker.js';
+import { aiUsageService } from './server/services/ai_usage.service.js';
+import { ENV_CONFIG } from './server/config/env.config.js';
 
 const port = process.env.API_PORT || 3001; 
 
-// Images uploaded on the create page and never saved with a story become orphans: purge them daily,
-// keeping files younger than 24 h (a story may still be in progress).
-const ORPHAN_UPLOAD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Housekeeping set in Settings > Storage (automatic backup, orphan uploads purge, old logs):
+// checked every hour, each task decides whether it is due.
+const MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
 
-async function purgeOrphanUploads() {
-  try {
-    const { deletedCount, reclaimedSpace } = await systemService.cleanupImages({ minAgeMs: ORPHAN_UPLOAD_MAX_AGE_MS });
-    if (deletedCount > 0) logger.info(`Orphan uploads purged: ${deletedCount} file(s), ${reclaimedSpace} bytes.`);
-  } catch (error) {
-    // Never block the server for a cleanup failure
-    logger.error('Orphan uploads purge failed:', {}, error);
-  }
-}
+const runMaintenance = () => maintenanceService.run().catch((error) => logger.error('Maintenance failed:', {}, error));
 
 async function startServer() {
   try {
@@ -27,8 +22,14 @@ async function startServer() {
        app.listen(port, () => {
          logger.info(`API Server running at http://localhost:${port}`);
        });
-       purgeOrphanUploads();
-       setInterval(purgeOrphanUploads, ORPHAN_UPLOAD_MAX_AGE_MS).unref();
+       runMaintenance();
+       // Quota statistics: the requests already in the AI logs, once
+       aiUsageService.importFromAiLogs(ENV_CONFIG.LOGS_DIR)
+         .then((count) => { if (count > 0) logger.info(`Quota statistics: ${count} request(s) imported from the AI logs.`); })
+         .catch((error) => logger.error('Quota statistics import failed:', {}, error));
+       // Mass generation jobs interrupted by a restart start again where they stopped
+       generationWorker.resumeAfterRestart().catch((error) => logger.error('Generation worker failed:', {}, error));
+       setInterval(runMaintenance, MAINTENANCE_INTERVAL_MS).unref();
     } else {
        logger.error('Failed to connect to database. Server not started.');
        process.exit(1);

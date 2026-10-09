@@ -1,10 +1,9 @@
 import { i18n } from "@/lib/i18n";
-import { Story, AgeGroup } from "@/types/Story";
+import { Story } from "@/types/Story";
 import StoryCard from "./StoryCard";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import useDarkMode from '@/hooks/useDarkMode';
 
 interface StoryGridProps {
   stories: Story[];
@@ -16,7 +15,6 @@ const StoryGrid = ({
   locale,
 }: StoryGridProps) => {
   const { t } = i18n;
-  const darkMode = useDarkMode();
 
   if (stories.length === 0) {
     return (

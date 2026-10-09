@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { i18n } from "@/lib/i18n";
 import { truncateText } from "@/lib/utils";
 import PageLayout from "@/components/Layout/PageLayout";
@@ -12,7 +12,6 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formSchema, FormValues } from "@/components/Story/StoryEditor/formSchema";
 import { AgeGroup, Illustration, Story } from "@/types/Story";
-import { Series } from "@/types/Series";
 import { format } from 'date-fns';
 import { getDayOrder } from "@/utils/dayUtils";
 import useDarkMode from "@/hooks/useDarkMode";
@@ -22,18 +21,16 @@ import { SelectedTheme } from "@/components/Theme/ThemeSelect";
 // Shared Components
 import StoryContent from "@/components/Story/StoryEditor/StoryContent";
 import StoryIllustrations from "@/components/Story/StoryEditor/StoryIllustrations";
-import StoryGenerationTab from "@/components/Story/CreateStory/StoryGenerationTab";
 // Preview Tab remains from CreateStory for now as it's simple display
 import StoryPreviewTab from "@/components/Story/CreateStory/StoryPreviewTab";
 
-import { themeApi, weeklyThemeApi } from "@/api/themes.api";
-import { storyApi, seriesApi } from "@/api/stories.api";
+import { storyApi } from "@/api/stories.api";
 import { systemApi } from "@/api/system.api";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
 import { Theme, WeeklyTheme } from "@/types/Theme";
 import { APP_ROUTES } from "@/constants";
-import { UploadResponse } from "@/types/system.types";
+import { currentIsoWeek } from "@/utils/weekUtils";
 
 
 
@@ -41,13 +38,11 @@ const CreateStoryPage = () => {
   const { t } = i18n;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("write");
-  const [isGenerating, setIsGenerating] = useState(false);
   const { data: availableThemes = [] } = useThemes();
   const { data: weeklyThemesQuery = [] } = useWeeklyThemes();
   const weeklyThemes = weeklyThemesQuery as WeeklyTheme[];
   const { data: availableSeries = [] } = useSeries();
 
-  const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
   const darkMode = useDarkMode();
   
   // Local state for illustrations (since they are not fully in form schema yet or handled differently)
@@ -63,16 +58,17 @@ const CreateStoryPage = () => {
       ageGroup: "4-6",
       language: "fr",
       dayOfWeek: "",
-      weekNumber: "",
+      // Current week by default (the field is required)
+      weekNumber: String(currentIsoWeek().week),
       seriesName: "",
       version: 1
     },
   });
 
-  const { handleSubmit, watch, setValue, formState: { errors, isDirty } } = methods;
+  const { handleSubmit, watch, formState: { isDirty } } = methods;
 
   // Leaving loses the text, the uploaded illustrations, or interrupts a running generation
-  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(isDirty || illustrations.length > 0 || isGenerating);
+  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(isDirty || illustrations.length > 0);
 
 
   const onSubmit = async (data: FormValues) => {
@@ -156,10 +152,6 @@ const CreateStoryPage = () => {
           .filter((img): img is Illustration => Boolean(img)));
   };
 
-  // No redirect: the generation tab lists the created stories with links
-  const handleStoryGenerated = () => {
-    toast.success(t("create.success.generatedAndSaved"));
-  };
   
   const memoizedAvailableThemes = useMemo(() => availableThemes, [availableThemes]);
   const sortedDayOfWeekOptions = useMemo(() => [
@@ -209,7 +201,6 @@ const CreateStoryPage = () => {
     <PageLayout>
         <h1 className="text-3xl font-bold text-story-purple-800 mb-6">
           {t("create.title")}
-          {weeklyTheme && ` (${t("story.weeklyTheme")}: ${weeklyTheme})`}
         </h1>
 
         <FormProvider {...methods}>
@@ -227,26 +218,29 @@ const CreateStoryPage = () => {
                       <Wand2 className="h-4 w-4 mr-1" />
                       {t("create.tabs.generate")}
                     </TabsTrigger>
-                    <TabsTrigger value="write" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="write" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <PenLine className="h-4 w-4 mr-1" />
                       {t("create.tabs.write")}
                     </TabsTrigger>
-                    <TabsTrigger value="illustrate" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="illustrate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Paintbrush className="h-4 w-4 mr-1"  />
                       {t("create.tabs.illustrate")}
                     </TabsTrigger>
-                    <TabsTrigger value="preview" disabled={isGenerating} className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
+                    <TabsTrigger value="preview" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
                       <Book className="h-4 w-4 mr-1"  />
                       {t("create.tabs.preview")}
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* Kept mounted so an ongoing generation (and its log) survives a tab switch */}
-                  <TabsContent value="generate" forceMount className="data-[state=inactive]:hidden">
-                    <StoryGenerationTab
-                      onStoryGenerated={handleStoryGenerated}
-                      onGeneratingChange={setIsGenerating}
-                    />
+                  {/* AI generation runs on the server as jobs: it has its own page */}
+                  <TabsContent value="generate">
+                    <div className="space-y-3 rounded-lg border bg-white/50 p-6 text-center dark:bg-slate-800/50">
+                      <Wand2 className="mx-auto h-8 w-8 text-indigo-500" />
+                      <p className="text-gray-700 dark:text-gray-300">{t("generation.createTabHint")}</p>
+                      <Button type="button" asChild className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                        <Link to={APP_ROUTES.GENERATION}>{t("generation.open")}</Link>
+                      </Button>
+                    </div>
                   </TabsContent>
 
                   <TabsContent value="write">
@@ -297,7 +291,6 @@ const CreateStoryPage = () => {
 
                 <Button
                   type="submit"
-                  disabled={isGenerating}
                   className="w-full bg-story-purple hover:bg-story-purple-600 mt-6"
                 >
                   <Save className="mr-2 h-4 w-4" />

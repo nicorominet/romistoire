@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { i18n } from "@/lib/i18n";
 import PageLayout from "@/components/Layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -67,26 +67,19 @@ const SeriesManagementPage = () => {
   const [viewingSeries, setViewingSeries] = useState<Series | null>(null);
 
   // Handlers
+  // Errors go back to the dialog, which stays open and shows them (e.g. a name already used)
   const handleCreateSeries = async (data: { name: string; description?: string }) => {
-    try {
-      await createSeries.mutateAsync(data);
-      toast.success(t("series.createSuccess"));
-    } catch (e) {
-      toast.error(t("series.management.createError"));
-    }
+    await createSeries.mutateAsync(data);
+    toast.success(t("series.createSuccess"));
   };
 
   const handleUpdateSeries = async (data: { name: string; description?: string }) => {
     if (!editingSeries) return;
-    try {
-      await updateSeries.mutateAsync({
-        id: editingSeries.id,
-        data: { ...editingSeries, ...data },
-      });
-      toast.success(t("series.updateSuccess"));
-    } catch (error) {
-      toast.error(t("series.management.updateError"));
-    }
+    await updateSeries.mutateAsync({
+      id: editingSeries.id,
+      data: { ...editingSeries, ...data },
+    });
+    toast.success(t("series.updateSuccess"));
   };
 
   const handleDeleteSeries = async (id: string) => {
@@ -304,6 +297,7 @@ const SeriesManagementPage = () => {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         mode="create"
+        existingSeries={series}
         onSubmit={handleCreateSeries}
       />
 
@@ -312,6 +306,7 @@ const SeriesManagementPage = () => {
         onOpenChange={(open) => !open && setEditingSeries(null)}
         mode="edit"
         initialData={editingSeries}
+        existingSeries={series}
         onSubmit={handleUpdateSeries}
       />
 

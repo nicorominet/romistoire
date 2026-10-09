@@ -1,5 +1,5 @@
 
-import { query, getConnection } from '../config/database.js';
+import { query } from '../config/database.js';
 
 async function checkOrphans() {
     try {

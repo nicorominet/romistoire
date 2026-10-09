@@ -57,5 +57,3 @@ export const ThemeColorPicker = ({ value, onChange, id }: ThemeColorPickerProps)
     </div>
   );
 };
-
-export default ThemeColorPicker;

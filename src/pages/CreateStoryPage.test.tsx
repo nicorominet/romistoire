@@ -1,10 +1,10 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CreateStoryPage from './CreateStoryPage';
 import { themeApi, weeklyThemeApi } from '@/api/themes.api';
-import { seriesApi, storyApi } from '@/api/stories.api';
+import { seriesApi } from '@/api/stories.api';
 
 // Mock dependencies
 vi.mock('@/lib/i18n', () => ({

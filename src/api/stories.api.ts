@@ -20,22 +20,6 @@ export const storyApi = {
   getById: (id: string) => client.get<StoryWithIllustrations>(`${API_ENDPOINTS.STORIES}/${id}`),
 
   /**
-   * Fetch the next story in the sequence.
-   * @param {string} id - The ID of the current story.
-   * @returns {Promise<Story | null>} The next story or null if none exists.
-   */
-  getNext: (id: string) => client.get<Story | null>(`${API_ENDPOINTS.STORIES}/${id}/next`),
-
-  /**
-   * Fetch the previous story in the sequence.
-   * @param {string} id - The ID of the current story.
-   * @returns {Promise<Story | null>} The previous story or null.
-   */
-  getPrevious: async (id: string) => {
-    return client.get(`${API_ENDPOINTS.STORIES}/${id}/previous`);
-  },
-
-  /**
    * Fetch both next and previous stories.
    * @param {string} id - The ID of the current story.
    * @returns {Promise<{prev: Story | null, next: Story | null}>} Object containing neighbor stories.
@@ -99,12 +83,6 @@ export const storyApi = {
       return response.data;
   },
 
-  /**
-   * Generate a story using AI.
-   * @param {any} data - Parameters for generation (theme, age group, etc.).
-   * @returns {Promise<Story>} The generated story.
-   */
-  generateAI: (data: any) => client.post<Story>(`${API_ENDPOINTS.GENERATE}/story`, data),
 
 
   /**
@@ -115,19 +93,22 @@ export const storyApi = {
   getAvailableWeeks: (params: any) => client.get<number[]>(`${API_ENDPOINTS.STORIES}/available-weeks`, { params }),
 
   /**
-   * Get all illustrations associated with a story.
-   * @param {string} id - The ID of the story.
-   * @returns {Promise<Illustration[]>} List of illustrations.
-   */
-  getIllustrations: (id: string) => client.get<Illustration[]>(`${API_ENDPOINTS.STORIES}/${id}/illustrations`),
-
-  /**
    * Reorder the illustrations of a story (the first one is used as cover).
    * @param {string} id - The ID of the story.
    * @param {string[]} illustrationIds - Illustration IDs in the new order.
    * @returns {Promise<Illustration[]>} Illustrations in their new order.
    */
   reorderIllustrations: (id: string, illustrationIds: string[]) => client.put<Illustration[]>(`${API_ENDPOINTS.STORIES}/${id}/illustrations/order`, { illustrationIds }),
+};
+
+export const storyReviewApi = {
+  /**
+   * Set the review status (indicative) of stories.
+   * @param {string[]} ids - Story IDs.
+   * @param {'to_review'|'validated'} status
+   */
+  setReviewStatus: (ids: string[], status: 'to_review' | 'validated') =>
+    client.put<{ success: boolean; updated: number }>(`${API_ENDPOINTS.STORIES}/review`, { ids, status }),
 };
 
 export const seriesApi = {

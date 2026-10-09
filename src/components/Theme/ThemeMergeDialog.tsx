@@ -91,5 +91,3 @@ export const ThemeMergeDialog = ({ open, onOpenChange }: ThemeMergeDialogProps) 
     </Dialog>
   );
 };
-
-export default ThemeMergeDialog;

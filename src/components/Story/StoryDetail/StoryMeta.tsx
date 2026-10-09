@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, BookOpen, User, Sparkles, Cpu } from 'lucide-react';
+import { Calendar, BookOpen, User, Sparkles, Cpu } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { formatDate } from '@/lib/utils';
 import { DAY_NAMES_EN, getDayLabel } from '@/utils/dayUtils';

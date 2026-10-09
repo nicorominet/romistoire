@@ -253,6 +253,65 @@ export const cleanStoryParagraphs = (paragraphs, illustrationPrompt = '') => {
 const splitSentences = (text) =>
   String(text || '').match(/[^.!?…]+(?:[.!?…]+(?:\s*»)?|$)/g)?.map(s => s.trim()).filter(Boolean) || [];
 
+const wordCount = (text) => String(text || '').split(/\s+/).filter(Boolean).length;
+
+/**
+ * Splits the paragraphs longer than the size of the age group into groups of whole sentences
+ * (models sometimes write 3 blocks of 100 words for 4-year-olds). The text itself is unchanged.
+ * @param {string[]} paragraphs
+ * @param {string} age - Age group ("4-6").
+ * @returns {string[]}
+ */
+export const splitParagraphsForAge = (paragraphs, age) => {
+  const max = PromptHelper.getAgeProfile(age).maxParagraphWords;
+  if (!max || !Array.isArray(paragraphs)) return paragraphs;
+  // Each new block aims at ~60 % of the maximum, so the split does not leave a tiny last block
+  const target = Math.round(max * 0.6);
+  return paragraphs.flatMap(paragraph => {
+    if (wordCount(paragraph) <= max) return [paragraph];
+    const sentences = splitSentences(paragraph);
+    if (sentences.length < 2) return [paragraph];
+    const blocks = [];
+    let current = [];
+    for (const sentence of sentences) {
+      current.push(sentence);
+      if (wordCount(current.join(' ')) >= target) {
+        blocks.push(current.join(' '));
+        current = [];
+      }
+    }
+    if (current.length) {
+      // A last block of one short sentence joins the previous one
+      if (blocks.length && wordCount(current.join(' ')) < target / 2) blocks[blocks.length - 1] += ` ${current.join(' ')}`;
+      else blocks.push(current.join(' '));
+    }
+    return blocks;
+  });
+};
+
+/** Words that only a filler story uses: the model talking about the JSON instead of telling a story. */
+const PLACEHOLDER_RE = /\b(?:jour|histoire|titre|texte|contenu)s?\s+(?:fictif|fictive|temporaire|factice|vide)s?\b|respecter la structure|structure (?:du|de la r[ée]ponse) json|placeholder|lorem ipsum|\bnon utilis[ée]e?\b/i;
+/**
+ * Share of identical sentences above which a text is a filler (the real filler repeated one sentence only;
+ * a story with a refrain stays well below).
+ */
+const REPEATED_SENTENCES_SHARE = 0.6;
+
+/**
+ * Whether a story is a filler written to reach the number of stories required by the JSON schema
+ * ("Titre temporaire non utilisé" / "Ceci est un jour fictif pour respecter la structure du JSON." x5).
+ * @param {{title?: string, paragraphs: string[]}} story
+ */
+export const isPlaceholderStory = ({ title = '', paragraphs = [] }) => {
+  const text = paragraphs.join(' ');
+  if (PLACEHOLDER_RE.test(title) || PLACEHOLDER_RE.test(text)) return true;
+  const sentences = splitSentences(text).map(comparable);
+  if (sentences.length < 3) return false;
+  const counts = new Map();
+  sentences.forEach(sentence => counts.set(sentence, (counts.get(sentence) || 0) + 1));
+  return Math.max(...counts.values()) / sentences.length > REPEATED_SENTENCES_SHARE;
+};
+
 /**
  * Removes the sentences of the previous day's ending that the model copied at the start of the new story.
  * @param {string[]} paragraphs - Paragraphs of the new story.
@@ -326,7 +385,8 @@ export const parseStoryOutput = (text) => {
         cleanedParagraphs: removed
       };
     })
-    .filter(story => story.paragraphs.length > 0);
+    // A filler story counts as missing: the week is incomplete and the missing day is asked again
+    .filter(story => story.paragraphs.length > 0 && !isPlaceholderStory(story));
 
   return stories.length > 0 ? stories : null;
 };

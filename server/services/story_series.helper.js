@@ -13,9 +13,14 @@ class StorySeriesHelper {
      */
     async resolveSeriesId(connection, seriesId, seriesName) {
         if (seriesId) return seriesId;
+        seriesName = String(seriesName ?? '').replace(/\s+/g, ' ').trim();
         if (!seriesName) return null;
 
-        const [existingSeries] = await connection.query('SELECT id FROM story_series WHERE name = ?', [seriesName]);
+        // Names are unique since series are checked on creation; older duplicates: the main, oldest one
+        const [existingSeries] = await connection.query(
+            'SELECT id FROM story_series WHERE name = ? ORDER BY parent_series_id IS NOT NULL, created_at ASC LIMIT 1',
+            [seriesName]
+        );
         if (existingSeries.length > 0) {
             return existingSeries[0].id;
         }

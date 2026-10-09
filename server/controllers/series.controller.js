@@ -21,8 +21,7 @@ export const getSeriesStats = async (req, res) => {
 
 export const createSeries = async (req, res) => {
     try {
-        if (!req.body.name) return res.status(400).json({ error: 'Missing name' });
-        const series = await seriesService.create(req.body);
+        const series = await seriesService.create(req.body || {});
         res.status(201).json(series);
     } catch (error) {
         handleError(res, error);
@@ -31,8 +30,7 @@ export const createSeries = async (req, res) => {
 
 export const updateSeries = async (req, res) => {
     try {
-        if (!req.body.name) return res.status(400).json({ error: 'Missing name' });
-        const series = await seriesService.update(req.params.id, req.body);
+        const series = await seriesService.update(req.params.id, req.body || {});
         res.json(series);
     } catch (error) {
         handleError(res, error);

@@ -238,5 +238,3 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
     </div>
   );
 };
-
-export default ThemeLibrary;

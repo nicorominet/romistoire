@@ -7,7 +7,7 @@ import { systemApi } from "@/api/system.api";
 import { useStory, useStoryMutations } from "@/hooks/useStory";
 import { useWeeklyThemes } from "@/hooks/useThemes";
 import { WeeklyTheme } from "@/types/Theme";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UseStoryDataProps {
   id?: string;
@@ -61,8 +61,7 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
       formData.append("storyId", id);
       formData.append("position", String(story?.illustrations?.length || 0));
       
-      const res = (await systemApi.uploadImage(formData)) as any;
-      const { imagePath, filename: savedFilename } = res;
+      await systemApi.uploadImage(formData);
       
       // Invalidate story to refresh illustrations
       queryClient.invalidateQueries({ queryKey: ['story', id] });

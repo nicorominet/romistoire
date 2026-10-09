@@ -1,4 +1,5 @@
 import { STORY_DAYS } from './story_schema.js';
+import { normalizeThemeName } from './theme_name.helper.js';
 
 export const ALL_WEEK = "Toute la semaine";
 
@@ -7,41 +8,56 @@ const DEFAULT_AGE = "4-6";
 
 /**
  * Writing profile per age group. Lengths stay within the output budget of a full week (7 stories).
+ * Models write about 70 % of a word count and stop at the smallest number of paragraphs allowed
+ * (measured on the generation logs): the length is given as a minimum number of developed paragraphs,
+ * with the word count it amounts to.
  */
 const AGE_PROFILES = {
   "2-3": {
     wordCount: "environ 150-250 mots",
-    paragraphs: "4 à 6 paragraphes très courts",
+    paragraphs: "6 à 8 paragraphes de 2 à 3 phrases",
+    minParagraphs: 6,
+    maxParagraphWords: 45,
     storyStyle: "Phrases de 5 à 8 mots, mots concrets du quotidien, répétitions et onomatopées (« plouf », « miam »). Un seul personnage principal, une seule action à la fois, ton doux et rassurant.",
     illustrationStyle: "Style « Livre d'éveil » : formes rondes et simples, couleurs vives et franches, gros plan sur un personnage mignon, fond épuré, aucun détail effrayant."
   },
   "4-6": {
     wordCount: "environ 300-450 mots",
-    paragraphs: "5 à 8 paragraphes courts",
+    paragraphs: "7 à 9 paragraphes de 3 à 4 phrases",
+    minParagraphs: 7,
+    maxParagraphWords: 70,
     storyStyle: "Phrases simples mais variées, vocabulaire concret avec un ou deux mots nouveaux expliqués par le contexte. Dialogues courts, ton enjoué, une petite difficulté résolue grâce à la curiosité ou l'entraide.",
     illustrationStyle: "Style album jeunesse : aquarelle ou gouache douce, personnages expressifs, scène lisible au premier coup d'œil, couleurs chaleureuses."
   },
   "7-9": {
     wordCount: "environ 500-700 mots",
-    paragraphs: "6 à 9 paragraphes",
+    paragraphs: "9 à 11 paragraphes de 3 à 5 phrases",
+    minParagraphs: 9,
+    maxParagraphWords: 90,
     storyStyle: "Phrases plus longues et liées, vocabulaire riche mais accessible, dialogues vivants. Une vraie intrigue avec un problème à résoudre ; la notion scientifique sert à le résoudre.",
     illustrationStyle: "Style roman illustré : décor détaillé, textures et lumière travaillées, mouvement dans la scène, palette harmonieuse."
   },
   "10-12": {
     wordCount: "environ 700-900 mots",
-    paragraphs: "7 à 10 paragraphes",
+    paragraphs: "10 à 12 paragraphes de 4 à 5 phrases",
+    minParagraphs: 10,
+    maxParagraphWords: 110,
     storyStyle: "Narration plus ambitieuse : descriptions, émotions nuancées, humour, personnages qui doutent et raisonnent. La science est expliquée avec précision (causes, conséquences, ordres de grandeur).",
     illustrationStyle: "Style roman illustré pour grands lecteurs : composition dynamique, éclairage cinématographique, détails réalistes avec une touche d'imaginaire."
   },
   "13-15": {
     wordCount: "environ 900-1100 mots",
-    paragraphs: "8 à 12 paragraphes",
+    paragraphs: "11 à 13 paragraphes de 4 à 6 phrases",
+    minParagraphs: 11,
+    maxParagraphWords: 130,
     storyStyle: "Ton « Young Adult » : narration immersive, dialogues naturels, enjeux personnels et questionnements éthiques autour de la science. Vocabulaire scientifique exact, défini quand il apparaît.",
     illustrationStyle: "Style « Young Adult » : illustration semi-réaliste, ambiance travaillée (lumière, météo, profondeur de champ), personnages adolescents crédibles."
   },
   "16-18": {
     wordCount: "environ 1000-1200 mots",
-    paragraphs: "9 à 13 paragraphes",
+    paragraphs: "12 à 14 paragraphes de 4 à 6 phrases",
+    minParagraphs: 12,
+    maxParagraphWords: 140,
     storyStyle: "Écriture littéraire pour jeunes adultes, sans édulcorer : réflexion, nuances, démarche scientifique (hypothèse, observation, preuve). Le lecteur est traité en adulte.",
     illustrationStyle: "Style « Young Adult » mature : illustration réaliste ou concept art, composition soignée, ambiance réfléchie, détails scientifiques exacts."
   }
@@ -68,6 +84,14 @@ const SUSPENSE_LAST_DAY = 4;
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 /** Existing themes listed in the prompt (most used first): enough to reuse, short enough for small models. */
 export const MAX_EXISTING_THEMES = 80;
+/** Titles of the series listed in the prompt (most recent first). */
+export const MAX_AVOID_TITLES = 60;
+/**
+ * Tags that would fit every story: the library ended up with only "Nature", "Curiosité" and "Amitié"
+ * (the examples of the former prompt). They are neither asked for nor offered for reuse.
+ */
+export const VAGUE_TAGS = ["Nature", "Science", "Curiosité", "Aventure", "Découverte"];
+const VAGUE_TAG_KEYS = new Set(VAGUE_TAGS.map(normalizeThemeName));
 /** Openings models use for the reminder of the previous day: the first sentence must be an action of the day. */
 export const FORBIDDEN_OPENINGS = ["Hier", "La veille", "Après avoir", "Alors que"];
 const OPENING_RULE = `- La première phrase est une action ou un dialogue du jour. Ne commencez jamais par ${FORBIDDEN_OPENINGS.map(o => `« ${o} »`).join(", ")} : le rappel de la veille vient en deuxième ou troisième phrase.`;
@@ -125,11 +149,12 @@ export class PromptHelper {
    * @param {{name: string, description: string}[]} [params.characters] - Character sheets, written by the first day
    * @param {number} [params.weekNumber] - ISO week of the story: gives the month and the season
    * @param {string} [params.lengthHint] - Extra length instruction (second try of a story that was too short)
+   * @param {string[]} [params.avoidTitles] - Titles already used in the series (other weeks), not to be repeated
    * @returns {string} The constructed prompt
    */
   static buildStoryPrompt(params) {
     const { theme, age, day, numCharacters, charNames, seriesName, previousSummary, previousChapter, existingThemes, themeDescription,
-      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint } = params;
+      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint, avoidTitles } = params;
     const isWeek = day === ALL_WEEK;
     const ageKey = this.normalizeAge(age);
     const profile = this.getAgeProfile(ageKey);
@@ -152,10 +177,12 @@ export class PromptHelper {
 
     const audience = [
       isWeek
-        ? `- Longueur : au moins ${this.getTargetWords(ageKey).min} mots (${profile.wordCount}) pour chacune des 7 histoires, en ${profile.paragraphs} chacune. Ne raccourcissez pas les derniers jours.`
-        : `- Longueur : au moins ${this.getTargetWords(ageKey).min} mots (${profile.wordCount}) par histoire, en ${profile.paragraphs}.`,
+        ? `- Longueur : ${this.getLengthRule(ageKey)} pour chacune des 7 histoires. Ne raccourcissez pas les derniers jours.`
+        : `- Longueur : ${this.getLengthRule(ageKey)}.`,
+      "- Pour atteindre cette longueur, développez les scènes (actions, dialogues, sensations, émotions), jamais en ajoutant des paragraphes de remplissage ou des commentaires sur le texte. Une histoire plus courte est incomplète.",
       `- Style : ${profile.storyStyle}`,
       `- Titre : court, captivant et unique${isWeek ? " (7 titres différents)" : ""}.`,
+      this.getAvoidTitlesRule(avoidTitles),
       lengthHint && String(lengthHint).trim() ? `- IMPORTANT : ${String(lengthHint).trim()}` : ""
     ].filter(Boolean).join("\n");
 
@@ -192,11 +219,24 @@ export class PromptHelper {
       illustration,
       "",
       "## ÉTIQUETTES",
-      this.getThemesPrompt(existingThemes),
+      this.getThemesPrompt(existingThemes, { isWeek }),
       "",
       "## FORMAT DE SORTIE",
       this.getOutputFormat(isWeek ? "Lundi" : (targetDay || "Lundi"), { withWeekPlan })
     ].join("\n");
+  }
+
+  /**
+   * Titles already used by other weeks of the series: a new story must not take one again
+   * (a mass generation repeated "Le festin des oiseaux" three times).
+   * @param {string[]} [titles]
+   * @returns {string} The rule, or "" when there is none.
+   */
+  static getAvoidTitlesRule(titles) {
+    const list = [...new Set((Array.isArray(titles) ? titles : []).map(title => String(title || "").trim()).filter(Boolean))].slice(0, MAX_AVOID_TITLES);
+    return list.length > 0
+      ? `- Titres déjà utilisés dans cette série, à ne pas reprendre ni imiter de près : ${list.map(title => `« ${title} »`).join(", ")}.`
+      : "";
   }
 
   /** "4-6 ans" / "4-6" / unknown -> "4-6". */
@@ -216,10 +256,20 @@ export class PromptHelper {
   /**
    * Writing profile of an age group.
    * @param {string} age - "4-6" or "4-6 ans" (unknown values fall back to 4-6).
-   * @returns {{wordCount: string, paragraphs: string, storyStyle: string, illustrationStyle: string}}
+   * @returns {{wordCount: string, paragraphs: string, minParagraphs: number, maxParagraphWords: number, storyStyle: string, illustrationStyle: string}}
    */
   static getAgeProfile(age) {
     return { ...AGE_PROFILES[this.normalizeAge(age)] };
+  }
+
+  /**
+   * Length instruction of an age group: minimum number of paragraphs, their size, and the word count it makes.
+   * @param {string} age - Age group.
+   * @returns {string} e.g. "au moins 7 paragraphes (7 à 9 paragraphes de 3 à 4 phrases), soit au moins 300 mots (environ 300-450 mots)"
+   */
+  static getLengthRule(age) {
+    const profile = this.getAgeProfile(age);
+    return `au moins ${profile.minParagraphs} paragraphes (${profile.paragraphs}), soit au moins ${this.getTargetWords(age).min} mots (${profile.wordCount})`;
   }
 
   /**
@@ -230,21 +280,6 @@ export class PromptHelper {
   static getTargetWords(age) {
     const [min, max] = (this.getAgeProfile(age).wordCount.match(/\d+/g) || []).map(Number);
     return { min: min || 0, max: max || min || 0 };
-  }
-
-  /**
-   * Number of paragraphs of a story ("5 à 8 paragraphes courts" -> { min: 5, max: 8 }).
-   * @param {string} age - Age group.
-   * @returns {{min: number, max: number}}
-   */
-  static getTargetParagraphs(age) {
-    const [min, max] = (this.getAgeProfile(age).paragraphs.match(/\d+/g) || []).map(Number);
-    return { min: min || 1, max: max || min || 1 };
-  }
-
-  /** @deprecated Use getAgeProfile. Kept for older callers. */
-  static getStyleByAge(age) {
-    return this.getAgeProfile(age);
   }
 
   static getCharacterPrompt(numCharacters, charNames) {
@@ -266,23 +301,31 @@ export class PromptHelper {
   }
 
   /**
-   * Tags of the stories (output field "themes"): the model reuses the library's themes,
-   * so generation does not create near-duplicates. The topic of the week is not a tag.
+   * Tags of the stories (output field "themes"): 2 or 3 per story, the precise subject of this story first,
+   * then the values lived in it. Existing tags are reused only when they describe the story exactly,
+   * so the library neither fills with near-duplicates nor collapses on a few vague tags.
    * @param {string[]} [existingThemes] - Existing theme names, most used first.
+   * @param {{isWeek?: boolean}} [options] - isWeek: 7 stories in the answer.
    */
-  static getThemesPrompt(existingThemes = []) {
-    const names = [...new Set((existingThemes || []).map(name => String(name).trim()).filter(Boolean))].slice(0, MAX_EXISTING_THEMES);
-    const lines = ["- Le champ \"themes\" contient les étiquettes de l'histoire : ses thèmes (valeurs, émotions, univers), pas le sujet de la semaine."];
+  static getThemesPrompt(existingThemes = [], { isWeek = false } = {}) {
+    const names = [...new Set((existingThemes || []).map(name => String(name).trim()).filter(Boolean))]
+      .filter(name => !VAGUE_TAG_KEYS.has(normalizeThemeName(name)))
+      .slice(0, MAX_EXISTING_THEMES);
+    const lines = [
+      "- Le champ \"themes\" contient 2 ou 3 étiquettes qui décrivent CETTE histoire :",
+      "  1. d'abord sa notion ou son univers précis (un animal, un phénomène, un lieu, une activité…), en 1 à 4 mots ;",
+      "  2. puis 1 ou 2 valeurs ou émotions vécues par les personnages dans cette histoire (par exemple entraide, patience, courage, partage, persévérance, confiance en soi, gentillesse, respect, gestion de la colère, ouverture aux autres, gratitude…).",
+      `- Pas d'étiquette vague qui conviendrait à toutes les histoires : ${VAGUE_TAGS.map(tag => `« ${tag} »`).join(", ")}.`,
+      isWeek ? "- D'un jour à l'autre, les valeurs changent : les 7 histoires n'ont pas toutes les mêmes étiquettes." : ""
+    ];
     if (names.length > 0) {
       lines.push(
-        "- ÉTIQUETTES EXISTANTES : réutilisez exactement l'un de ces noms (même orthographe) :",
+        "- ÉTIQUETTES EXISTANTES : si l'une décrit exactement l'histoire, reprenez son nom à l'identique :",
         `  ${names.map(name => `« ${name} »`).join(", ")}.`,
-        "- Ne proposez une nouvelle étiquette que si aucune étiquette existante ne convient ; donnez-lui alors un nom court et général (ex. « Nature », « Amitié »)."
+        "- Sinon, créez une étiquette nouvelle : mieux vaut une étiquette précise et nouvelle qu'une étiquette existante approximative."
       );
-    } else {
-      lines.push("- Les étiquettes ont des noms courts et généraux (ex. « Nature », « Amitié »).");
     }
-    return lines.join("\n");
+    return lines.filter(Boolean).join("\n");
   }
 
   /**
@@ -461,7 +504,7 @@ export class PromptHelper {
       `- "day" : jour de la semaine, parmi ${STORY_DAYS.map(d => `"${d}"`).join(", ")}.`,
       "- \"title\" : le titre, sans guillemets ni markdown.",
       "- \"summary\" : 2 ou 3 phrases qui serviront de contexte au jour suivant : ce qui s'est passé, ce que les personnages ont découvert, et la situation exacte à la fin (le suspense laissé pour demain).",
-      "- \"themes\" : 1 ou 2 thèmes associés, chacun avec \"name\" (ex. \"Nature\"), \"description\" (une phrase), \"icon\" (un emoji) et \"color\" (code hexadécimal, ex. \"#4CAF50\").",
+      "- \"themes\" : 2 ou 3 étiquettes (voir ÉTIQUETTES), la notion précise en premier, chacune avec \"name\", \"description\" (une phrase), \"icon\" (un emoji) et \"color\" (code hexadécimal, ex. \"#4CAF50\").",
       "- \"paragraphs\" : uniquement le texte de l'histoire, un paragraphe par élément : jamais le titre, la description d'illustration, ni un commentaire sur le texte ou sa longueur.",
       "- \"illustration_prompt\" : la description détaillée de l'illustration.",
       "",
@@ -475,7 +518,10 @@ export class PromptHelper {
           day: exampleDay,
           title: "Le secret de la goutte d'eau",
           summary: "Léa découvre d'où vient la pluie…",
-          themes: [{ name: "Nature", description: "Le cycle de l'eau", icon: "💧", color: "#2196F3" }],
+          themes: [
+            { name: "Cycle de l'eau", description: "Comment la pluie se forme", icon: "💧", color: "#2196F3" },
+            { name: "Patience", description: "Attendre et observer avant de comprendre", icon: "⏳", color: "#9C27B0" }
+          ],
           paragraphs: ["Premier paragraphe…", "Deuxième paragraphe…"],
           illustration_prompt: "Une petite fille aux tresses rousses, en ciré jaune…"
         }]

@@ -40,6 +40,10 @@ export interface Story {
   /** AI-suggested description used to create the illustration */
   illustration_prompt?: string | null;
   illustrations: Illustration[];
+  /** Indicative review status: AI stories wait for a human reading */
+  review_status?: 'to_review' | 'validated';
+  /** Mass generation job that wrote the story */
+  generation_job_id?: string | null;
   /** Set by create/update when the slot was taken and the story was moved to an alias series */
   aliasSeries?: { id: string; name: string } | null;
 }
@@ -98,6 +102,8 @@ export interface PaginationParams {
   dayOfWeek?: string; // Align with findAll 'dayOfWeek'
   source?: string;
   editStatus?: string;
+  reviewStatus?: string;
+  generationJobId?: string;
 }
 
 /**

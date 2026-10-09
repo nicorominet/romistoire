@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { i18n } from "@/lib/i18n";
 import {
   Card,
@@ -21,14 +21,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Download, Upload, Trash2, AlertCircle } from "lucide-react";
+import { Download, Upload, Trash2, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useSystemMutations } from "@/hooks/useSystem";
-import { systemApi } from "@/api/system.api"; 
+import { systemApi } from "@/api/system.api";
 import { downloadBlob, generateDateFilename } from "@/utils/fileUtils";
-import { STORAGE_KEYS } from "@/constants";
-import { CleanupResponse, ExportType, ImportMode } from "@/types/system.types";
+import { ExportType, ImportMode } from "@/types/system.types";
 
 /**
  * DataSettings Component
@@ -44,7 +42,9 @@ export const DataSettings = () => {
     
     // Local state
     const [importMode, setImportMode] = useState<ImportMode>('skip');
-    const [isExporting, setIsExporting] = useState(false); 
+    const [isExporting, setIsExporting] = useState(false);
+    const [confirmOverwriteOpen, setConfirmOverwriteOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Composite loading state
     const isLoading = importData.isPending || resetData.isPending || cleanupImages.isPending || isExporting;
@@ -60,14 +60,12 @@ export const DataSettings = () => {
         try {
             const action = type === 'zip' ? systemApi.exportFull : systemApi.exportData;
             
-            // Fetch blob from API
-            const response = await action();
             // Client already returns unwrapped data (the blob)
-            const blob = response as unknown as Blob; 
+            const blob = await action();
 
             // Generate filename and trigger download
             const extension = type === 'zip' ? 'zip' : 'json';
-            const prefix = type === 'zip' ? 'romihistoire-full-export' : 'romihistoire-data-export';
+            const prefix = type === 'zip' ? 'imagitales-full-export' : 'imagitales-data-export';
             const filename = generateDateFilename(prefix, extension);
 
             downloadBlob(blob, filename);
@@ -82,12 +80,25 @@ export const DataSettings = () => {
     };
 
     /**
+     * Opens the file picker. In overwrite mode, a confirmation is asked first.
+     */
+    const handleImportClick = () => {
+        if (importMode === 'overwrite') {
+            setConfirmOverwriteOpen(true);
+        } else {
+            fileInputRef.current?.click();
+        }
+    };
+
+    /**
      * Handles data import from a file.
-     * 
+     *
      * @param {React.ChangeEvent<HTMLInputElement>} event - File input change event.
      */
     const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
+        // Reset so that picking the same file again triggers onChange
+        event.target.value = '';
         if (!file) {
             toast.error(t("settings.importNoFile"));
             return;
@@ -98,8 +109,17 @@ export const DataSettings = () => {
         formData.append('mode', importMode);
 
         try {
-            await importData.mutateAsync(formData);
-            toast.success(t("settings.dataImported"));
+            const result = await importData.mutateAsync(formData);
+            const summary = t("settings.importSummary", {
+                inserted: result.inserted,
+                skipped: result.skipped,
+                failed: result.failed,
+            });
+            if (result.failed > 0) {
+                toast.warning(summary);
+            } else {
+                toast.success(summary);
+            }
             // UI update handled by React Query invalidation in hook
         } catch (error: any) {
              console.error("Import failed:", error);
@@ -108,17 +128,10 @@ export const DataSettings = () => {
     };
 
     /**
-     * Handles factory reset.
-     * Clears local storage and invokes backend reset.
+     * Handles factory reset (server-side data; settings and the weekly program are kept).
      */
     const handleClearData = async () => {
         try {
-            // Clear Client-side Storage using Constants
-            localStorage.removeItem(STORAGE_KEYS.STORIES);
-            localStorage.removeItem(STORAGE_KEYS.VERSIONS);
-            localStorage.removeItem(STORAGE_KEYS.ILLUSTRATIONS);
-            
-            // Clear Server-side Data
             await resetData.mutateAsync();
 
             toast.success(t("settings.dataCleared"));
@@ -134,9 +147,7 @@ export const DataSettings = () => {
      */
     const handleCleanupImages = async () => {
         try {
-            const response = await cleanupImages.mutateAsync();
-             // Client already returns response.data
-            const result  = response as unknown as CleanupResponse;
+            const result = await cleanupImages.mutateAsync();
 
             if (result && result.success) {
                 toast.success(t("settings.cleanupSuccess", { 
@@ -160,14 +171,14 @@ export const DataSettings = () => {
             </CardHeader>
             <CardContent className="space-y-6">
                 {isLoading && (
-                    <div className="space-y-4">
-                        <Skeleton className="h-6 w-3/4" />
-                        <Skeleton className="h-4 w-full" />
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400" role="status">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t("common.loading")}
                     </div>
                 )}
 
-                {!isLoading && (
-                    <>
+                {/* Kept visible during operations, but disabled */}
+                <fieldset disabled={isLoading} className="space-y-6">
                         <div className="space-y-2">
                             <h3 className="font-medium">{t("settings.exportData")}</h3>
                             <p className="text-sm text-gray-500">
@@ -232,24 +243,42 @@ export const DataSettings = () => {
                             </div>
 
                             <input
+                                ref={fileInputRef}
                                 type="file"
                                 id="import-file"
                                 className="hidden"
                                 accept=".json,.zip"
                                 onChange={handleImportData}
                             />
-                            <Label htmlFor="import-file">
-                                <Button
-                                    variant="outline"
-                                    className="flex items-center gap-1"
-                                    asChild
-                                >
-                                    <span>
-                                        <Upload className="h-4 w-4" />
-                                        {t("settings.importButton")}
-                                    </span>
-                                </Button>
-                            </Label>
+                            <Button
+                                variant="outline"
+                                className="flex items-center gap-1"
+                                onClick={handleImportClick}
+                            >
+                                <Upload className="h-4 w-4" />
+                                {t("settings.importButton")}
+                            </Button>
+
+                            {/* Overwrite mode: confirmation first, then the file picker */}
+                            <AlertDialog open={confirmOverwriteOpen} onOpenChange={setConfirmOverwriteOpen}>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>{t("settings.confirmOverwriteTitle")}</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            {t("settings.confirmOverwriteDesc")}
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="bg-red-500 hover:bg-red-600"
+                                        >
+                                            {t("settings.confirmOverwrite")}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                         <Separator />
                         <div className="space-y-2">
@@ -334,8 +363,7 @@ export const DataSettings = () => {
                                 </AlertDialog>
                             </div>
                         </div>
-                    </>
-                )}
+                </fieldset>
             </CardContent>
         </Card>
     );

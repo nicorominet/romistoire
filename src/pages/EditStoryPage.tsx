@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { APP_ROUTES } from "@/constants";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +25,6 @@ import RestoreVersionCard from "@/components/Story/EditStory/RestoreVersionCard"
 import { Theme } from "@/types/Theme";
 import { Series } from "@/types/Series";
 import { Story, AgeGroup } from "@/types/Story";
-import { themeApi } from "@/api/themes.api";
 import { storyApi } from "@/api/stories.api";
 import { useThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";

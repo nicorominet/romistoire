@@ -141,5 +141,3 @@ export const WeeklyTopicRow = forwardRef<HTMLLIElement, WeeklyTopicRowProps>(({ 
 });
 
 WeeklyTopicRow.displayName = "WeeklyTopicRow";
-
-export default WeeklyTopicRow;

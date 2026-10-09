@@ -19,6 +19,15 @@ export const updateWeeklyThemes = async (req, res) => {
     }
 };
 
+/** AI topic suggestions for weeks of the program: { weeks }. */
+export const suggestWeekThemes = async (req, res) => {
+    try {
+        res.json(await weeklyThemeService.suggest(req.body?.weeks));
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 export const setWeekTheme = async (req, res) => {
     try {
         const week = await weeklyThemeService.setWeek(req.params.week, req.body || {});

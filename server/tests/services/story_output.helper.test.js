@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assignWeekDays, cleanStoryParagraphs, countRepetitiveOpenings, openingPattern, removeStutter, extractJson, extractWeekContext, extractWeekPlan, parseStoryOutput, removeRepeatedOpening, splitLongParagraph } from '../../services/helpers/story_output.helper.js';
+import { assignWeekDays, cleanStoryParagraphs, isPlaceholderStory, splitParagraphsForAge, countRepetitiveOpenings, openingPattern, removeStutter, extractJson, extractWeekContext, extractWeekPlan, parseStoryOutput, removeRepeatedOpening, splitLongParagraph } from '../../services/helpers/story_output.helper.js';
 
 const story = (overrides = {}) => ({
   day: 'Lundi',
@@ -104,6 +104,46 @@ describe('splitLongParagraph', () => {
     const block = Array.from({ length: 10 }, (_, i) => `« Bonjour ${i} ! » dit le faon, qui trottine longuement dans la forêt givrée du matin.`).join(' ');
     const [story] = parseStoryOutput(JSON.stringify({ stories: [{ day: 'Samedi', title: 'T', summary: 'S', themes: [], paragraphs: [block], illustration_prompt: 'I' }] }));
     expect(story.paragraphs.length).toBeGreaterThan(1);
+  });
+});
+
+describe('isPlaceholderStory', () => {
+  it('should spot the filler written to reach 7 stories (real case of week 53)', () => {
+    const filler = Array.from({ length: 5 }, () => 'Ceci est un jour fictif pour respecter la structure du JSON.');
+    expect(isPlaceholderStory({ title: 'Titre temporaire non utilisé', paragraphs: filler })).toBe(true);
+    expect(isPlaceholderStory({ title: 'Le jeudi', paragraphs: filler })).toBe(true);
+    // The same sentence repeated, without any telltale word
+    expect(isPlaceholderStory({ title: 'T', paragraphs: ['Léonie dort. Léonie dort. Léonie dort. Léonie dort.'] })).toBe(true);
+  });
+
+  it('should keep real stories, refrains included', () => {
+    expect(isPlaceholderStory({ title: 'La forêt', paragraphs: ['Léonie court dans la forêt. Elle ramasse une châtaigne.', '« Regarde ! » dit Papa. Ils rient.'] })).toBe(false);
+    expect(isPlaceholderStory({ title: 'Le refrain', paragraphs: ['Toc toc toc ! Qui est là ? Le vent souffle. Toc toc toc ! Qui est là ? La porte grince. Léonie ouvre.'] })).toBe(false);
+  });
+
+  it('should drop a filler story from a parsed week', () => {
+    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    const stories = parseStoryOutput(JSON.stringify({ stories: days.map(day => (day === 'Jeudi'
+      ? { day, title: 'Titre temporaire non utilisé', summary: '', themes: [], paragraphs: ['Ceci est un jour fictif pour respecter la structure du JSON.'], illustration_prompt: '' }
+      : { day, title: `Histoire ${day}`, summary: 'S', themes: [], paragraphs: [`Léonie vit le ${day}.`], illustration_prompt: 'I' })) }));
+    expect(stories.map(story => story.day)).toEqual(['Lundi', 'Mardi', 'Mercredi', 'Vendredi', 'Samedi', 'Dimanche']);
+  });
+});
+
+describe('splitParagraphsForAge', () => {
+  const sentence = (i) => `Léonie observe la feuille numéro ${i} qui tombe doucement dans le jardin.`;
+  it('should split a block too long for 4-6 into groups of whole sentences', () => {
+    const block = Array.from({ length: 9 }, (_, i) => sentence(i)).join(' '); // ~108 words
+    const result = splitParagraphsForAge([block], '4-6');
+    expect(result.length).toBeGreaterThan(1);
+    expect(result.join(' ')).toBe(block);
+    result.forEach(paragraph => expect(paragraph.endsWith('.')).toBe(true));
+  });
+
+  it('should keep paragraphs within the size of the age', () => {
+    const block = Array.from({ length: 9 }, (_, i) => sentence(i)).join(' ');
+    expect(splitParagraphsForAge([block], '16-18')).toEqual([block]);
+    expect(splitParagraphsForAge(['Court.'], '2-3')).toEqual(['Court.']);
   });
 });
 

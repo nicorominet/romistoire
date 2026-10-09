@@ -29,33 +29,6 @@ export const getStoryById = async (req, res) => {
   }
 };
 
-export const getStoryIllustrations = async (req, res) => {
-    try {
-        const illustrations = await storyService.getIllustrations(req.params.id);
-        res.json(illustrations);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
-
-export const getNextStory = async (req, res) => {
-    try {
-        const story = await storyService.getNext(req.params.id);
-        res.json(story || null);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
-
-export const getPreviousStory = async (req, res) => {
-    try {
-        const story = await storyService.getPrevious(req.params.id);
-        res.json(story || null);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
-
 export const getStoryNeighbors = async (req, res) => {
     try {
         const neighbors = await storyService.getNeighbors(req.params.id);
@@ -70,6 +43,16 @@ export const createStory = async (req, res) => {
   try {
     const story = await storyService.create(req.body);
     res.status(201).json(story);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+/** Review status (indicative) of several stories: { ids, status }. */
+export const setReviewStatus = async (req, res) => {
+  try {
+    const updated = await storyService.setReviewStatus(req.body?.ids, req.body?.status);
+    res.json({ success: true, updated });
   } catch (error) {
     handleError(res, error);
   }

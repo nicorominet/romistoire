@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from "react";
 import { i18n } from "@/lib/i18n";
 import {
   Card,
@@ -25,7 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RotateCcw, Code2 } from "lucide-react";
 import { toast } from "sonner";
-import { STORAGE_KEYS } from "@/constants";
+import useDarkMode from "@/hooks/useDarkMode";
+import { setTheme, resetTheme } from "@/lib/theme";
 
 interface GeneralSettingsProps {
   devMode: boolean;
@@ -35,43 +35,21 @@ interface GeneralSettingsProps {
 /**
  * GeneralSettings Component
  * 
- * Manages global application settings like Theme (Dark/Light), Auto-save, and Developer Mode.
+ * Manages global application settings: Theme (Dark/Light) and Developer Mode.
  * Settings are persisted in LocalStorage.
  */
 export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsProps) => {
   const { t, changeLocale } = i18n;
 
-  // Initialize state based on DOM class (for theme) to prevent mismatch
-  const [darkMode, setDarkMode] = useState<boolean>(
-    document.documentElement.classList.contains("dark")
-  );
-  const [autoSave, setAutoSave] = useState<boolean>(true);
-
-  // Load persisted settings on mount
-  useEffect(() => {
-    const savedAutoSave = localStorage.getItem(STORAGE_KEYS.AUTO_SAVE);
-    if (savedAutoSave !== null) {
-      setAutoSave(savedAutoSave === "true");
-    }
-  }, []);
+  // Follows the "dark" class on <html>
+  const darkMode = useDarkMode();
 
   /**
    * Toggles Dark Mode and updates DOM + LocalStorage.
    */
   const handleDarkModeToggle = (checked: boolean) => {
-    setDarkMode(checked);
-    document.documentElement.classList.toggle("dark", checked);
-    localStorage.setItem(STORAGE_KEYS.THEME, checked ? "dark" : "light");
+    setTheme(checked ? "dark" : "light");
     toast.success(t("settings.appearanceChanged"));
-  };
-
-  /**
-   * Toggles Auto Save and updates LocalStorage.
-   */
-  const handleAutoSaveToggle = (checked: boolean) => {
-    setAutoSave(checked);
-    localStorage.setItem(STORAGE_KEYS.AUTO_SAVE, checked.toString());
-    toast.success(t("settings.autoSaveChanged"));
   };
 
   /**
@@ -79,17 +57,14 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
    */
   const handleResetSettings = () => {
     try {
-      // 1. Reset Language
+      // 1. Theme: back to the OS preference
+      resetTheme();
+
+      // 2. Developer mode off
+      onToggleDevMode(false);
+
+      // 3. Language: French (remounts the page, so it goes last)
       changeLocale("fr");
-      
-      // 2. Reset Theme to Light
-      setDarkMode(false);
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem(STORAGE_KEYS.THEME, "light");
-      
-      // 3. Reset AutoSave to True
-      setAutoSave(true);
-      localStorage.setItem(STORAGE_KEYS.AUTO_SAVE, "true");
 
       toast.success(t("settings.settingsReset"));
     } catch (error) {
@@ -109,7 +84,7 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="dark-mode">{t("settings.darkMode")}</Label>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {t("settings.darkModeDescription")}
             </p>
           </div>
@@ -122,23 +97,6 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
         
         <Separator />
         
-        {/* Auto Save Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="auto-save">{t("settings.autoSave")}</Label>
-            <p className="text-sm text-gray-500">
-              {t("settings.autoSaveDescription")}
-            </p>
-          </div>
-          <Switch
-            id="auto-save"
-            checked={autoSave}
-            onCheckedChange={handleAutoSaveToggle}
-          />
-        </div>
-        
-        <Separator />
-        
         {/* Developer Mode Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
@@ -146,7 +104,7 @@ export const GeneralSettings = ({ devMode, onToggleDevMode }: GeneralSettingsPro
               <Code2 className="h-4 w-4" />
               {t("settings.developerMode")}
             </Label>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {t("settings.developerModeDescription")}
             </p>
           </div>

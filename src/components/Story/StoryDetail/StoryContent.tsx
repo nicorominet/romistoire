@@ -1,6 +1,4 @@
 import DOMPurify from 'dompurify';
-import { i18n } from '@/lib/i18n';
-import useDarkMode from '@/hooks/useDarkMode';
 
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
@@ -9,8 +7,6 @@ interface StoryContentProps {
 }
 
 const StoryContent = ({ story }: StoryContentProps) => {
-  const { t } = i18n;
-  const darkMode = useDarkMode();
 
   const illustrations = story.illustrations || [];
   const hasIllustrations = illustrations.length > 0;

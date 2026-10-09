@@ -14,6 +14,7 @@ const StoryDetailPage = lazy(() => import("./pages/StoryDetailPage"));
 const CreateStoryPage = lazy(() => import("./pages/CreateStoryPage"));
 const EditStoryPage = lazy(() => import("./pages/EditStoryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const GenerationPage = lazy(() => import("@/pages/GenerationPage"));
 const TimelinePage = lazy(() => import("@/pages/TimelinePage"));
 const ThemesPage = lazy(() => import("@/pages/ThemesPage"));
 const WeeklyTopicsPage = lazy(() => import("@/pages/WeeklyTopicsPage"));
@@ -57,6 +58,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
 import { logger } from "@/lib/logger";
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { useLocale } from "@/lib/i18n";
 
 const GlobalLogger = () => {
     const location = useLocation();
@@ -111,10 +113,13 @@ const GlobalLogger = () => {
 };
 
 // Root layout: everything that needs the router context (logger, error boundary, lazy pages)
-const RootLayout = () => (
+const RootLayout = () => {
+  // Route elements are created once: remount the page so every text is translated again
+  const locale = useLocale();
+  return (
   <>
     <GlobalLogger />
-    <ErrorBoundary>
+    <ErrorBoundary key={locale}>
       <Suspense fallback={
         <div className="flex h-screen w-full items-center justify-center">
           <Spinner className="h-12 w-12 text-primary" />
@@ -124,7 +129,8 @@ const RootLayout = () => (
       </Suspense>
     </ErrorBoundary>
   </>
-);
+  );
+};
 
 // Data router: required by useBlocker (unsaved changes guard on create/edit pages)
 const router = createBrowserRouter([
@@ -138,6 +144,7 @@ const router = createBrowserRouter([
       { path: "/edit/:id", element: <EditStoryPage /> },
       { path: "/series-management", element: <SeriesManagementPage /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/generation", element: <GenerationPage /> },
       // Old URL of the themes page
       { path: "/theme", element: <Navigate to="/themes" replace /> },
       { path: "/weekly-themes", element: <WeeklyTopicsPage /> },

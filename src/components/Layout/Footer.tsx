@@ -1,16 +1,8 @@
 import { i18n } from "@/lib/i18n";
-import { useState, useEffect } from "react";
-import { STORAGE_KEYS } from "@/constants";
-import useDarkMode from '@/hooks/useDarkMode';
 
 const Footer = () => {
   const { t } = i18n;
   const currentYear = new Date().getFullYear();
-  const darkMode = useDarkMode();
-  useEffect(() => {
-    const storedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    document.documentElement.classList.toggle('dark', storedTheme === 'dark');  }, []);
-
 
   return (
     <footer className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-t border-white/20 dark:border-white/5 py-3">

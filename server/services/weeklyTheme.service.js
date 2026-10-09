@@ -1,5 +1,9 @@
 import { query } from '../config/database.js';
 import { ValidationError } from '../middleware/error.middleware.js';
+import { geminiService } from './gemini.service.js';
+import { localLLMService } from './local_llm.service.js';
+import { settingsService } from './settings.service.js';
+import { TOPIC_SUGGESTION_SYSTEM, buildTopicSuggestionPrompt, parseTopicSuggestions } from './helpers/topic_suggestion.helper.js';
 
 const MAX_WEEK = 53;
 const NAME_MAX = 150;
@@ -67,6 +71,27 @@ class WeeklyThemeService {
     const week = this._toWeek(weekNumber, Number.MAX_SAFE_INTEGER);
     await query('DELETE FROM weekly_themes WHERE week_number = ?', [week]);
     return true;
+  }
+
+  /**
+   * AI suggestions for weeks of the program (nothing is saved: the user picks what to keep).
+   * Same provider choice as the illustration descriptions: Gemini, unless Ollama is chosen or Gemini has no key.
+   * @param {number[]} weeks - 1 to 53, at most 26 at a time.
+   * @returns {Promise<{week: number, name: string, description: string}[]>}
+   */
+  async suggest(weeks) {
+    const list = [...new Set((Array.isArray(weeks) ? weeks : []).map(Number))]
+      .filter(week => Number.isInteger(week) && week >= 1 && week <= MAX_WEEK)
+      .sort((a, b) => a - b);
+    if (list.length === 0) throw new ValidationError('Choose at least one week');
+    if (list.length > 26) throw new ValidationError('At most 26 weeks at a time');
+
+    const existing = await this.findAll();
+    const ai = settingsService.ai.defaultProvider !== 'local' && geminiService.apiKey ? geminiService : localLLMService;
+    const { text } = await ai.generateText(TOPIC_SUGGESTION_SYSTEM, buildTopicSuggestionPrompt(list, existing), 'TopicSuggestion', { maxOutputTokens: 4000 });
+    const suggestions = parseTopicSuggestions(text, list);
+    if (suggestions.length === 0) throw new Error('The AI answer could not be read. Try again.');
+    return suggestions;
   }
 
   /**

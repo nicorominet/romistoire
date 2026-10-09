@@ -1,7 +1,6 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { logger } from '@/lib/logger';
-import { X, RefreshCw, Trash2, Filter, AlertTriangle, Info, Bug } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { X, RefreshCw, Trash2, AlertTriangle, Info, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { API_ENDPOINTS } from '@/constants';

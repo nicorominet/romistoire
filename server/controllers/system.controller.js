@@ -1,13 +1,5 @@
 import { systemService } from '../services/system.service.js';
 import { handleError } from '../middleware/error.middleware.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-import { ENV_CONFIG } from '../config/env.config.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export const importData = async (req, res) => {
     try {
@@ -69,24 +61,6 @@ export const uploadImage = async (req, res) => {
     }
 };
 
-export const getLogs = async (req, res) => {
-    try {
-        const logs = await systemService.getLogsList();
-        res.json(logs);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
-
-export const getLogDetails = async (req, res) => {
-    try {
-        const logs = await systemService.getLogContent(req.params.filename);
-        res.json(logs);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
-
 export const getLogConfig = async (req, res) => {
     try {
         const config = systemService.getLogConfig();
@@ -103,19 +77,4 @@ export const updateLogConfig = async (req, res) => {
     } catch (error) {
         handleError(res, error);
     }
-};
-
-export const serveImage = async (req, res) => {
-  try {
-    const { yearMonth, filename } = req.params;
-    const { filePath, mimeType } = systemService.serveImage(yearMonth, filename);
-    
-    res.setHeader('Content-Type', mimeType);
-    fs.createReadStream(filePath).pipe(res);
-  } catch (error) {
-    if (error.message === 'Image not found') {
-        return res.status(404).json({ error: 'Image not found' });
-    }
-    res.status(500).json({ error: 'Failed to serve image' });
-  }
 };

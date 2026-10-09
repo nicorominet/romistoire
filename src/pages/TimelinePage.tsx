@@ -4,7 +4,7 @@ import PageLayout from "@/components/Layout/PageLayout";
 import { i18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import "@/App.css";
-import { getAgeGroupColor, storyPreview } from "@/lib/utils";
+import { storyPreview } from "@/lib/utils";
 import useDarkMode from '@/hooks/useDarkMode';
 import SafeImage from "@/components/ui/SafeImage";
 import { storyApi } from "@/api/stories.api";
@@ -76,19 +76,7 @@ const TimelinePage: React.FC = () => {
   const { t } = i18n;
   const { deleteStory } = useStoryMutations();
   const [storyToDelete, setStoryToDelete] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState<boolean>(false);
 
-  // ... (hasActiveFilters logic)
-  const hasActiveFilters = 
-    selectedAgeGroup !== null || 
-    selectedTheme !== null || 
-    selectedWeek !== null || 
-    selectedSeries !== 'all' ||
-    searchTerm !== '' ||
-    hasImage !== 'all' ||
-    hasAudio !== 'all' ||
-    selectedSource !== 'all' ||
-    selectedEditStatus !== 'all';
 
   const handleSearch = () => setDebouncedSearchTerm(searchTerm);
   

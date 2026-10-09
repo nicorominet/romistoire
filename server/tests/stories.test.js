@@ -24,8 +24,6 @@ vi.mock('../services/story.service.js', () => ({
     restoreVersion: vi.fn(),   // Added missing mock
     getAvailableWeeks: vi.fn(),// Added missing mock
     getIllustrations: vi.fn(), // Added missing mock
-    getNext: vi.fn(),          // Added missing mock
-    getPrevious: vi.fn(),      // Added missing mock
   }
 }));
 
@@ -161,29 +159,5 @@ describe('Story API', () => {
            expect(res.status).toBe(200);
            expect(res.body).toHaveProperty('success', true);
        });
-  });
-
-  describe('GET /api/stories/:id/next', () => {
-      it('should return next story', async () => {
-          const next = { id: '2' };
-          storyService.getNext.mockResolvedValue(next);
-          
-          const res = await request(app).get('/api/stories/1/next');
-          
-          expect(res.status).toBe(200);
-          expect(res.body).toEqual(next);
-      });
-  });
-
-  describe('GET /api/stories/:id/previous', () => {
-      it('should return previous story', async () => {
-          const prev = { id: '0' };
-          storyService.getPrevious.mockResolvedValue(prev);
-          
-          const res = await request(app).get('/api/stories/1/previous');
-          
-          expect(res.status).toBe(200);
-          expect(res.body).toEqual(prev);
-      });
   });
 });

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 import { migrateThemes } from './theme.migration.js';
+import { migrateGeneration } from './generation.migration.js';
 
 dotenv.config();
 
@@ -20,7 +21,10 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true // Ensure this is enabled for init scripts
+  multipleStatements: true, // Ensure this is enabled for init scripts
+  // The app writes every DATETIME as a UTC string ("2026-10-09 12:47:05"): read them back as UTC too
+  // (the default, local time, shifted every displayed time by the server offset)
+  timezone: 'Z'
 };
 
 console.log('Initializing database connection with config:', {
@@ -33,6 +37,13 @@ console.log('Initializing database connection with config:', {
 let pool;
 try {
   pool = mysql.createPool(dbConfig);
+  // MySQL's own clock (column defaults such as CURRENT_TIMESTAMP) in UTC as well.
+  // Commands of a connection run in order: this one always runs before its first query.
+  pool.on('connection', (connection) => {
+    connection.query("SET time_zone = '+00:00'", (error) => {
+      if (error) console.error('Could not set the session time zone to UTC:', error.message);
+    });
+  });
   if (process.env.NODE_ENV !== 'production') {
     pool.getConnection()
       .then(connection => {
@@ -54,17 +65,6 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-function dbLogger(operation, details, duration) {
-  const timestamp = new Date().toISOString();
-  const log = {
-    timestamp,
-    operation,
-    duration: duration ? `${duration}ms` : undefined,
-    ...details
-  };
-  if (operation.includes('error')) console.error('DB Error:', log);
-  else if (process.env.NODE_ENV !== 'production') console.log('DB:', log);
-}
 
 export async function query(sql, params = []) {
   const start = Date.now();
@@ -224,6 +224,7 @@ export async function initializeDatabase() {
         console.log('Migration: illustration_prompt column added to stories.');
       }
 
+      await migrateGeneration(pool);
       await migrateThemes(pool);
     } catch (migError) {
        console.error("Migration Failed:", migError);

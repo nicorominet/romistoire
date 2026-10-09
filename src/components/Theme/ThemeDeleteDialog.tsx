@@ -99,5 +99,3 @@ export const ThemeDeleteDialog = ({ theme, themes, mode = "delete", defaultRepla
     </AlertDialog>
   );
 };
-
-export default ThemeDeleteDialog;

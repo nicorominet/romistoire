@@ -48,6 +48,21 @@ describe('GeminiService', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('should try the next audio model when one rejects the request (400)', async () => {
+    const audioBody = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: Buffer.from([0, 0]).toString('base64') } }] } }] };
+    fetch
+      .mockResolvedValueOnce(jsonResponse(400, { error: { message: 'Request contains an invalid argument.' } }))
+      .mockResolvedValueOnce(jsonResponse(200, audioBody));
+
+    const { value, error } = await run(geminiService.generateAudio('Il était une fois'));
+
+    expect(error).toBeUndefined();
+    expect(value.extension).toBe('wav');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    // The rejecting model is skipped by the next calls
+    expect(modelCooldowns.reason(fetch.mock.calls[0][0].match(/models\/([^:]+):/)[1])).toBe('invalid request');
+  });
+
   it('should retry the same model on 503 then succeed', async () => {
     fetch
       .mockResolvedValueOnce(jsonResponse(503, { error: { message: 'overloaded' } }))
@@ -204,6 +219,8 @@ describe('buildStoryRequestBody', () => {
 
     const day = buildStoryRequestBody('gemini-3.5-flash-lite', 'S', 'P', 8192).generationConfig.responseSchema;
     expect(day.properties.stories.minItems).toBeUndefined();
+    // 2 or 3 tags per story
+    expect(day.properties.stories.items.properties.themes).toMatchObject({ minItems: 2, maxItems: 3 });
   });
 
   it('should require the paragraphs of the age group, and the week context on the first day', () => {

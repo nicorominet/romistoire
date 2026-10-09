@@ -22,7 +22,6 @@ interface LogEntry {
 class LoggerService {
     private buffer: LogEntry[] = [];
     private flushInterval: number = 2000; // 2 seconds
-    private intervalId: NodeJS.Timeout | null = null;
     private maxBufferSize = 50;
 
     constructor() {
@@ -39,7 +38,7 @@ class LoggerService {
     }
 
     private startFlushInterval() {
-        this.intervalId = setInterval(() => this.flush(), this.flushInterval);
+        setInterval(() => this.flush(), this.flushInterval);
     }
 
     public log(category: LogCategory, message: string, data?: any, level: LogLevel = 'INFO') {

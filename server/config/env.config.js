@@ -19,6 +19,9 @@ export const ENV_CONFIG = {
   
   // Absolute path to uploads directory
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),
+  // Automatic and manual backups (Settings > Storage)
+  BACKUPS_DIR: path.join(PROJECT_ROOT, 'backups'),
+  LOGS_DIR: path.join(PROJECT_ROOT, 'server', 'logs'),
   PROJECT_ROOT, // Exporting for use where paths are relative to root
 
   // Test runs (Vitest) must not write into the real log files

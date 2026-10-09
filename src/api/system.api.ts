@@ -4,6 +4,7 @@ import {
     LogEntry, 
     AccessLogFile, 
     CleanupResponse, 
+    ImportResponse,
     LogConfig 
 } from '../types/system.types';
 
@@ -37,9 +38,9 @@ export const systemApi = {
   /**
    * Imports data from a JSON or ZIP backup.
    * @param {FormData} formData - Contains 'file' and 'mode' ('skip' | 'overwrite').
-   * @returns {Promise<{ success: boolean, message: string }>} Import result.
+   * @returns {Promise<ImportResponse>} Import result (row counts).
    */
-  importData: (formData: FormData) => client.post(API_ENDPOINTS.IMPORT_DATA, formData, {
+  importData: (formData: FormData) => client.post<ImportResponse>(API_ENDPOINTS.IMPORT_DATA, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
   }),
 
@@ -47,13 +48,13 @@ export const systemApi = {
    * Exports data as a JSON file.
    * @returns {Promise<Blob>} Binary blob of the JSON file.
    */
-  exportData: () => client.get(API_ENDPOINTS.EXPORT_DATA, { responseType: 'blob' }),
+  exportData: () => client.get<Blob>(API_ENDPOINTS.EXPORT_DATA, { responseType: 'blob' }),
 
   /**
    * Exports full data including images as a ZIP archive.
    * @returns {Promise<Blob>} Binary blob of the ZIP file.
    */
-  exportFull: () => client.get(API_ENDPOINTS.EXPORT_FULL, { responseType: 'blob' }),
+  exportFull: () => client.get<Blob>(API_ENDPOINTS.EXPORT_FULL, { responseType: 'blob' }),
 
   /**
    * Exports a story as PDF.
@@ -68,13 +69,6 @@ export const systemApi = {
    */
   getLogs: () => client.get<LogEntry[]>(API_ENDPOINTS.LOGS),
 
-  /**
-   * Retrieves specific log file details.
-   * @param {string} filename - Name of the log file.
-   * @returns {Promise<LogEntry[]>} List of log entries from the file.
-   */
-  getLogDetails: (filename: string) => client.get<LogEntry[]>(`${API_ENDPOINTS.LOGS}/${filename}`),
-  
   /**
    * Retrieves list of available access log files.
    * @returns {Promise<AccessLogFile[]>} List of log files.

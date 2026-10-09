@@ -48,5 +48,3 @@ export const ThemeBadgeList = ({ themes, max, className, ...badgeProps }: ThemeB
     </div>
   );
 };
-
-export default ThemeBadgeList;

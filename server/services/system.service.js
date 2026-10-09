@@ -21,6 +21,28 @@ export const toStoredPath = (absolutePath) =>
   path.relative(ENV_CONFIG.PROJECT_ROOT, absolutePath).split(path.sep).join('/');
 
 /**
+ * Number of files and total size of a directory, recursively (missing directory: zeros).
+ * @param {string} dir
+ * @returns {{files: number, bytes: number}}
+ */
+export const dirUsage = (dir) => {
+  const usage = { files: 0, bytes: 0 };
+  if (!fs.existsSync(dir)) return usage;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const sub = dirUsage(entryPath);
+      usage.files += sub.files;
+      usage.bytes += sub.bytes;
+    } else if (entry.isFile()) {
+      usage.files++;
+      usage.bytes += fs.statSync(entryPath).size;
+    }
+  }
+  return usage;
+};
+
+/**
  * Service for system-level operations like data import/export, file management, and logs.
  */
 class SystemService {
@@ -28,7 +50,7 @@ class SystemService {
    * Import data from a JSON or ZIP file.
    * @param {Object} file - The uploaded file object from multer.
    * @param {'skip'|'overwrite'} [mode='skip'] - Import mode.
-   * @returns {Promise<{success: boolean}>} Result of import.
+   * @returns {Promise<{success: boolean, inserted: number, skipped: number, failed: number}>} Result of import (row counts).
    * @throws {Error} If file format is invalid or import fails.
    */
   async importData(file, mode = 'skip') {
@@ -65,7 +87,7 @@ class SystemService {
 
       if (!dataToImport) throw new Error('No data found to import.');
 
-      const { stories, versions, illustrations, weeklyThemes: rawWeeklyThemes, themes: rawThemes, storyThemes: rawStoryThemes, storySeries } = dataToImport;
+      const { stories, versions, illustrations, weeklyThemes: rawWeeklyThemes, themes: rawThemes, storyThemes: rawStoryThemes, versionThemes: rawVersionThemes, storySeries, generationJobs, generationUnits } = dataToImport;
 
       // Themes are unique by normalized name: an imported "Nature" reuses the local "nature",
       // and the story / week links of the imported id are moved to the local theme.
@@ -87,15 +109,24 @@ class SystemService {
       }
       const mapThemeId = (row) => (row.theme_id && themeIdMap.has(row.theme_id) ? { ...row, theme_id: themeIdMap.get(row.theme_id) } : row);
       const storyThemes = (rawStoryThemes || []).map(mapThemeId);
+      const versionThemes = (rawVersionThemes || []).map(mapThemeId);
       // Week topics are free text: unknown columns (theme_id from older exports) are ignored by insertData
       const weeklyThemes = rawWeeklyThemes || [];
+
+      // FOREIGN_KEY_CHECKS is a session variable: every statement must run on the same connection
+      const connection = await getConnection();
+      const run = async (sql, params = []) => {
+        const [rows] = await connection.query(sql, params);
+        return rows;
+      };
+      const stats = { inserted: 0, skipped: 0, failed: 0 };
 
       const insertData = async (tableName, data) => {
         if (!data || data.length === 0) return;
 
         let validColumns = [];
         try {
-          const columnsResult = await query(`SHOW COLUMNS FROM ${tableName}`);
+          const columnsResult = await run(`SHOW COLUMNS FROM ${tableName}`);
           validColumns = columnsResult.map(row => row.Field);
         } catch (err) { return; }
         
@@ -121,34 +152,43 @@ class SystemService {
             if (!columns.includes(pkColumn)) continue;
 
             const pkValue = item[pkColumn];
-            const existing = await query(`SELECT 1 FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+            const existing = await run(`SELECT 1 FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
 
             if (existing && existing.length > 0) {
               if (mode === 'overwrite') {
-                  await query(`DELETE FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+                  await run(`DELETE FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
               } else {
+                  stats.skipped++;
                   continue;
               }
             }
 
             const placeholders = columns.map(() => '?').join(', ');
-            await query(`INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`, values);
+            await run(`INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`, values);
+            stats.inserted++;
           } catch (error) {
+            stats.failed++;
             console.error(`Error inserting/updating ${tableName}:`, error);
           }
         }
       };
 
       try {
-        await query('SET FOREIGN_KEY_CHECKS = 0');
-        await insertData('story_series', storySeries);
-        await insertData('themes', themes);
-        await insertData('weekly_themes', weeklyThemes);
-        await insertData('stories', stories);
-        await insertData('story_themes', storyThemes);
-        await insertData('story_versions', versions);
-        await insertData('illustrations', illustrations);
-        await query('SET FOREIGN_KEY_CHECKS = 1');
+        try {
+          await run('SET FOREIGN_KEY_CHECKS = 0');
+          await insertData('story_series', storySeries);
+          await insertData('themes', themes);
+          await insertData('weekly_themes', weeklyThemes);
+          await insertData('stories', stories);
+          await insertData('story_themes', storyThemes);
+          await insertData('story_versions', versions);
+          await insertData('story_version_themes', versionThemes);
+          await insertData('illustrations', illustrations);
+          await insertData('generation_jobs', generationJobs);
+          await insertData('generation_units', generationUnits);
+        } finally {
+          try { await run('SET FOREIGN_KEY_CHECKS = 1'); } finally { connection.release(); }
+        }
         themeService.invalidateCache();
 
         if (imagesDir && fs.existsSync(imagesDir)) {
@@ -172,15 +212,12 @@ class SystemService {
             };
             copyImages(imagesDir, targetUploads);
         }
-      } catch (error) {
-         try { await query('SET FOREIGN_KEY_CHECKS = 1'); } catch (e) {}
-         throw error;
       } finally {
          if (tempDir && fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
          }
       }
-      return { success: true };
+      return { success: true, ...stats };
   }
 
   /**
@@ -195,7 +232,10 @@ class SystemService {
     const weeklyThemes = await query('SELECT * FROM weekly_themes');
     const themes = await query('SELECT * FROM themes');
     const storyThemes = await query('SELECT * FROM story_themes');
+    const versionThemes = await query('SELECT * FROM story_version_themes');
     const storySeries = await query('SELECT * FROM story_series');
+    const generationJobs = await query('SELECT * FROM generation_jobs');
+    const generationUnits = await query('SELECT * FROM generation_units');
 
     const exportData = {
       stories,
@@ -204,7 +244,10 @@ class SystemService {
       weeklyThemes,
       themes,
       storyThemes,
+      versionThemes,
       storySeries,
+      generationJobs,
+      generationUnits,
       exportDate: new Date().toISOString()
     };
 
@@ -218,9 +261,9 @@ class SystemService {
         if (fs.existsSync(uploadsDir)) {
            zip.addLocalFolder(uploadsDir, "images");
         }
-        return { buffer: zip.toBuffer(), filename: `romihistoire-full-export-${new Date().toISOString().slice(0, 10)}.zip`, type: 'application/zip' };
+        return { buffer: zip.toBuffer(), filename: `imagitales-full-export-${new Date().toISOString().slice(0, 10)}.zip`, type: 'application/zip' };
     } else {
-        return { buffer: Buffer.from(JSON.stringify(exportData, null, 2)), filename: `romihistoire-data-export-${new Date().toISOString().slice(0, 10)}.json`, type: 'application/json' };
+        return { buffer: Buffer.from(JSON.stringify(exportData, null, 2)), filename: `imagitales-data-export-${new Date().toISOString().slice(0, 10)}.json`, type: 'application/json' };
     }
   }
 
@@ -229,7 +272,7 @@ class SystemService {
    * @param {Object} [options]
    * @param {number} [options.minAgeMs=0] - Only remove files older than this. Images uploaded on the
    *   create page are unreferenced until the story is saved: the automatic purge gives them time.
-   * @returns {Promise<{deletedCount: number, reclaimedSpace: number}>} Cleanup stats.
+   * @returns {Promise<{success: boolean, deletedCount: number, reclaimedSpace: number}>} Cleanup stats.
    */
   async cleanupImages({ minAgeMs = 0 } = {}) {
     const illustrations = await query('SELECT image_path FROM illustrations');
@@ -243,7 +286,7 @@ class SystemService {
     let deletedCount = 0;
     let reclaimedSpace = 0;
 
-    if (!fs.existsSync(uploadsDir)) return { deletedCount: 0, reclaimedSpace: 0 };
+    if (!fs.existsSync(uploadsDir)) return { success: true, deletedCount: 0, reclaimedSpace: 0 };
 
     function walkDir(dir) {
       const files = fs.readdirSync(dir);
@@ -267,7 +310,29 @@ class SystemService {
       }
     }
     walkDir(uploadsDir);
-    return { deletedCount, reclaimedSpace };
+    return { success: true, deletedCount, reclaimedSpace };
+  }
+
+  /**
+   * Library counts and disk usage (Settings > Storage).
+   * @returns {Promise<{counts: Object<string, number>, disk: {uploads: DirUsage, logs: DirUsage, debugLog: DirUsage}}>}
+   *   DirUsage = {files: number, bytes: number}.
+   */
+  async getStats() {
+    const tables = { stories: 'stories', versions: 'story_versions', illustrations: 'illustrations', series: 'story_series', themes: 'themes', weeklyThemes: 'weekly_themes' };
+    const counts = {};
+    for (const [key, table] of Object.entries(tables)) {
+      const [row] = await query(`SELECT COUNT(*) AS total FROM ${table}`);
+      counts[key] = Number(row?.total ?? 0);
+    }
+    return {
+      counts,
+      disk: {
+        uploads: dirUsage(ENV_CONFIG.UPLOADS_DIR),
+        logs: dirUsage(ENV_CONFIG.LOGS_DIR),
+        debugLog: dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
+      }
+    };
   }
 
   /**
@@ -285,6 +350,9 @@ class SystemService {
         await connection.query('DELETE FROM stories');
         await connection.query('DELETE FROM story_series');
         await connection.query('DELETE FROM themes');
+        // The generation history points at the deleted stories (units follow by cascade).
+        // The quota statistics stay: they describe requests really sent.
+        await connection.query('DELETE FROM generation_jobs');
         await connection.commit();
       } catch (error) {
         await connection.rollback();
@@ -394,34 +462,6 @@ class SystemService {
    */
   updateLogConfig(config) {
       return logger.updateConfig(config);
-  }
-
-  /**
-   * Serve an uploaded image securely.
-   * @param {string} yearMonth - Year-month folder name.
-   * @param {string} filename - Filename.
-   * @returns {Object} { filePath: string, mimeType: string }
-   */
-  serveImage(yearMonth, filename) {
-      // Security check
-      const safeYearMonth = yearMonth.replace(/[^0-9-]/g, '');
-      const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-      
-      const imagePath = path.join(ENV_CONFIG.UPLOADS_DIR, safeYearMonth, safeFilename);
-      
-      if (!fs.existsSync(imagePath)) {
-          throw new Error('Image not found');
-      }
-      
-      const ext = path.extname(imagePath).toLowerCase();
-      const mimeType = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif'
-      }[ext] || 'application/octet-stream';
-
-      return { filePath: imagePath, mimeType };
   }
 }
 

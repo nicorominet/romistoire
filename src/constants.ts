@@ -3,12 +3,9 @@
  */
 
 export const STORAGE_KEYS = {
-    STORIES: "imagitales-stories",
-    VERSIONS: "imagitales-versions",
-    ILLUSTRATIONS: "imagitales-illustrations",
     DEV_MODE: "devMode",
     THEME: "theme",
-    AUTO_SAVE: "autoSave",
+    LOCALE: "locale",
     LANGUAGES: {
         FR: "fr",
         EN: "en",
@@ -17,7 +14,9 @@ export const STORAGE_KEYS = {
     SETTINGS_TABS: {
         GENERAL: "general",
         LANGUAGE: "language",
+        AI: "ai",
         DATA: "data",
+        STORAGE: "storage",
         NETWORK: "network"
     }
 } as const;
@@ -34,16 +33,21 @@ export const API_ENDPOINTS = {
     ACCESS_LOGS_FILES: '/api/logs/access/files',
     ACCESS_LOGS_CONTENT: '/api/logs/access',
     CONFIG_LOGS: '/api/config/logs',
+    SETTINGS: '/api/settings',
+    SETTINGS_AI_STATUS: '/api/settings/ai-status',
+    SETTINGS_QUOTA_USAGE: '/api/settings/quota-usage',
+    SETTINGS_TEST_OLLAMA: '/api/settings/test-ollama',
+    SETTINGS_STORAGE_STATS: '/api/settings/storage-stats',
+    BACKUPS: '/api/backups',
+    GENERATION_JOBS: '/api/generation-jobs',
     
     // Stories & Content
     STORIES: '/api/stories',
     THEMES: '/api/themes',
-    ALBUMS: '/api/albums', // Potential future use
     SERIES: '/api/series',
     SERIES_STORIES_BATCH: '/api/series/:id/stories/batch', // :id will be replaced dynamically
     WEEKLY_THEMES: '/api/weekly-themes',
     ILLUSTRATIONS: '/api/illustrations',
-    GENERATE: '/api/generate',
 
 } as const;
 
@@ -55,6 +59,8 @@ export const APP_ROUTES = {
     EDIT_STORY: (id: string) => `/edit/${id}`,
     SERIES_MANAGEMENT: '/series-management',
     SETTINGS: '/settings',
+    // Mass generation (server-side jobs, coverage of the program)
+    GENERATION: '/generation',
     TIMELINE: '/timeline',
     // Story themes (tags)
     THEMES: '/themes',
@@ -68,9 +74,7 @@ export const APP_ROUTES = {
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
-// AI generation
-// Stories are generated in French only (prompt and output format are French)
-export const GENERATION_LOCALE = 'fr';
+// AI generation (stories are generated in French only: prompt and output format are French)
 // "Whole week" day value: understood by the server prompt helper (server/services/helpers/prompt.helper.js)
 export const ALL_WEEK = 'Toute la semaine';
 // Day values sent to the prompt, in week order

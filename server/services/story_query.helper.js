@@ -7,7 +7,7 @@ class StoryQueryHelper {
      * @param {Object} params - Filter parameters.
      * @returns {Object} { whereClause, params }
      */
-    buildWhere({ locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, searchTerm, hasImage, hasAudio, seriesId, excludeSeriesId, source, editStatus }) {
+    buildWhere({ locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, searchTerm, hasImage, hasAudio, seriesId, excludeSeriesId, source, editStatus, reviewStatus, generationJobId }) {
         let whereClauses = ['s.locale = ?'];
         let params = [locale];
 
@@ -75,6 +75,17 @@ class StoryQueryHelper {
             } else if (editStatus === 'original') {
                 whereClauses.push('s.is_manually_edited = FALSE');
             }
+        }
+
+        if (reviewStatus === 'to_review' || reviewStatus === 'validated') {
+            whereClauses.push('s.review_status = ?');
+            params.push(reviewStatus);
+        }
+
+        // Stories written by one mass generation job
+        if (generationJobId) {
+            whereClauses.push('s.generation_job_id = ?');
+            params.push(generationJobId);
         }
 
         return { whereClause: whereClauses.join(' AND '), params };

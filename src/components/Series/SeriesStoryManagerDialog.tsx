@@ -8,11 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Series } from "@/types/Series";
-import { useStories, useInfiniteStories } from "@/hooks/useStories";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteStories } from "@/hooks/useStories";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Search, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
-import { storyApi, seriesApi } from "@/api/stories.api";
+import { seriesApi } from "@/api/stories.api";
 import { getAgeGroupColor, cn } from "@/lib/utils";
 import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
 import { Theme } from "@/types/Theme";

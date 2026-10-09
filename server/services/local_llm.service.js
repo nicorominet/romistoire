@@ -2,17 +2,37 @@ import dotenv from 'dotenv';
 import { logger } from './logger.service.js';
 import { PromptHelper, ALL_WEEK } from './helpers/prompt.helper.js';
 import { jsonSchema, STORY_DAYS } from './helpers/story_schema.js';
+import { settingsService } from './settings.service.js';
 dotenv.config();
+
+// Configuration from .env (or the code defaults): Settings > AI generation overrides it, read on every call
+export const OLLAMA_DEFAULTS = Object.freeze({
+  baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+  model: process.env.OLLAMA_MODEL || 'gemma4:e2b',
+  // Local generation is slow (a full week can take minutes): generous default
+  timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS) || 600000
+});
+
+// Temperatures when no creativity is set
+const STORY_TEMPERATURE = 0.8;
+const TEXT_TEMPERATURE = 0.7;
+// "Test connection" must answer quickly
+const LIST_MODELS_TIMEOUT_MS = 5000;
 
 /**
  * Service for interacting with Local LLM via Ollama.
  */
 class LocalLLMService {
-  constructor() {
-    this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-    this.model = process.env.OLLAMA_MODEL || 'gemma4:e2b'; // Default model, can be configured
-    // Local generation is slow (a full week can take minutes): generous default
-    this.timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS) || 600000;
+  get baseUrl() {
+    return settingsService.ai.ollamaBaseUrl ?? OLLAMA_DEFAULTS.baseUrl;
+  }
+
+  get model() {
+    return settingsService.ai.ollamaModel ?? OLLAMA_DEFAULTS.model;
+  }
+
+  get timeoutMs() {
+    return settingsService.ai.ollamaTimeoutMs ?? OLLAMA_DEFAULTS.timeoutMs;
   }
 
   /**
@@ -47,7 +67,7 @@ class LocalLLMService {
                 format: jsonSchema({ withWeekPlan: PromptHelper.wantsWeekPlan(params), storyCount: day === ALL_WEEK ? STORY_DAYS.length : 0 }),
                 stream: false, // We want full response
                 options: {
-                    temperature: 0.8,
+                    temperature: settingsService.ai.creativity ?? STORY_TEMPERATURE,
                     num_ctx: 10000, // Ensure large context for week generation
                     num_predict: -1 // Infinite generation (until stop token)
                 }
@@ -86,15 +106,16 @@ class LocalLLMService {
    * @param {string} system
    * @param {string} prompt
    * @param {string} label - Label for the AI logs.
+   * @param {{maxOutputTokens?: number}} [options]
    * @returns {Promise<{text: string, model: string}>}
    */
-  async generateText(system, prompt, label) {
+  async generateText(system, prompt, label, { maxOutputTokens = 600 } = {}) {
     const startTime = Date.now();
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.model, system, prompt, stream: false, options: { temperature: 0.7, num_predict: 600 } }),
+        body: JSON.stringify({ model: this.model, system, prompt, stream: false, options: { temperature: settingsService.ai.creativity ?? TEXT_TEMPERATURE, num_predict: maxOutputTokens } }),
         signal: AbortSignal.timeout(this.timeoutMs)
       });
       if (!response.ok) throw new Error(`Ollama API Error: ${response.statusText}`);
@@ -111,16 +132,11 @@ class LocalLLMService {
 
   /**
    * Lists available models from the local Ollama instance.
-   * @returns {Promise<string[]>} List of model names.
+   * @returns {Promise<string[]>} List of model names (empty when Ollama does not answer).
    */
   async listModels() {
       try {
-          const response = await fetch(`${this.baseUrl}/api/tags`);
-          if (!response.ok) {
-              throw new Error(`Ollama API Error: ${response.statusText}`);
-          }
-          const data = await response.json();
-          return data.models.map(m => m.name);
+          return await this.fetchModels();
       } catch (error) {
           console.error('[LocalLLM] Failed to list models:', error);
           logger.ai('Ollama', 'ListModels-Error', {}, { error: error.message }, { success: false });
@@ -128,10 +144,23 @@ class LocalLLMService {
       }
   }
 
-  // Audio generation logic (Not supported text-only local LLM)
-  async generateAudio(text) {
-      console.warn("Local LLM does not support audio generation directly. Using dummy or fallback?");
-      throw new Error("Local Audio generation not yet implemented. Please use Cloud provider for Audio or configure local TTS.");
+  /**
+   * Lists the models of an Ollama instance, throwing a readable error (Settings > Test connection).
+   * @param {string} [baseUrl] - Instance to query (default: the configured one).
+   * @returns {Promise<string[]>}
+   */
+  async fetchModels(baseUrl = this.baseUrl) {
+      let response;
+      try {
+          response = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(LIST_MODELS_TIMEOUT_MS) });
+      } catch (error) {
+          throw new Error(error.name === 'TimeoutError'
+              ? `Ollama did not answer within ${LIST_MODELS_TIMEOUT_MS / 1000}s at ${baseUrl}.`
+              : `Ollama is not reachable at ${baseUrl} (${error.cause?.code || error.message}).`);
+      }
+      if (!response.ok) throw new Error(`Ollama API Error ${response.status}: ${response.statusText}`);
+      const data = await response.json();
+      return (data.models || []).map(m => m.name);
   }
 }
 

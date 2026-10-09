@@ -67,7 +67,7 @@ describe('StoryCard', () => {
     };
 
     it('renders story title and excerpt', () => {
-        const { debug } = render(
+        render(
             <MemoryRouter>
                 <StoryCard story={mockStory} />
             </MemoryRouter>

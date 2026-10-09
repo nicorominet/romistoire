@@ -22,9 +22,6 @@ vi.mock('../controllers/system.controller.js', () => ({
   cleanupImages: vi.fn((req, res) => res.json({ cleaned: 5 })),
   resetData: vi.fn((req, res) => res.json({ success: true })),
   uploadImage: vi.fn((req, res) => res.json({ path: '/uploads/image.png' })),
-  getLogs: vi.fn((req, res) => res.json(['log1.log'])),
-  getLogDetails: vi.fn((req, res) => res.json({ logs: [] })),
-  serveImage: vi.fn((req, res) => res.send('image-data')),
   getLogConfig: vi.fn((req, res) => res.json({ level: 'info' })),
   updateLogConfig: vi.fn((req, res) => res.json({ success: true })),
 }));

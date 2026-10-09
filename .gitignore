@@ -43,3 +43,7 @@ uploads/
 temp_import_*/
 public/audio/
 public/audio/
+
+# App settings (Settings page) and backups
+server/config/app-settings.json
+backups/

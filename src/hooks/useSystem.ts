@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { systemApi } from '../api/system.api';
-import { CleanupResponse } from '../types/system.types';
 
 /**
  * Custom hook to handle System and Data mutations.

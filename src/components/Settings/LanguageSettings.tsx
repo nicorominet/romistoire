@@ -1,4 +1,3 @@
-import React from "react";
 import { i18n } from "@/lib/i18n";
 import {
   Card,
@@ -24,18 +23,18 @@ import { STORAGE_KEYS } from "@/constants";
  * LanguageSettings Component
  * 
  * Allows users to switch the application language.
- * Changes are applied immediately using the i18n helper.
+ * Changes are applied immediately (the page is remounted in the new language) and persisted.
+ *
+ * @param {boolean} devMode - Shows the obfuscated debug locale.
  */
-export const LanguageSettings = () => {
+export const LanguageSettings = ({ devMode }: { devMode: boolean }) => {
   const { t, getCurrentLocale, changeLocale } = i18n;
-  const [language, setLanguage] = React.useState<string>(getCurrentLocale() || STORAGE_KEYS.LANGUAGES.FR);
+  const language = getCurrentLocale();
 
   /**
-   * Handles language change events.
-   * Updates state, applies locale change, and notifies the user.
+   * Handles language change events: applies the locale and notifies the user.
    */
   const handleLanguageChange = (value: string) => {
-    setLanguage(value);
     changeLocale(value);
     toast.success(t("settings.languageChanged"));
   };
@@ -56,13 +55,15 @@ export const LanguageSettings = () => {
             <SelectContent>
               <SelectItem value={STORAGE_KEYS.LANGUAGES.EN}>{t("languages.en")}</SelectItem>
               <SelectItem value={STORAGE_KEYS.LANGUAGES.FR}>{t("languages.fr")}</SelectItem>
-              <SelectItem value={STORAGE_KEYS.LANGUAGES.OBF}>Obfuscated (Debug)</SelectItem>
+              {(devMode || language === STORAGE_KEYS.LANGUAGES.OBF) && (
+                <SelectItem value={STORAGE_KEYS.LANGUAGES.OBF}>Obfuscated (Debug)</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
       </CardContent>
       <CardFooter>
-        <div className="flex items-center gap-2 text-blue-600">
+        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
           <Info className="h-5 w-5" />
           <span>{t("settings.languageNote")}</span>
         </div>

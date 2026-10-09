@@ -124,6 +124,11 @@ const StoryCard = ({ story }: StoryCardProps) => {
               {!!story.is_manually_edited && story.source !== 'manual' && (
                 <span className="ml-1 text-[10px] opacity-70 italic">{t('story.source.editedByHuman')}</span>
               )}
+              {story.review_status === 'to_review' && (
+                <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                  {t('review.toReview')}
+                </span>
+              )}
             </div>
           </div>
         </CardFooter>

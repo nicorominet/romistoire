@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { systemApi } from '@/api/system.api';
 import { i18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LogEntry, AccessLogFile, LogConfig } from '@/types/system.types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 /**
  * NetworkSettings Component
@@ -73,6 +74,7 @@ export const NetworkSettings = () => {
             setDebugLogs(entries);
         } catch (error) {
             console.error('Failed to load debug logs', error);
+            toast.error(t('settings.logsLoadError'));
         } finally {
             setLoadingDebug(false);
         }
@@ -90,6 +92,7 @@ export const NetworkSettings = () => {
             }
         } catch (error) {
             console.error('Failed to load access files', error);
+            toast.error(t('settings.logsLoadError'));
         }
     };
 
@@ -105,6 +108,7 @@ export const NetworkSettings = () => {
             }
         } catch (error) {
             console.error('Failed to load ai files', error);
+            toast.error(t('settings.logsLoadError'));
         }
     };
 
@@ -116,6 +120,7 @@ export const NetworkSettings = () => {
             setAccessLogs(entries);
         } catch (error) {
             console.error('Failed to load access log content', error);
+            toast.error(t('settings.logsLoadError'));
         } finally {
             setLoadingAccess(false);
         }
@@ -130,6 +135,7 @@ export const NetworkSettings = () => {
             setAiLogs(entries);
         } catch (error) {
             console.error('Failed to load ai log content', error);
+            toast.error(t('settings.logsLoadError'));
         } finally {
             setLoadingAi(false);
         }
@@ -142,6 +148,7 @@ export const NetworkSettings = () => {
             if (cfg) setConfig(cfg);
         } catch (error) {
            console.error('Failed to load log config', error);
+            toast.error(t('settings.logsLoadError'));
         }
     };
 
@@ -179,6 +186,7 @@ export const NetworkSettings = () => {
         } catch (error) {
             // Revert on error
             console.error('Failed to update config', error);
+            toast.error(t('settings.logConfigError'));
             loadConfig(); 
         }
     };
@@ -436,6 +444,22 @@ export const NetworkSettings = () => {
                                         checked={config.enableAccessLogging} 
                                         onCheckedChange={(checked) => handleConfigChange({ enableAccessLogging: checked })}
                                     />
+                               </div>
+                               <div className="flex items-center justify-between">
+                                    <Label htmlFor="min-level">{t('settings.network.config.minLevel')}</Label>
+                                    <Select
+                                        value={config.minLevel}
+                                        onValueChange={(minLevel) => handleConfigChange({ minLevel })}
+                                    >
+                                        <SelectTrigger id="min-level" className="w-[140px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {['INFO', 'WARN', 'ERROR'].map((level) => (
+                                                <SelectItem key={level} value={level}>{level}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                </div>
                             </CardContent>
                         </Card>

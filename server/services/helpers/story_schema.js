@@ -21,8 +21,11 @@ export const GEMINI_RESPONSE_SCHEMA = {
           day: { type: 'STRING', enum: STORY_DAYS },
           title: { type: 'STRING' },
           summary: { type: 'STRING' },
+          // 2 or 3 tags: the precise subject of the story, then 1 or 2 values (see PromptHelper.getThemesPrompt)
           themes: {
             type: 'ARRAY',
+            minItems: 2,
+            maxItems: 3,
             items: {
               type: 'OBJECT',
               properties: {
@@ -62,6 +65,8 @@ export const JSON_SCHEMA = {
           summary: { type: 'string' },
           themes: {
             type: 'array',
+            minItems: 2,
+            maxItems: 3,
             items: {
               type: 'object',
               properties: {

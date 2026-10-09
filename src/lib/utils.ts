@@ -31,47 +31,6 @@ function stripHtmlTags(html: string): string {
   return text.trim(); // Trim leading/trailing spaces
 }
 
-async function optimizeImage(imageData: string, maxSizeKB = 500): Promise<string> {
-  if (!imageData.startsWith('data:image')) {
-    return imageData;
-  }
-
-  const getImageSize = (data: string): number => {
-    const base64Length = data.split(',')[1].length;
-    return (base64Length * 3) / 4;
-  };
-
-  const currentSize = getImageSize(imageData) / 1024; // Convert to KB
-  if (currentSize <= maxSizeKB) {
-    return imageData;
-  }
-
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-
-      // Réduire progressivement la taille jusqu'à atteindre la taille cible
-      const scale = Math.sqrt(maxSizeKB / currentSize);
-      width *= scale;
-      height *= scale;
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(imageData);
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
-    };
-    img.src = imageData;
-  });
-}
 
 
 function formatDate(dateString: string | Date, locale: string = 'fr'): string {
@@ -111,4 +70,4 @@ function storyPreview(content: string | null | undefined, maxLength: number): st
   return truncateText(storyPlainText(content), maxLength);
 }
 
-export { cn, getAgeGroupColor, stripHtmlTags, optimizeImage, formatDate, truncateText, storyPlainText, storyPreview };
+export { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, storyPlainText, storyPreview };

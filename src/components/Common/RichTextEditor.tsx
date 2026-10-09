@@ -42,7 +42,6 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
     if (editor && content) {
       // Check if current editor content matches the prop content
       // We need to parse legacy content slightly differently to ensure paragraphs are respected
-      const editorHTML = editor.getHTML();
       
       // If content is HTML (TipTap), it's fine. 
       // If content is plain text (Legacy), we want to convert newlines to paragraphs

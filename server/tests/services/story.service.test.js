@@ -82,6 +82,19 @@ describe('StoryService Unit Tests', () => {
     });
 
     describe('create', () => {
+        it('should refuse an empty or invalid story with every field in error', async () => {
+            const { ValidationError } = await import('../../middleware/error.middleware.js');
+            let error;
+            try {
+                await storyService.create({ title: ' ', content: '<p></p>', ageGroup: '5-8', weekNumber: 0, themes: [] });
+            } catch (e) {
+                error = e;
+            }
+            expect(error).toBeInstanceOf(ValidationError);
+            expect(error.details.fields).toHaveLength(4);
+            expect(db.getConnection).not.toHaveBeenCalled();
+        });
+
         it('should store the AI illustration prompt', async () => {
             const connection = {
                 query: vi.fn(async () => [[]]),
@@ -95,8 +108,12 @@ describe('StoryService Unit Tests', () => {
             await storyService.create({ title: 'T', content: 'C', ageGroup: '4-6', weekNumber: 1, dayOfWeek: 'Monday', locale: 'fr', source: 'gemini', illustrationPrompt: 'Un escargot', themes: [] });
 
             const insert = connection.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO stories'));
-            expect(insert[0]).toContain('illustration_prompt');
-            expect(insert[1][insert[1].length - 1]).toBe('Un escargot');
+            const columns = insert[0].match(/\(([^)]*)\)/)[1].split(',').map(c => c.trim());
+            const value = (column) => insert[1][columns.indexOf(column)];
+            expect(value('illustration_prompt')).toBe('Un escargot');
+            // An AI story waits for a human review
+            expect(value('review_status')).toBe('to_review');
+            expect(value('generation_job_id')).toBeNull();
         });
     });
 
@@ -126,6 +143,13 @@ describe('StoryService Unit Tests', () => {
         };
 
         const updateCall = (connection) => connection.query.mock.calls.find(([sql]) => sql.includes('UPDATE stories'));
+        /** Value sent for a column of the UPDATE ("col = ?" placeholders, in order; literal values skipped). */
+        const updatedValue = (connection, column) => {
+            const [sql, params] = updateCall(connection);
+            const assignments = sql.slice(sql.indexOf('SET') + 3, sql.indexOf('WHERE')).split(',').map(a => a.trim());
+            const placeholders = assignments.filter(a => a.endsWith('?')).map(a => a.split('=')[0].trim());
+            return params[placeholders.indexOf(column)];
+        };
 
         it('should persist the selected series', async () => {
             const connection = setupConnection({ existingSeries: [{ id: 'series-a' }] });
@@ -134,7 +158,7 @@ describe('StoryService Unit Tests', () => {
 
             const [sql, params] = updateCall(connection);
             expect(sql).toContain('series_id = ?');
-            expect(params[params.length - 3]).toBe('series-a');
+            expect(updatedValue(connection, 'series_id')).toBe('series-a');
         });
 
         it('should remove the series when an empty name is sent', async () => {
@@ -143,8 +167,7 @@ describe('StoryService Unit Tests', () => {
 
             await storyService.update('story-1', { title: 'T', content: 'C', age_group: '4-6', week_number: 1, day_order: 1, locale: 'fr', series_name: '', themes: [] });
 
-            const [, params] = updateCall(connection);
-            expect(params[params.length - 3]).toBeNull();
+            expect(updatedValue(connection, 'series_id')).toBeNull();
             oldStory.series_id = null;
         });
 
@@ -154,8 +177,7 @@ describe('StoryService Unit Tests', () => {
 
             await storyService.update('story-1', { title: 'T2', content: 'C', themes: [] });
 
-            const [, params] = updateCall(connection);
-            expect(params[params.length - 3]).toBe('series-a');
+            expect(updatedValue(connection, 'series_id')).toBe('series-a');
             expect(connection.query).not.toHaveBeenCalledWith(expect.stringContaining('SELECT id, series_id FROM stories'), expect.anything());
             oldStory.series_id = null;
         });
@@ -168,7 +190,7 @@ describe('StoryService Unit Tests', () => {
 
             const [sql, params] = updateCall(connection);
             expect(sql).toContain('illustration_prompt = ?');
-            expect(params[params.length - 2]).toBe('Un escargot sur une feuille');
+            expect(updatedValue(connection, 'illustration_prompt')).toBe('Un escargot sur une feuille');
             delete oldStory.illustration_prompt;
         });
 
@@ -201,6 +223,45 @@ describe('StoryService Unit Tests', () => {
             expect(connection.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO story_series'), expect.arrayContaining(['Série Principale (Alias 1)']));
             // The client is told, so it can warn the user
             expect(result.aliasSeries).toEqual({ id: expect.any(String), name: 'Série Principale (Alias 1)' });
+        });
+
+        it('should keep the audio when only the themes change, and delete it when the text changes', async () => {
+            const { fileCleanup } = await import('../../services/helpers/file_cleanup.helper.js');
+            const remove = vi.spyOn(fileCleanup, 'removeAudioIfUnused').mockResolvedValue(undefined);
+            oldStory.audio_path = '/uploads/audio/a.wav';
+
+            let connection = setupConnection();
+            await storyService.update('story-1', { title: 'T', content: 'C', themes: [{ id: 't1', isPrimary: true }] });
+            expect(updatedValue(connection, 'audio_path')).toBe('/uploads/audio/a.wav');
+            expect(remove).not.toHaveBeenCalled();
+
+            connection = setupConnection();
+            await storyService.update('story-1', { title: 'T', content: 'C modifié' });
+            expect(updatedValue(connection, 'audio_path')).toBeNull();
+            expect(remove).toHaveBeenCalledWith('/uploads/audio/a.wav');
+
+            oldStory.audio_path = null;
+            remove.mockRestore();
+        });
+
+        it('should mark the story as reviewed and keep its themes when none are sent', async () => {
+            const connection = setupConnection();
+
+            await storyService.update('story-1', { title: 'Nouveau titre' });
+
+            const [sql] = updateCall(connection);
+            expect(sql).toContain("review_status = 'validated'");
+            expect(updatedValue(connection, 'content')).toBe('C');
+            expect(connection.query).not.toHaveBeenCalledWith('DELETE FROM story_themes WHERE story_id = ?', ['story-1']);
+        });
+
+        it('should answer 404 for an unknown story and 400 for an invalid one', async () => {
+            const { NotFoundError, ValidationError } = await import('../../middleware/error.middleware.js');
+            const connection = setupConnection();
+            connection.query.mockImplementationOnce(async () => [[]]);
+            await expect(storyService.update('missing', { title: 'T' })).rejects.toBeInstanceOf(NotFoundError);
+            await expect(storyService.update('story-1', { content: '<p> </p>' })).rejects.toBeInstanceOf(ValidationError);
+            await expect(storyService.update('story-1', { week_number: 60 })).rejects.toBeInstanceOf(ValidationError);
         });
     });
 
@@ -369,11 +430,21 @@ describe('generateFromAI', () => {
     });
 
     it('should not ask again for a story long enough', async () => {
-        const { generate } = await mockGeneration(storyText(500));
+        // 560 words for a minimum of 700: 80 %
+        const { generate } = await mockGeneration(storyText(560));
 
         await storyService.generateFromAI({ theme: 'Bateaux', age: '10-12', day: 'Mardi' }, 'gemini');
 
         expect(generate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ask again for a story at 70 % of the minimum (the usual shortfall)', async () => {
+        const { generate } = await mockGeneration(storyText(490), storyText(720));
+
+        await storyService.generateFromAI({ theme: 'Bateaux', age: '10-12', day: 'Mardi' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(generate.mock.calls[1][0].lengthHint).toContain('au moins 700 mots');
     });
 
     const weekText = (wordsPerDay, paragraphsOf = () => null) => JSON.stringify({
