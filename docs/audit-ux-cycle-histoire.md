@@ -514,3 +514,470 @@ Les deux points restants sont traités dans l'audit 3 ci-dessous.
   - calendrier : lier, retirer et créer à la volée ;
   - générer une semaine avec l'IA ;
   - vérifier les anciennes URL, le mobile et le mode sombre.
+
+---
+
+# Audit 4 bis : étiquettes d'histoire et sujet de la semaine
+
+*7 octobre 2026, après recette de l'audit 4. Retours : on ne voit plus les histoires d'un thème, pas de suppression en masse, trop de semaines dans le calendrier, impossible de saisir librement le thème d'une semaine, confusion entre thème d'histoire et thème de la semaine.*
+
+**Décisions**
+- Deux notions séparées :
+  - l'**étiquette** (table `themes`) : plusieurs par histoire ;
+  - le **sujet de la semaine** (table `weekly_themes`) : texte libre et description, qui guide l'écriture.
+- Le lien `weekly_themes.theme_id` de l'audit 4 est abandonné.
+- Deux pages : « Étiquettes » (`/themes`) et « Programme » (`/weekly-themes`).
+- À la génération, le sujet guide seulement l'écriture : les étiquettes viennent de l'IA, choisies parmi l'existant.
+- Les semaines numérotées au-delà de 53 sont des erreurs héritées.
+
+## Données
+- **Migration** ([theme.migration.js](../server/config/theme.migration.js)) : le nom et la description de l'étiquette liée sont recopiés dans la semaine (les renommages sont conservés), puis la FK et la colonne `theme_id` sont supprimées.
+  - Les étiquettes créées par l'audit 4 à partir des semaines restent ; elles apparaissent dans « Inutilisés » et se suppriment en masse.
+- **[weeklyTheme.service.js](../server/services/weeklyTheme.service.js)** :
+  - `setWeek(week, { name, description })` : nom obligatoire (150 caractères au plus), description de 500 au plus, semaine de 1 à 53 ;
+  - `clearWeek` accepte toute semaine ≥ 1, pour nettoyer les semaines héritées.
+- La fusion et la suppression d'étiquettes ne touchent plus `weekly_themes`. L'import ZIP ignore le `theme_id` des anciens exports.
+- **Nouvelle route** `POST /api/themes/bulk-delete { ids }` (`themeService.deleteMany`), en une transaction : seules les étiquettes sans histoire sont supprimées, les autres reviennent dans `skipped`.
+- `GET /api/themes/:id/stories` renvoie des colonnes légères (`id, title, age_group, week_number, day_order, locale`).
+
+## Génération
+- Prompt : « Sujet de la semaine » (et « Précisions sur le sujet » si une description existe) dans les paramètres. La section `## ÉTIQUETTES` ne demande plus que la première étiquette soit le sujet.
+- Front : les étiquettes de l'histoire sont celles de l'IA, la première étant la principale. Si l'IA n'en propose aucune, le sujet sert d'étiquette en dernier recours (une histoire en exige une), et le journal le signale.
+
+## Écrans
+- **Programme** ([WeeklyTopicsPage](../src/pages/WeeklyTopicsPage.tsx), [WeeklyTopicCalendar](../src/components/WeeklyTopics/WeeklyTopicCalendar.tsx), [WeeklyTopicRow](../src/components/WeeklyTopics/WeeklyTopicRow.tsx)) :
+  - 52 ou 53 semaines selon l'année ISO, groupées par mois ;
+  - champ « Sujet » éditable directement et description dépliable ;
+  - enregistrement à la sortie du champ (Entrée valide, Échap annule), avec un indicateur ; vider le champ retire la semaine ;
+  - encart « semaines hors calendrier » pour retirer les semaines > 53.
+- **Étiquettes** : la page n'a plus d'onglets (un ancien `?tab=calendar` redirige vers le Programme).
+  - « N histoires » déplie la liste des histoires (âge, S12 · Lundi, titre en lien ; au-delà de 10, lien vers la bibliothèque) ;
+  - case à cocher sur les étiquettes inutilisées, barre de sélection collante (« Tout sélectionner », « Supprimer ») et confirmation qui liste les étiquettes.
+- Menu : « Étiquettes » et « Programme ». La page détail affiche « Sujet de la semaine : … » en texte. Les sélecteurs n'épinglent plus d'étiquette de la semaine (prop `pinned` supprimée). Les sélecteurs de semaine (bibliothèque, éditeur) vont de 1 à 53.
+
+## Vérification
+- Typecheck : OK. Client : **76/76**. Serveur : **155/155**. `vite build` : OK.
+- Nouveaux tests :
+  - `WeeklyTopics.test.tsx` : 53 semaines en 2026, semaine 88 à part, retrait, enregistrement à la perte du focus, vidage ;
+  - `ThemeListItem.test.tsx` : case seulement si inutilisée, dépliage des histoires ;
+  - `deleteMany` et la route `bulk-delete` ;
+  - `weeklyTheme.service` réécrit ;
+  - prompt : le sujet est un paramètre, pas une étiquette.
+- À faire sur la vraie base : démarrer le serveur, vérifier le log « weekly_themes.theme_id dropped » et que les sujets sont intacts.
+- Recette :
+  - Programme : saisir, recharger, vider, retirer les semaines hors calendrier ;
+  - Étiquettes : déplier, puis filtre « Inutilisés » → tout sélectionner → supprimer ;
+  - générer une semaine avec l'IA.
+
+---
+
+# Audit 5 : génération IA d'après les logs
+
+*7 octobre 2026. Sources :*
+- *`server/logs/ai-*.log` (5 jours de génération), `access-*.log` et `server/debug/logs.jsonl` ;*
+- *la génération relancée à 23:02 (heure locale) et la console du serveur ;*
+- *les quotas du niveau gratuit ;*
+- *la liste réelle des modèles de la clé (ListModels).*
+
+## Constats
+| # | Constat | Cause |
+|---|---|---|
+| 1 | Génération de 23:02 : **10 min 40 s**. Gemma 31B puis 26B abandonnées après 180 s chacune, puis des 503 « high demand » en série sur Gemini 3.8, 3.7 et 3.6 Flash ; Gemini 3.5 Flash a fini par répondre. | Les Gemma (lentes, avec thinking) étaient en tête ; chaque 503 était retenté 3 fois ; rien ne mémorisait les échecs. |
+| 2 | Histoires trop courtes pour 13-15 ans : environ 300 mots à 20:58 (ancien prompt), 457 à 672 mots à 23:02, pour une cible de 900 à 1100. | La semaine entière était demandée en **un seul appel** : le modèle comprime. Seul Ollama passait en jour par jour. |
+| 3 | Les corrections des audits 3 et 4 fonctionnent en réel : JSON valide, illustration enregistrée, étiquette principale marquée, **aucune nouvelle étiquette** (contre 11 créées à 20:58). | — |
+| 4 | 19 fausses générations (`POST /api/generate/story` en environ 10 ms, depuis 127.0.0.1) dans les logs d'accès. | Les tests serveur écrivaient dans les vrais logs. |
+| 5 | « Ollama ListModels-Error: fetch failed » à chaque ouverture de « Créer ». | Ollama n'est pas lancé : sans conséquence. |
+
+## Quotas du niveau gratuit (relevé du 7 octobre)
+| Modèles | Requêtes/min | Requêtes/jour | Remarques |
+|---|---|---|---|
+| gemini-3.5-flash-lite, gemini-3.1-flash-lite | 15 | 500 | JSON natif |
+| gemini-3.8 / 3.7 / 3.6 / 3.5-flash, gemini-3-flash-preview, gemini-2.5-flash | 5 | 20 chacun | JSON natif |
+| gemma-4-31b-it, gemma-4-26b-a4b-it | 30 | 14 400 | lentes, pas de JSON natif, 16K tokens d'entrée par minute |
+| Pro (2.5, 3.1) | 0 | 0 | indisponibles |
+
+## Corrections
+- **Ordre des modèles** ([gemini.service.js](../server/services/gemini.service.js)) : d'abord les Flash Lite, puis les Flash, puis Gemma en dernier recours. L'ordre se surcharge avec `GEMINI_MODELS`.
+- **Thinking réduit** pour la narration : `thinkingLevel: low` pour Gemini 3.x et `thinkingBudget: 0` pour 2.5. Un modèle qui refuse ce réglage (400) est rappelé sans lui.
+- **Mémoire des échecs** ([model_cooldown.helper.js](../server/services/helpers/model_cooldown.helper.js)) :
+  - 503 : une seule nouvelle tentative, puis modèle écarté 5 min ;
+  - 429 quota du jour : modèle écarté jusqu'à minuit (heure du Pacifique) ;
+  - 429 par minute : attente du délai suggéré s'il fait 20 s au plus, sinon modèle suivant ;
+  - délai dépassé : modèle écarté 10 min ; 404 : 1 h.
+  - Le log `Story` liste les modèles écartés et pourquoi.
+- **Délai** : 120 s par appel (un appel = une histoire).
+- **Semaine toujours jour par jour** ([useStoryGeneration.ts](../src/hooks/useStoryGeneration.ts), [generationPlan.ts](../src/utils/generationPlan.ts)) :
+  - 7 appels, quel que soit le fournisseur ; chaque jour reçoit le résumé de la veille ;
+  - le premier jour reçoit `weekSeries` : « Cette histoire ouvre une aventure suivie sur 7 jours » au lieu de « aventure autonome » ;
+  - les appels au cloud commencent à au moins 12 s d'intervalle (5 requêtes par minute), et le journal affiche la pause.
+- **Longueur visible** :
+  - le log IA `Story-Parsed` donne le modèle, le nombre de mots de chaque histoire et la cible de l'âge (`PromptHelper.getTargetWords`) ;
+  - le journal de génération signale une histoire de moins de la moitié du minimum.
+- **Tests sans logs** : `ENV_CONFIG.FILE_LOGGING` est faux sous Vitest pour les trois loggers.
+
+## Vérification
+- Typecheck : OK. Client : **79/79**. Serveur : **169/169**. `vite build` : OK.
+- Aucune ligne écrite dans `server/logs/access-<date>.log` pendant les tests.
+- **À faire** : relancer une semaine en 13-15 ans, puis vérifier dans `ai-<date>.log` :
+  - 7 entrées `Story` sur Flash Lite ou Flash, chacune en moins de 2 min ;
+  - 7 entrées `Story-Parsed` avec environ 900 mots ou plus ;
+  - pas de passage par Gemma.
+
+---
+
+# Audit 6 : continuité de la semaine
+
+*7 octobre 2026. Semaine générée à 23:22 : « Les animaux qui hibernent », 4-6 ans, jour par jour avec Gemini 3.5 Flash Lite.*
+
+## Constat : les histoires ne se suivaient pas
+| Jour | Fin (suspense laissé) | Début du lendemain |
+|---|---|---|
+| Lundi | suit de mystérieuses empreintes | Mardi : va voir un chêne creux, empreintes oubliées |
+| Mardi | un tas de feuilles bouge : qui est-ce ? | Mercredi : rend visite au loir et au hérisson, tas oublié |
+| Mercredi | s'approche d'un tas de feuilles qui bouge | Jeudi : « le lit du hérisson était vide hier » |
+| Jeudi | écoute à l'entrée d'un terrier | Vendredi : « hier, le lit était vide » (encore) |
+
+Ce qu'on observe aussi :
+- mercredi, jeudi et vendredi recommencent la même enquête ;
+- le dimanche reprend le titre du lundi ;
+- le faon est présenté de nouveau chaque jour ;
+- le samedi est écrit en un seul bloc de 1459 caractères.
+
+**Causes.**
+- Chaque jour ne recevait que le résumé de la veille : une phrase qui décrit le point de départ, pas la fin.
+- Il ne recevait ni la dernière scène, ni les jours d'avant, ni les titres déjà pris.
+- Il n'y avait aucun plan de la semaine : chaque appel réinventait son intrigue.
+
+## Corrections
+- **Plan de la semaine**. Le lundi renvoie aussi `week_plan` : 7 étapes, une par jour.
+  - Une seule intrigue qui progresse : suspense du lundi au jeudi, résolution le vendredi, activité le samedi, conclusion le dimanche.
+  - Le champ est obligatoire dans le schéma JSON quand on le demande, et placé avant l'histoire pour que le modèle planifie d'abord ([story_schema.js](../server/services/helpers/story_schema.js) : `geminiResponseSchema` et `jsonSchema`).
+  - Il est lu par `extractWeekPlan` ([story_output.helper.js](../server/services/helpers/story_output.helper.js)).
+- **Contexte de chaque jour** (`getWeekSeriesContinuity` dans [prompt.helper.js](../server/services/helpers/prompt.helper.js)) :
+  - le plan, et l'étape du jour (« Aujourd'hui (Mercredi) : … ») ;
+  - tout ce qui a déjà été raconté (jour, titre, résumé) ;
+  - la **fin d'hier citée mot pour mot**.
+  - Consignes :
+    - reprendre exactement là où s'arrête la fin d'hier et répondre à son suspense ;
+    - ne pas recommencer une recherche ou une découverte déjà faite ;
+    - ne pas présenter de nouveau les personnages ;
+    - utiliser un titre différent de ceux déjà pris.
+- **Résumé** : il doit maintenant décrire la situation exacte à la fin (le suspense laissé pour demain).
+- **Côté client** ([generationPlan.ts](../src/utils/generationPlan.ts), [useStoryGeneration.ts](../src/hooks/useStoryGeneration.ts)) : le contexte de la semaine (plan, jours écrits, dernière scène) est gardé pendant la boucle et envoyé à chaque jour (`buildDayParams`).
+- **Paragraphes** : une histoire écrite en un seul bloc est découpée (`splitLongParagraph`).
+- **Log IA** : l'entrée `Story-Parsed` indique le contexte reçu (plan, nombre de jours précédents, fin d'hier) et le plan renvoyé.
+
+## Vérification
+- Typecheck : OK. Client : **81/81**. Serveur : **178/178**. `vite build` : OK.
+- **À faire** : régénérer une semaine, puis vérifier dans `ai-<date>.log` :
+  - la réponse du lundi contient `week_plan` ;
+  - chaque histoire commence par la suite directe de la scène finale de la veille ;
+  - les titres sont tous différents.
+
+## Audit 6 bis : seconde correction (semaines « Papouin »)
+
+*7 octobre 2026. Semaines « Le sable », Papouin, 4-6 et 7-9 ans, générées à 23:33 avec Gemini 3.5 Flash Lite.*
+
+**Ce qui marchait** :
+- les 14 histoires sont enregistrées ;
+- le plan de la semaine est produit et suivi (sable sec → eau → dosage → château → concours) ;
+- chaque jour reçoit le contexte (de 0 à 6 jours précédents).
+
+**Nouveaux défauts.** La consigne « reprenez exactement là où s'arrête la fin d'hier (mot pour mot) » était trop forte :
+- **le premier paragraphe recopiait la fin de la veille**, 10 fois sur 12 ;
+- on ne changeait plus de jour (mercredi commençait le mardi soir) ;
+- des histoires s'ouvraient sur « Il… », sans nommer Papouin ;
+- Papouin changeait d'apparence chaque jour (cheveux blonds, bouclés, ébouriffés ; 7 ou 8 ans ; short bleu, rayé ou beige) ;
+- les histoires étaient courtes : 153 à 255 mots pour une cible de 300 à 450.
+
+**Corrections.**
+- **Consigne** ([prompt.helper.js](../server/services/helpers/prompt.helper.js)) :
+  - la fin d'hier est donnée « pour mémoire, à ne pas recopier » ;
+  - chaque histoire se passe un nouveau jour ;
+  - elle s'ouvre sur un court rappel, avec ses propres mots, en nommant le personnage principal, puis répond au suspense ;
+  - « Ne recopiez aucune phrase des histoires précédentes ».
+- **Garde-fou** : `removeRepeatedOpening` ([story_output.helper.js](../server/services/helpers/story_output.helper.js)) retire les phrases de la fin d'hier recopiées en tête de l'histoire. Le nombre retiré est noté dans le log `Story-Parsed`. Rejoué sur les 14 histoires réelles, il nettoie les 10 reprises sans toucher aux autres.
+- **Fiche des personnages** : le lundi renvoie `characters` (nom, âge, apparence, vêtements, caractère).
+  - Les jours suivants la reçoivent dans le texte et les illustrations (« décrivez les personnages exactement comme dans la fiche »).
+  - Elle est obligatoire dans le schéma avec le plan, et lue par `extractWeekContext`.
+- **Longueur** :
+  - « au moins N mots » dans la consigne ;
+  - `minItems` sur les paragraphes selon l'âge, dans le schéma JSON (`PromptHelper.getTargetParagraphs`) ;
+  - le lundi ne doit pas dévoiler les découvertes des jours suivants.
+- **Console** : plus de « undefinedms ».
+
+**Vérification** :
+- Typecheck : OK. Client : **81/81**. Serveur : **187/187**. `vite build` : OK.
+- À faire : régénérer la semaine Papouin et relire les débuts et fins, ainsi que les illustrations.
+
+## Audit 6 ter : finitions (semaines « Marouin »)
+
+*7 octobre 2026. Semaine 30, Marouin, 4-6 et 10-12 ans, générée à 23:43 avec Gemini 3.5 Flash Lite.*
+
+**Réglé et vérifié dans les logs** :
+- chaque jour s'ouvre sur un rappel qui nomme Marouin et reprend le suspense de la veille ;
+- aucune phrase recopiée (`repeatedOpeningRemoved = 0`) ;
+- la fiche des personnages est suivie dans les 7 illustrations ;
+- les titres sont tous différents.
+
+**Défauts restants et corrections** :
+
+| Défaut | Correction |
+|---|---|
+| 10-12 ans : chaque suspense inventait un mystère hors du plan (parchemin, capsule, mécanisme, symbole, lueur), jamais résolu. | Chaque jour reçoit l'étape de **demain**, et le suspense doit la préparer, sans mystère hors du plan. Le **vendredi** résout tous les mystères ouverts ; le week-end n'en rouvre aucun (`getMysteryRule`). |
+| Semaine 30 (fin juillet) racontée « un lundi de printemps ». | Le client envoie `weekNumber`. `getWeekPeriod` donne « fin juillet, en été » (jeudi de la semaine ISO), placé dans PARAMÈTRES. |
+| 10-12 ans : 211 mots le jeudi (cible 700 à 900). | Si une histoire fait moins de 60 % du minimum de l'âge, une seconde demande est faite avec « Votre précédente version faisait N mots… » (`lengthHint`), et la plus longue est gardée. Le log note `lengthRetry: { before, after }`. |
+| Anglicismes (« puddles », « splash »). | Instruction système : uniquement des mots français, prénoms à la française. |
+
+**Vérification** :
+- Typecheck : OK. Client : **81/81**. Serveur : **193/193**. `vite build` : OK.
+- À faire : régénérer la semaine 30 en 10-12 ans, puis vérifier que :
+  - les suspenses mènent à l'étape suivante et le vendredi referme tout ;
+  - l'histoire se passe en été ;
+  - les histoires font environ 700 mots ;
+  - aucun mot anglais n'apparaît.
+
+## Audit 6 quater : paragraphes de remplissage (semaine « Noulopi »)
+
+*7 octobre 2026. Noulopi, 13-15 ans, générée à 23:53.*
+
+**Ce qui marche** :
+- la saison (« mi-septembre ») ;
+- la continuité et la fiche du personnage ;
+- la relance de longueur (vendredi : de 485 à 845 mots).
+
+**Défauts, causés par le `minItems` ajouté à l'audit 6 bis.** Obligé de produire au moins 8 paragraphes, le modèle a rempli :
+- le dimanche se terminait par trois commentaires sur le texte (« Un paragraphe de transition pour atteindre la longueur minimale requise… ») ;
+- le jeudi se terminait par sa description d'illustration.
+
+Ces lignes comptaient comme des mots, si bien que la relance ne se déclenchait pas.
+
+**Corrections.**
+- `minItems` n'est plus envoyé : l'option reste dans `buildSchema`, mais elle n'est pas utilisée pour les histoires.
+- `cleanStoryParagraphs` ([story_output.helper.js](../server/services/helpers/story_output.helper.js)), appliqué par `parseStoryOutput`, retire :
+  - les paragraphes courts qui parlent du texte lui-même ;
+  - la description d'illustration recopiée.
+
+  Il ne vide jamais une histoire. Le nombre retiré est noté dans `Story-Parsed` (`cleanedParagraphs`), et les mots sont comptés après nettoyage.
+- Consigne : `paragraphs` ne contient que le texte de l'histoire.
+- Rejoué sur les 43 histoires générées le 7 octobre : seuls ces 4 paragraphes sont retirés.
+
+**Vérification** :
+- Typecheck : OK. Client : **81/81**. Serveur : **198/198**. `vite build` : OK.
+- Les histoires déjà enregistrées (jeudi et dimanche de Noulopi) gardent ces paragraphes : il faut les supprimer ou les régénérer.
+
+## Audit 6 quinquies : longueur des grands et débuts répétitifs (« Claudine et Wikotine »)
+
+*8 octobre 2026. 16-18 ans, deux personnages, « la digestion après les fêtes », Gemini 3.5 Flash Lite.*
+
+**Ce qui marche** :
+- deux personnages présents chaque jour, avec la même apparence ;
+- le plan suivi jour après jour (salive, estomac, foie et pancréas, intestin, bouillon en famille, bilan) ;
+- chaque fin annonce l'étape du lendemain, et le vendredi conclut avec l'activité du week-end ;
+- saison juste, aucune recopie, aucun remplissage.
+
+**Défauts et corrections** :
+
+| Défaut | Correction |
+|---|---|
+| De 609 à 724 mots pour une cible de 1000 à 1200 : Flash Lite plafonne vers 700 mots, au-dessus du seuil de relance (60 %). | **Décision de l'utilisateur** : pour 13-15 et 16-18 ans, les modèles Flash passent en premier (`modelsForAge` dans [gemini.service.js](../server/services/gemini.service.js)), Flash Lite en secours. Les autres âges gardent l'ordre configuré. |
+| Débuts répétitifs : « Alors que [neige, givre, tempête]…, Claudine ajusta ses lunettes rondes… » presque chaque jour. | La première phrase de chaque jour (`storyOpening`, [generationPlan.ts](../src/utils/generationPlan.ts)) est montrée aux jours suivants dans « DÉBUTS DÉJÀ UTILISÉS (ne pas imiter) ». Consignes : ouvrir sur une scène nouvelle, puis glisser le rappel de la veille ; ne pas répéter les mêmes gestes ou tics descriptifs. |
+
+**Vérification** :
+- Typecheck : OK. Client : **82/82**. Serveur : **200/200**. `vite build` : OK.
+- À faire : régénérer en 16-18 ans, puis vérifier dans le log :
+  - le modèle est un Flash, et les histoires font environ 1000 mots ;
+  - les débuts sont variés.
+
+---
+
+# Audit 7 : semaine en un seul appel pour les petits
+
+*8 octobre 2026. Question de l'utilisateur : peut-on générer une semaine en un seul prompt au lieu de 7, sans faire exploser les quotas gratuits ?*
+
+**Réponse.** Un seul appel consomme **moins** de quota : 1 requête au lieu de 7. Flash Lite permet 500 requêtes par jour : environ 500 semaines par jour en un appel, contre environ 70 en jour par jour. Les tokens d'entrée et les pauses de 12 s sont aussi réduits.
+
+Le jour par jour avait été adopté pour la **qualité** (audit 5) :
+- en un appel, le modèle comprime les histoires longues (13-15 ans : 457 à 672 mots pour une cible de 900 à 1100) ;
+- une grosse réponse risque de dépasser le délai ;
+- un échec fait perdre toute la semaine.
+
+Pour les petits âges, une semaine reste courte (environ 2 500 mots en 4-6 ans).
+
+**Décision de l'utilisateur** :
+- **un seul appel** pour 2-3, 4-6 et 7-9 ans ;
+- **jour par jour** à partir de 10-12 ans ;
+- **Ollama** toujours en jour par jour.
+
+**Changements.**
+- **Client** :
+  - `isIterativeGeneration(dayOfWeek, age, provider)` ([generationPlan.ts](../src/utils/generationPlan.ts)) ;
+  - la décision est prise par âge dans la boucle ([useStoryGeneration.ts](../src/hooks/useStoryGeneration.ts)), et la progression compte 1 ou 7 unités par âge.
+- **Prompt en mode semaine** ([prompt.helper.js](../server/services/helpers/prompt.helper.js)). Les consignes qui ont fait leurs preuves en jour par jour :
+  - une seule aventure, avec des personnages identiques (texte et illustrations) ;
+  - chaque histoire se comprend seule : une scène nouvelle, puis le rappel de la veille en nommant le personnage principal ;
+  - 7 débuts différents, aucune phrase recopiée, aucun tic répété ;
+  - le suspense du lundi au jeudi mène au lendemain, le vendredi résout tout, le week-end n'ouvre rien ;
+  - « au moins N mots pour chacune des 7 histoires ».
+- **Serveur** :
+  - délai de 240 s pour un appel « semaine » (`GEMINI_WEEK_TIMEOUT_MS`) ;
+  - `removeRepeatedOpening` appliqué entre les jours d'une même réponse ;
+  - relance de longueur sur la **médiane** des 7 histoires (sous 60 % du minimum), une seule fois.
+
+**Vérification** :
+- Typecheck : OK. Client : **82/82**. Serveur : **204/204**. `vite build` : OK.
+- À faire : générer une semaine en 4-6 ans (une seule entrée `Story` avec 7 histoires dans le log) et une en 10-12 ans (7 entrées), puis relire la continuité et la longueur.
+
+## Audit 7 bis : première semaine en un seul appel (« Les châtaignes », 4-6 ans)
+
+*8 octobre 2026. Léonie et Antonin, Gemini 3.5 Flash Lite.*
+
+**Résultat** : 1 requête, 23 s, de 267 à 337 mots par histoire, contre 204 à 323 en jour par jour (Jimini).
+- La continuité tient : bogue → ouverture → écureuil voleur → panier trop lourd → festin.
+- La saison est juste (mi-octobre), et le vendredi conclut avec l'activité du week-end.
+- Aucune relance ni nettoyage nécessaire.
+
+**Défauts et corrections** :
+
+| Défaut | Correction |
+|---|---|
+| Du mardi au dimanche, les 6 histoires s'ouvrent sur « Hier, Léonie et Antonin avaient… Aujourd'hui, … ». | Consigne dans les deux modes : la première phrase est une action ou un dialogue du jour, jamais « Hier », « La veille », « Après avoir » ni « Alors que » (`FORBIDDEN_OPENINGS`). Le log `Story-Parsed` compte ces débuts et les débuts identiques (`repetitiveOpenings`). |
+| Dialogues sans guillemets. | Instruction système : dialogues entre guillemets français, tiret à chaque changement d'interlocuteur. |
+| « les bogues et les bogues et les branches ». | `removeStutter` retire un groupe de 2 à 4 mots écrit deux fois de suite (8 caractères au moins : « très très » reste). Rejoué sur 407 paragraphes réels, il ne corrige que ce cas. |
+
+**Vérification** :
+- Typecheck : OK. Client : **82/82**. Serveur : **211/211**. `vite build` : OK.
+- À faire : régénérer la semaine. `repetitiveOpenings` doit être proche de 0, et les dialogues entre guillemets.
+
+## Audit 7 ter : semaine incomplète (« Halloween », 4-6 ans)
+
+*8 octobre 2026. Semaine 43, Sweety, « Toute la semaine » : **1 histoire créée au lieu de 7**, sans erreur visible.*
+
+**Causes** (`ai-2026-10-08.log`, 22:03) :
+1. La première réponse ne contenait qu'**une** histoire (le lundi, 167 mots) : le schéma n'imposait pas 7 histoires.
+2. **Bug de la relance (audit 7)** : la relance est partie (167 mots, sous 60 % de 300) et a renvoyé les **7 histoires**. Mais deux réponses n'étaient comparées que si elles avaient le même nombre d'histoires (1 contre 7) : la relance a été écartée, et la réponse à une histoire gardée.
+3. Dans la relance, le jeudi était étiqueté « Mardi ».
+
+**Corrections** :
+- **Schéma** : `storyCount` impose exactement 7 histoires (`minItems` et `maxItems` sur `stories`) pour un appel « semaine », avec Gemini comme avec Ollama.
+- **Relance** ([story.service.js](../server/services/story.service.js)) :
+  - une semaine de moins de 7 histoires est relancée, avec « Votre réponse ne contenait que N histoire(s) : écrivez les 7 histoires… » ;
+  - `isBetterAnswer` garde la réponse la plus **complète**, puis la plus longue ;
+  - le log note `incomplete` si la semaine reste incomplète.
+- **Jours** : `assignWeekDays` attribue Lundi…Dimanche dans l'ordre quand les 7 jours ne sont pas distincts, et retire les doublons d'une réponse incomplète. Le log note `daysFixed`.
+- **Client** : « ⚠️ Semaine incomplète : N histoire(s) sur 7 » dans le journal, et les histoires manquantes sont comptées comme des échecs dans le rapport.
+
+**Vérification** :
+- Typecheck : OK. Client : **83/83**. Serveur : **217/217**. `vite build` : OK.
+- À faire : régénérer la semaine 43 et vérifier qu'on obtient 7 histoires. L'histoire « Le costume magique de Sweety » déjà créée reste seule : il faut la supprimer, ou régénérer la semaine.
+
+---
+
+# Audit 8 : export PDF
+
+*8 octobre 2026.*
+
+**Fonctionnement.** « Mes histoires » → « Exporter en PDF » :
+- on choisit les histoires et les options : illustrations, couverture, sommaire, police, taille, format, orientation ;
+- `POST /api/export/pdf` construit le livre avec jsPDF ([server/lib/pdf](../server/lib/pdf)).
+
+**Problèmes trouvés** :
+
+| Problème | Effet |
+|---|---|
+| Le client demandait un fichier (`responseType: 'blob'`), le serveur répondait en JSON (`{ url }`). | L'export échouait à chaque fois (« Réponse invalide du serveur »). |
+| La traduction serveur cherchait les clés à plat (`"pdf.tocTitle"`) dans des fichiers imbriqués, et 3 clés n'existaient pas. | Le PDF affichait « pdf.tocTitle », « story.themes: … ». |
+| Le contenu des histoires était écrit tel quel. | Les balises `<p>` des histoires générées apparaissaient, sans séparation des paragraphes. |
+| La page d'histoire imposait Helvetica 14 pt. | Les options police et taille étaient sans effet. |
+| PDF renvoyé encodé dans du JSON (data URI), ouvert avec `window.open`. | Réponse lourde, et ouverture bloquée par les navigateurs. |
+| Le sommaire était écrit après coup, sans couper les titres. | Titres longs débordants ; numéros de page faux si le sommaire dépassait une page. |
+| Aucun ordre ni repère. | Histoires dans un ordre arbitraire, sans semaine ni jour, sans numéros de page. |
+| Images. | Le format WebP n'était géré que pour la première illustration. |
+
+**Corrections** :
+- **Réponse binaire** : `application/pdf` en pièce jointe ([index.js](../server/lib/pdf/index.js)). Le client crée une URL locale et un lien de téléchargement ([PDFExport.tsx](../src/components/Common/PDFExport.tsx)). Les erreurs reçues sous forme de Blob sont relues pour afficher le vrai message ([client.ts](../src/api/client.ts)).
+- **Traductions** : clés imbriquées lues dans [i18n.js](../server/lib/i18n.js), dossier des langues trouvé depuis le module (et non le dossier courant). Nouvelles clés `pdf.illustrationFor`, `storiesCount`, `generatedOn`, `pageNumber`, `tags`, `ageGroup` et `weekDay`.
+- **Texte** ([storyText.js](../server/lib/pdf/helpers/storyText.js)) :
+  - HTML ou texte converti en paragraphes ;
+  - caractères codés traduits, gras et mentions `[Illustration]` retirés ;
+  - caractères absents des polices standard retirés (emojis) ;
+  - espaces insécables avant ; : ! ? et à l'intérieur des guillemets « ».
+- **Typographie** ([fonts.js](../server/lib/pdf/fonts.js)) : police (Helvetica, Times, Courier) et taille (12, 14 ou 16 pt) appliquées au texte, avec un interligne de 1,5 et un espace entre les paragraphes.
+- **Livre** ([generate.js](../server/lib/pdf/generate.js)) :
+  - ordre semaine → âge → jour ;
+  - page de titre : titre sur plusieurs lignes, « Semaine N · Jour », âge, étiquettes, illustration principale ;
+  - sommaire sur des pages réservées à l'avance, titres tronqués avec « … » ;
+  - numéros de page « n / total » en bas, sauf sur la couverture ;
+  - `loadImage` partagé, WebP compris ;
+  - messages de débogage retirés.
+- **Rendu vérifié** sur un PDF d'essai, converti en images : couverture, sommaire, titre long sur trois lignes, paragraphes, accents, guillemets.
+
+**Vérification** :
+- Typecheck : OK. Client : **87/87**. Serveur : **227/227** (nouveau `pdf.layout.test.js`). `vite build` : OK.
+- À faire : un export réel depuis l'application, avec des illustrations.
+
+## Audit 8 bis : styles du PDF
+
+*8 octobre 2026. Demande : pouvoir choisir un style enfantin pour les petits, un style ado ou un style plus professionnel.*
+
+**Décisions de l'utilisateur** :
+- polices libres embarquées (licence SIL OFL, `server/assets/fonts`, chacune avec son `OFL.txt`) ;
+- choix « Automatique » par défaut selon l'âge, ou style forcé.
+
+| | Enfantin | Ado | Pro |
+|---|---|---|---|
+| Police | Andika (conçue pour l'apprentissage de la lecture) | Poppins | Crimson Text |
+| Corps (petit / moyen / grand) | 16 / 18 / 20 pt | 12 / 13 / 14 pt | 11 / 12 / 13 pt |
+| Titre | bandeau arrondi pastel, étoiles | « JOUR 1 · LUNDI » + barre turquoise | centré, filet bordeaux, métadonnées en italique |
+| Texte | à gauche, interligne 1,7 | à gauche, interligne 1,5 | justifié, retrait, interligne 1,4 |
+| Page | cadre arrondi, numéro dans une pastille | bande turquoise, « — 3 — » | en-tête courant et filet, numéro centré |
+| Couverture | fond pastel, ronds et étoiles | aplat bleu nuit | sobre, filet |
+
+**Fonctionnement** :
+- `resolveTheme` ([themes.js](../server/lib/pdf/themes.js)) : en Automatique, Enfantin si une histoire est pour les 2-6 ans, sinon Ado. La même règle existe côté client (`resolvePdfStyle`) pour afficher le style retenu.
+- `registerThemeFonts` ([fontRegistry.js](../server/lib/pdf/fontRegistry.js)) charge les TTF une seule fois, et se replie sur Helvetica ou Times si un fichier manque.
+- Les cadres, en-têtes courants et numéros de page sont dessinés une fois toutes les pages créées (`decoratePage`).
+
+**Mise en page commune** :
+- **Plus de page de titre vide** : sans illustration, le titre est en haut de la première page de texte (l'export du 8 octobre aurait 9 pages de moins).
+- **Contrôle des orphelines** (`chooseLayout`) : une dernière page de 1 ou 2 lignes est évitée en resserrant l'interligne de 10 % au plus.
+- L'option « police » du formulaire est remplacée par « Style » ; la taille reste réglable.
+
+**Rendu vérifié** : trois PDF d'essai avec de vraies histoires (Léonie et Antonin, Marouin), convertis en images. Le PDF Enfantin pèse 443 Ko, car seuls les caractères utilisés sont embarqués.
+
+**Vérification** :
+- Typecheck : OK. Client : **88/88**. Serveur : **233/233**. `vite build` : OK.
+- À faire : exporter les mêmes histoires dans chaque style depuis l'application, avec des illustrations.
+
+## Audit 9 : atelier d'illustrations
+
+**Problème** : beaucoup d'histoires n'ont pas d'image. Le prompt d'illustration existe (`stories.illustration_prompt`), mais il fallait, pour chaque histoire : l'ouvrir, copier le prompt, générer l'image ailleurs, la télécharger, ouvrir l'édition, choisir le fichier.
+
+**Contrainte** : tous les modèles d'image de l'API Gemini (Nano Banana, 2, Pro, Lite) sont à 0/0 en gratuit. L'appli ne peut pas générer les images elle-même.
+
+**Décisions** : images faites dans des outils web gratuits ; prompts manquants créés par IA.
+
+**Serveur**
+- [image_prompt.helper.js](../server/services/helpers/image_prompt.helper.js) : `imageCode` (`IMG-` + 8 premiers caractères de l'id), `buildImagePrompt` (style selon l'âge + description + « format 4:3, aucun texte »), textes d'export `.txt` (groupés par semaine) et `.json` (outil Canvas).
+- [illustration.service.js](../server/services/illustration.service.js) et `/api/illustrations` :
+  - `GET /todo` : histoires sans image (filtre `hasImage` existant), dans l'ordre du livre ;
+  - `GET /export?format=txt|json` ;
+  - `POST /:storyId/prompt` : description écrite par l'IA (`geminiService.generateText`, mêmes modèles et replis que les histoires ; Ollama sans clé Gemini), enregistrée sans nouvelle version ;
+  - `PUT /:storyId/prompt` : correction manuelle.
+- Les images passent par l'upload existant (`POST /api/upload` avec `storyId`).
+
+**Client** : page [Illustrations](../src/pages/IllustrationsPage.tsx), lien dans l'en-tête.
+- Une ligne par histoire : prompt modifiable, « Copier le prompt », « Créer le prompt », zone image (clic puis Ctrl+V, glisser-déposer, fichier). Les images de plus de 4,5 Mo sont réduites avant l'envoi.
+- « Créer les prompts manquants » : un appel toutes les 5 s (quota Flash Lite), avec arrêt possible.
+- Import en lot ([illustrationImport.ts](../src/utils/illustrationImport.ts)) : images ou ZIP (`fflate`) ; rattachement par code dans le nom, sinon par ordre de téléchargement vers les histoires sans image ; chaque rattachement est modifiable avant l'envoi.
+- Fiche d'une histoire sans image : « Créer le prompt » et « Ajouter l'image ».
+
+**Outil Gemini Canvas** : [canvas-illustrations.html](../public/tools/canvas-illustrations.html), version remise à jour de l'ancien générateur par lots de l'utilisateur.
+- L'ancien outil ne fonctionnait plus : Imagen 3 seul, prompts lus dans un dump SQL à l'ancien format, images nommées `image_N_…`.
+- Le nouvel outil lit le JSON exporté, essaie Gemini 2.5 Flash Image puis Imagen 4 (modèle suivant si refusé, attente sur 429), peut donner l'image précédente de la semaine en modèle pour garder les personnages, et télécharge un ZIP d'images nommées par code.
+- Il ne marche que dans Canvas (clé vide fournie par Google) : à confirmer par un essai réel.
+
+**Vérification**
+- Typecheck : OK. Client : **95/95**. Serveur : **242/242**. `vite build` : OK.
+- API réelle : 28 histoires sans image, toutes avec un prompt ; exports `.txt` et `.json` corrects.
+- À faire : coller une image sur une ligne, importer un lot sans renommer, essayer l'outil dans Gemini Canvas, vérifier les images sur les cartes et dans le PDF.

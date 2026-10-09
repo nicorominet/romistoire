@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractJson, parseStoryOutput } from '../../services/helpers/story_output.helper.js';
+import { assignWeekDays, cleanStoryParagraphs, countRepetitiveOpenings, openingPattern, removeStutter, extractJson, extractWeekContext, extractWeekPlan, parseStoryOutput, removeRepeatedOpening, splitLongParagraph } from '../../services/helpers/story_output.helper.js';
 
 const story = (overrides = {}) => ({
   day: 'Lundi',
@@ -33,7 +33,8 @@ describe('parseStoryOutput', () => {
       summary: 'Léa suit une goutte.',
       themes: [{ name: 'Nature', description: "Le cycle de l'eau", icon: '💧', color: '#2196F3' }],
       paragraphs: ['Premier.', 'Second.'],
-      illustrationPrompt: 'Une fille en ciré jaune.'
+      illustrationPrompt: 'Une fille en ciré jaune.',
+      cleanedParagraphs: 0
     });
   });
 
@@ -66,5 +67,170 @@ describe('parseStoryOutput', () => {
   it('should return null when the answer is not JSON', () => {
     expect(parseStoryOutput('**Titre de l\'Histoire :** La pluie\n\nIl pleut.')).toBeNull();
     expect(parseStoryOutput('{"stories": []}')).toBeNull();
+  });
+});
+
+describe('extractWeekPlan', () => {
+  const days = ['Lundi : Léo trouve une carte', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((d, i) => (i === 0 ? d : `Étape ${i + 1}`));
+
+  it('should read the 7 lines of the plan, without a leading day name', () => {
+    const plan = extractWeekPlan(JSON.stringify({ week_plan: days, stories: [] }));
+    expect(plan).toHaveLength(7);
+    expect(plan[0]).toBe('Léo trouve une carte');
+  });
+
+  it('should ignore a missing or incomplete plan', () => {
+    expect(extractWeekPlan(JSON.stringify({ stories: [] }))).toBeNull();
+    expect(extractWeekPlan(JSON.stringify({ week_plan: days.slice(0, 5), stories: [] }))).toBeNull();
+    expect(extractWeekPlan('pas de JSON')).toBeNull();
+  });
+});
+
+describe('splitLongParagraph', () => {
+  it('should split a story written as one block', () => {
+    const sentences = Array.from({ length: 9 }, (_, i) => `Phrase numéro ${i + 1} assez longue pour remplir le paragraphe de cette histoire.`);
+    const paragraphs = splitLongParagraph(sentences.join(' '));
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs[0]).toContain('Phrase numéro 1');
+    expect(paragraphs[1].startsWith('Phrase numéro 4')).toBe(true);
+  });
+
+  it('should prefer line breaks and keep short paragraphs', () => {
+    expect(splitLongParagraph('Premier.\nDeuxième.')).toEqual(['Premier.', 'Deuxième.']);
+    expect(splitLongParagraph('Court.')).toEqual(['Court.']);
+  });
+
+  it('should split a single paragraph of a parsed story', () => {
+    const block = Array.from({ length: 10 }, (_, i) => `« Bonjour ${i} ! » dit le faon, qui trottine longuement dans la forêt givrée du matin.`).join(' ');
+    const [story] = parseStoryOutput(JSON.stringify({ stories: [{ day: 'Samedi', title: 'T', summary: 'S', themes: [], paragraphs: [block], illustration_prompt: 'I' }] }));
+    expect(story.paragraphs.length).toBeGreaterThan(1);
+  });
+});
+
+describe('extractWeekContext', () => {
+  it('should read the plan and the character sheets of the first day', () => {
+    const plan = ['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six', 'Sept'];
+    const context = extractWeekContext(JSON.stringify({
+      week_plan: plan,
+      characters: [{ name: 'Papouin', description: 'Garçon de 5 ans, cheveux blonds' }, { name: '', description: 'sans nom' }],
+      stories: []
+    }));
+    expect(context.weekPlan).toEqual(plan);
+    expect(context.characters).toEqual([{ name: 'Papouin', description: 'Garçon de 5 ans, cheveux blonds' }]);
+  });
+
+  it('should return nulls without context', () => {
+    expect(extractWeekContext(JSON.stringify({ stories: [] }))).toEqual({ weekPlan: null, characters: null });
+  });
+});
+
+describe('removeRepeatedOpening', () => {
+  const ending = "En attendant de le découvrir dès demain, Papouin ramassa son seau et sa pelle. Il avait hâte de mener l'enquête !";
+
+  it('should drop a first paragraph copied from the previous ending', () => {
+    const { paragraphs, removed } = removeRepeatedOpening([ending, 'Ce mardi matin, Papouin revient sur la plage.'], ending);
+    expect(paragraphs).toEqual(['Ce mardi matin, Papouin revient sur la plage.']);
+    expect(removed).toBe(2);
+  });
+
+  it('should keep the new text that follows a copied opening', () => {
+    const copied = `${ending} Dès le lendemain matin, il s'installa au bord de l'eau.`;
+    const { paragraphs } = removeRepeatedOpening([copied, 'Suite.'], ending);
+    expect(paragraphs[0]).toBe("Dès le lendemain matin, il s'installa au bord de l'eau.");
+  });
+
+  it('should leave a story that does not repeat the ending', () => {
+    const story = ['Ce mardi, Papouin se souvient du mystère d’hier.', 'Suite.'];
+    expect(removeRepeatedOpening(story, ending)).toEqual({ paragraphs: story, removed: 0 });
+    expect(removeRepeatedOpening(story, '')).toEqual({ paragraphs: story, removed: 0 });
+  });
+});
+
+describe('cleanStoryParagraphs', () => {
+  // Real answers of the Noulopi week (7 October 2026)
+  const filler = [
+    "Un paragraphe de transition pour atteindre la longueur minimale requise tout en maintenant le rythme narratif de cette conclusion dominicale.",
+    "Un autre paragraphe pour enrichir la description de l'ambiance automnale et clore définitivement la réflexion sur la biodiversité forestière.",
+    "Le huitième et dernier paragraphe qui scelle la fin de cette belle aventure naturaliste au cœur des bois de septembre."
+  ];
+  const illustration = "Un adolescent aux cheveux châtains ébouriffés, portant une veste en velours côtelé vert olive, est penché sur un carnet de notes en cuir posé sur une souche dans une forêt de chênes en automne. Il tient un compas.";
+  const story = [
+    "Noulopi referme son carnet, la tête pleine de questions.",
+    "« Encore un paragraphe à écrire dans mon carnet ! » soupire-t-il en riant, avant de reprendre sa marche le long du ruisseau, les yeux rivés sur les branches où les écureuils s'activent déjà pour l'hiver."
+  ];
+
+  it('should remove comments about the text', () => {
+    expect(cleanStoryParagraphs([...story, ...filler])).toEqual({ paragraphs: story, removed: 3 });
+  });
+
+  it('should remove the illustration description copied into the text', () => {
+    const copied = `${illustration} Ambiance de fin de journée, style illustration jeunesse semi-réaliste et soignée.`;
+    expect(cleanStoryParagraphs([...story, copied], illustration)).toEqual({ paragraphs: story, removed: 1 });
+    expect(cleanStoryParagraphs([...story, illustration], illustration).removed).toBe(1);
+  });
+
+  it('should keep a normal story and never empty one', () => {
+    expect(cleanStoryParagraphs(story, illustration)).toEqual({ paragraphs: story, removed: 0 });
+    expect(cleanStoryParagraphs(filler)).toEqual({ paragraphs: filler, removed: 0 });
+  });
+
+  it('should be applied when parsing an answer', () => {
+    const [parsed] = parseStoryOutput(JSON.stringify({ stories: [{ day: 'Dimanche', title: 'T', summary: 'S', themes: [], paragraphs: [...story, ...filler], illustration_prompt: illustration }] }));
+    expect(parsed.paragraphs).toEqual(story);
+    expect(parsed.cleanedParagraphs).toBe(3);
+  });
+});
+
+describe('removeStutter', () => {
+  it('should remove a group of words written twice (real Friday sentence)', () => {
+    expect(removeStutter('fabriquer des petits bonhommes avec les bogues et les bogues et les branches ramassées dans le jardin'))
+      .toEqual({ text: 'fabriquer des petits bonhommes avec les bogues et les branches ramassées dans le jardin', count: 1 });
+  });
+
+  it('should keep intended repetitions', () => {
+    expect(removeStutter('Il fait très très beau, beau comme un soleil.').count).toBe(0);
+    expect(removeStutter('Pas à pas, petit à petit, ils avancent.').count).toBe(0);
+  });
+
+  it('should be counted by the paragraph cleaning', () => {
+    expect(cleanStoryParagraphs(['Avec les bogues et les bogues et les branches.'])).toEqual({ paragraphs: ['Avec les bogues et les branches.'], removed: 1 });
+  });
+});
+
+describe('repetitive openings', () => {
+  const forbidden = ['Hier', 'La veille', 'Après avoir', 'Alors que'];
+  const story = (text) => ({ paragraphs: [text] });
+
+  it('should give the first two words of a story', () => {
+    expect(openingPattern('Hier, Léonie et Antonin avaient trouvé une bogue.')).toBe('hier léonie');
+    expect(openingPattern('« Regarde ! » cria Léo.')).toBe('regarde cria');
+  });
+
+  it('should count forbidden and repeated openings (real week: 6 times "Hier, Léonie et Antonin")', () => {
+    const week = [story('Les feuilles des arbres se parent de teintes dorées.'), ...Array.from({ length: 6 }, () => story('Hier, Léonie et Antonin avaient découvert une bogue.'))];
+    expect(countRepetitiveOpenings(week, forbidden)).toBe(6);
+
+    const varied = [story('Le vent souffle fort.'), story('« Regarde ! » cria Léo.'), story('Antonin court vers le châtaignier.')];
+    expect(countRepetitiveOpenings(varied, forbidden)).toBe(0);
+    expect(countRepetitiveOpenings([story('Alors que le soleil se lève, Léo part.')], forbidden)).toBe(1);
+  });
+});
+
+describe('assignWeekDays', () => {
+  const week = (days) => days.map((day, index) => ({ day, title: `T${index}` }));
+
+  it('should give the days by position when a day of a 7-story week is repeated (real Halloween answer)', () => {
+    const { stories, fixed } = assignWeekDays(week(['Lundi', 'Mardi', 'Mercredi', 'Mardi', 'Vendredi', 'Samedi', 'Dimanche']));
+    expect(stories.map(story => story.day)).toEqual(['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']);
+    expect(fixed).toBe(1);
+  });
+
+  it('should keep a correct week and remove a repeated day from an incomplete one', () => {
+    const correct = week(['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']);
+    expect(assignWeekDays(correct)).toEqual({ stories: correct, fixed: 0 });
+
+    const { stories, fixed } = assignWeekDays(week(['Lundi', 'Mardi', 'Mardi']));
+    expect(stories.map(story => story.day)).toEqual(['Lundi', 'Mardi', null]);
+    expect(fixed).toBe(1);
   });
 });

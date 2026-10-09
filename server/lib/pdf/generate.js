@@ -1,110 +1,96 @@
-import { query } from "../../config/database.js";
-import { configureFonts } from './fonts.js';
-import { addBlankTableOfContents } from './helpers/addBlankTableOfContents.js';
+import { jsPDF } from 'jspdf';
+import { i18n, init } from '../i18n.js';
+import { registerThemeFonts } from './fontRegistry.js';
+import { decoratePage, resolveTheme, themeSizes } from './themes.js';
+import { addCoverPage } from './helpers/addCoverPage.js';
 import { addStoryPage } from './helpers/addStoryPage.js';
 import { addIllustrations } from './helpers/addIllustrations.js';
-import { updateTableOfContents } from './helpers/updateTableOfContents.js';
-import { i18n, init } from '../i18n.js';
-import { jsPDF } from 'jspdf';
-import { addCoverPage } from './helpers/addCoverPage.js';
+import { fillTableOfContents, tocPageCount } from './helpers/tableOfContents.js';
 import { storyService } from '../../services/story.service.js';
 
-async function generatePDF(options) {
-  // Initialize i18n if it's not already loaded
-  if (!i18n.isLoaded()) {
-    console.log("i18n not loaded yet, initializing...");
-    try {
-      await init();
-      console.log("i18n initialized successfully.");
-    } catch (error) {
-      console.error("Failed to initialize i18n:", error);
-      throw new Error("Failed to initialize i18n for PDF generation.");
-    }
-  }
+const AGE_ORDER = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
 
-  if (!options?.stories?.length) {
-    throw new Error("No stories provided for PDF generation");
-  }
+/** Book order: week, then age group, then day, then title. */
+export const sortStoriesForBook = (stories) => [...stories].sort((a, b) =>
+  (Number(a.week_number) || 0) - (Number(b.week_number) || 0)
+  || AGE_ORDER.indexOf(a.age_group) - AGE_ORDER.indexOf(b.age_group)
+  || (Number(a.day_order) || 0) - (Number(b.day_order) || 0)
+  || String(a.title).localeCompare(String(b.title)));
+
+/**
+ * Builds the PDF of the selected stories, in a style: kids, teen or pro (or auto, from the youngest age group).
+ * Layout: optional cover, optional table of contents (pages reserved up front so its page numbers are right),
+ * then each story (header, main illustration if any, text, other illustrations). Frames, running headers and
+ * page numbers are drawn last, once every page exists.
+ * @param {Object} options - { stories: ids, style, coverPage, tableOfContents, includeIllustrations, fontSize,
+ *   pageSize, orientation, coverTitle, coverSubtitle }
+ * @returns {Promise<import('jspdf').jsPDF>}
+ */
+async function generatePDF(options) {
+  if (!i18n.isLoaded()) await init();
+  if (!options?.stories?.length) throw new Error('No stories provided for PDF generation');
+
+  const stories = sortStoriesForBook((await storyService.findByIds(options.stories)).filter(Boolean));
+  if (stories.length === 0) throw new Error('No stories found for the provided IDs');
 
   const doc = new jsPDF({
-    orientation: options.orientation || "portrait",
-    unit: "mm",
-    format: options.pageSize?.toLowerCase() || "a4",
+    orientation: options.orientation === 'landscape' ? 'landscape' : 'portrait',
+    unit: 'mm',
+    format: String(options.pageSize || 'a4').toLowerCase()
   });
 
-  try {
-    // Use the storyService to fetch stories with full details
-    const stories = await storyService.findByIds(options.stories);
+  const theme = resolveTheme(options, stories);
+  const family = registerThemeFonts(doc, theme);
+  const ctx = { theme, family, sizes: themeSizes(theme, options.fontSize) };
+  doc.setFont(family, 'normal');
 
-    if (!stories?.length) {
-      throw new Error("No stories found for the provided IDs");
-    }
+  // What each page holds, for the frames, running headers and page numbers drawn at the end
+  const pages = [];
+  const markPages = (info) => {
+    while (pages.length < doc.getNumberOfPages()) pages.push(info);
+  };
 
-    configureFonts(doc, options);
+  // Page 1 exists already: it holds the cover, the first contents page or the first story
+  let pageInUse = false;
+  const nextPage = () => {
+    if (pageInUse) doc.addPage();
+    pageInUse = true;
+  };
 
-    let currentPage = 1;
-    const storyPages = [];
-
-    if (options.coverPage) {
-      addCoverPage(doc, stories, options);
-      currentPage = doc.internal.getNumberOfPages();
-    }
-
-    if (options.tableOfContents) {
-      // Assuming TOC is on the "next" page after cover
-      doc.addPage(); 
-      currentPage = doc.internal.getNumberOfPages();
-      const tocPage = currentPage; // Page number of TOC
-      
-      addBlankTableOfContents(doc);
-      // NOTE: addBlankTableOfContents might not add pages, it just draws headers.
-      // But if we want proper TOC tracking, we just mark this page.
-
-      for (const story of stories) {
-        doc.addPage();
-        currentPage = doc.internal.getNumberOfPages();
-        storyPages.push({ title: story.title, page: currentPage });
-        
-        addStoryPage(doc, story, options);
-        currentPage = doc.internal.getNumberOfPages(); // Sync after text pages
-
-        await addIllustrations(
-          doc,
-          story,
-          options,
-          currentPage
-        );
-        currentPage = doc.internal.getNumberOfPages(); // Sync after illustrations
-      }
-
-      updateTableOfContents(doc, storyPages, tocPage);
-    } else {
-      for (const story of stories) {
-        if (currentPage > 1) doc.addPage();
-        // If it's the very first page of content (and no cover/toc), we might be on page 1.
-        
-        addStoryPage(doc, story, options);
-        currentPage = doc.internal.getNumberOfPages();
-
-        await addIllustrations(
-          doc,
-          story,
-          options,
-          currentPage
-        );
-        currentPage = doc.internal.getNumberOfPages();
-      }
-    }
-
-    return doc;
-  } catch (error) {
-    console.error("Error during PDF generation:", error);
-    throw new Error(
-      `PDF generation failed: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
+  if (options.coverPage) {
+    nextPage();
+    addCoverPage(doc, stories, options, ctx);
+    markPages({ type: 'cover' });
   }
+
+  let firstTocPage = null;
+  if (options.tableOfContents) {
+    const tocPages = tocPageCount(stories.length, doc.internal.pageSize.getHeight());
+    for (let i = 0; i < tocPages; i++) {
+      nextPage();
+      if (i === 0) firstTocPage = doc.getNumberOfPages();
+    }
+    markPages({ type: 'toc' });
+  }
+
+  const entries = [];
+  for (const story of stories) {
+    nextPage();
+    entries.push({ title: story.title, page: doc.getNumberOfPages() });
+    addStoryPage(doc, story, options, ctx);
+    markPages({ type: 'story', storyTitle: story.title });
+    await addIllustrations(doc, story, options, ctx);
+    markPages({ type: 'illustration', storyTitle: story.title });
+  }
+
+  if (firstTocPage) fillTableOfContents(doc, entries, firstTocPage, ctx);
+
+  const total = doc.getNumberOfPages();
+  pages.forEach((info, index) => {
+    doc.setPage(index + 1);
+    decoratePage(doc, ctx, info, index + 1, total);
+  });
+  return doc;
 }
 
 export { generatePDF };

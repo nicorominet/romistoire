@@ -9,7 +9,31 @@ import { storySeriesHelper } from './story_series.helper.js';
 import { geminiService } from './gemini.service.js';
 import { localLLMService } from './local_llm.service.js';
 import { fileCleanup, AUDIO_DIR } from './helpers/file_cleanup.helper.js';
-import { parseStoryOutput } from './helpers/story_output.helper.js';
+import { assignWeekDays, countRepetitiveOpenings, extractWeekContext, parseStoryOutput, removeRepeatedOpening } from './helpers/story_output.helper.js';
+import { ALL_WEEK, FORBIDDEN_OPENINGS, PromptHelper } from './helpers/prompt.helper.js';
+import { STORY_DAYS } from './helpers/story_schema.js';
+import { logger } from './logger.service.js';
+
+/** A single story (or a week whose median story) under this share of the minimum length of its age is asked once more. */
+const SHORT_STORY_RATIO = 0.6;
+
+/**
+ * Whether a second answer is better than the first: more complete first (up to the expected number of stories),
+ * then longer (typical length).
+ */
+const isBetterAnswer = (candidateWords, currentWords, expectedStories) => {
+  const complete = (words) => Math.min(words.length, expectedStories);
+  if (complete(candidateWords) !== complete(currentWords)) return complete(candidateWords) > complete(currentWords);
+  return typicalLength(candidateWords) > typicalLength(currentWords);
+};
+
+/** Length of an answer: the word count of a single story, the median of several. */
+const typicalLength = (words) => {
+  if (words.length === 0) return 0;
+  const sorted = [...words].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+};
 
 /**
  * Turns stored story content (plain text, markdown or editor HTML) into text fit for speech.
@@ -70,14 +94,107 @@ class StoryService {
       // The model reuses the library's themes instead of inventing near-duplicates
       const existingThemes = (await themeService.findAll({ sort: 'usage' })).map(theme => theme.name);
       const promptParams = { ...params, existingThemes };
+      const targetWords = PromptHelper.getTargetWords(params.age);
 
+      const isWeek = params.day === ALL_WEEK;
+      const expectedStories = isWeek ? STORY_DAYS.length : 1;
+
+      let attempt = await this._generateOnce(aiProvider, promptParams);
+
+      // Ask once more when the answer is incomplete (a week with fewer than 7 stories) or far below the length
+      // of its age (small models), and keep the better answer: the most complete, then the longest.
+      let lengthRetry = null;
+      const firstWords = typicalLength(attempt.words);
+      const firstCount = attempt.words.length;
+      const incompleteFirst = firstCount > 0 && firstCount < expectedStories;
+      const shortFirst = firstCount > 0 && targetWords.min > 0 && firstWords < targetWords.min * SHORT_STORY_RATIO;
+      if (incompleteFirst || shortFirst) {
+        const hints = [];
+        if (incompleteFirst) {
+          hints.push(`Votre réponse ne contenait que ${firstCount} histoire(s) : écrivez les ${expectedStories} histoires, une par jour du lundi au dimanche.`);
+        }
+        if (shortFirst) {
+          hints.push(isWeek
+            ? `Vos histoires faisaient environ ${firstWords} mots chacune : écrivez au moins ${targetWords.min} mots pour chacune des ${expectedStories} histoires, en développant les scènes, les dialogues et les sensations.`
+            : `Votre précédente version faisait ${firstWords} mots : écrivez au moins ${targetWords.min} mots, en développant les scènes, les dialogues et les sensations.`);
+        }
+        try {
+          const retry = await this._generateOnce(aiProvider, { ...promptParams, lengthHint: hints.join(' ') });
+          lengthRetry = { before: firstWords, after: typicalLength(retry.words), storiesBefore: firstCount, storiesAfter: retry.words.length };
+          if (isBetterAnswer(retry.words, attempt.words, expectedStories)) {
+            attempt = {
+              ...retry,
+              weekPlan: retry.weekPlan ?? attempt.weekPlan,
+              characters: retry.characters ?? attempt.characters
+            };
+          }
+        } catch (error) {
+          // The first version is still usable
+          lengthRetry = { before: firstWords, after: null, error: error.message };
+        }
+      }
+
+      const { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, weekPlan, characters, daysFixed } = attempt;
+      const incomplete = words.length > 0 && words.length < expectedStories ? { stories: words.length, expected: expectedStories } : null;
+
+      // Length and continuity context, so short or disconnected stories show up in the AI log
+      logger.ai(aiProvider === 'local' ? 'Ollama' : 'Gemini', 'Story-Parsed',
+        {
+          age: params.age, day: params.day, weekSeries: Boolean(params.weekSeries),
+          previousDays: Array.isArray(params.previousDays) ? params.previousDays.length : 0,
+          previousEnding: Boolean(params.previousEnding), weekPlanGiven: Array.isArray(params.weekPlan) && params.weekPlan.length > 0,
+          charactersGiven: Array.isArray(params.characters) ? params.characters.length : 0
+        },
+        {
+          model: result.model, finishReason: result.finishReason, parsed: Boolean(stories), stories: words.length, words, targetWords,
+          repeatedOpeningRemoved, cleanedParagraphs, lengthRetry, incomplete, daysFixed, weekPlan, characters,
+          // Stories opening with "Hier…" or the same words as another day: measures the opening rule
+          repetitiveOpenings: countRepetitiveOpenings(stories || [], FORBIDDEN_OPENINGS)
+        });
+
+      return { ...result, stories, targetWords, weekPlan, characters };
+  }
+
+  /**
+   * One generation request: parsed stories (opening copied from the previous day removed),
+   * their word counts, and the week context written by the first day.
+   * @private
+   */
+  async _generateOnce(aiProvider, promptParams) {
       const result = aiProvider === 'local'
           ? await localLLMService.generateStory(promptParams)
           : await geminiService.generateStory(promptParams);
 
-      const stories = parseStoryOutput(result.text);
+      let stories = parseStoryOutput(result.text);
       if (!stories) console.warn('[StoryService] AI answer is not valid JSON, client will use the text parser.');
-      return { ...result, stories };
+
+      // A whole week: one story per day (a repeated or missing day is fixed by position)
+      let daysFixed = 0;
+      if (stories && promptParams.day === ALL_WEEK) {
+        ({ stories, fixed: daysFixed } = assignWeekDays(stories));
+      }
+
+      // Models sometimes open the new day by copying the end of the previous one:
+      // the ending sent for a day generated day by day, or the previous story of a whole week
+      let repeatedOpeningRemoved = 0;
+      if (stories) {
+        const original = stories;
+        stories = original.map((story, index) => {
+          const previous = index > 0 ? original[index - 1] : null;
+          const ending = previous ? previous.paragraphs[previous.paragraphs.length - 1] : promptParams.previousEnding;
+          if (!ending) return story;
+          const { paragraphs, removed } = removeRepeatedOpening(story.paragraphs, ending);
+          repeatedOpeningRemoved += removed;
+          return { ...story, paragraphs };
+        });
+      }
+
+      // First day of a week generated day by day: the plan and the characters the following days will follow
+      const { weekPlan, characters } = extractWeekContext(result.text);
+      const words = (stories || []).map(story => story.paragraphs.join(' ').split(/\s+/).filter(Boolean).length);
+      // Filler and illustration paragraphs removed by parseStoryOutput
+      const cleanedParagraphs = (stories || []).reduce((total, story) => total + (story.cleanedParagraphs || 0), 0);
+      return { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, daysFixed, weekPlan, characters };
   }
 
   /**

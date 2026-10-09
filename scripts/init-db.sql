@@ -104,12 +104,10 @@ CREATE TABLE illustrations (
 -- Create weekly_themes table
 CREATE TABLE weekly_themes (
   week_number INT PRIMARY KEY,
-  theme_id VARCHAR(36) NULL,
-  -- Fallback label, kept in sync with the linked theme
+  -- Topic of the week (free text, not a story theme/tag)
   theme_name VARCHAR(255) NOT NULL,
   theme_description TEXT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_weekly_themes_theme FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE SET NULL
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for performance

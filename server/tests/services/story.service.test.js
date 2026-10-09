@@ -278,3 +278,197 @@ describe('StoryService Unit Tests', () => {
         });
     });
 });
+
+describe('generateFromAI', () => {
+    it('should log the length of each parsed story against the target of the age', async () => {
+        const { geminiService } = await import('../../services/gemini.service.js');
+        const { themeService } = await import('../../services/theme.service.js');
+        const { logger } = await import('../../services/logger.service.js');
+        vi.spyOn(themeService, 'findAll').mockResolvedValue([{ name: 'Nature' }]);
+        const ai = vi.spyOn(logger, 'ai').mockImplementation(() => {});
+        const generate = vi.spyOn(geminiService, 'generateStory').mockResolvedValue({
+            text: JSON.stringify({ stories: [{ day: 'Lundi', title: 'T', summary: 'S', themes: [], paragraphs: ['un deux trois', 'quatre'], illustration_prompt: 'I' }] }),
+            model: 'gemini-3.8-flash', finishReason: 'STOP', truncated: false, skipped: []
+        });
+
+        const result = await storyService.generateFromAI({ theme: 'Pluie', age: '13-15', day: 'Lundi', weekSeries: true }, 'gemini');
+
+        expect(generate).toHaveBeenCalledWith(expect.objectContaining({ existingThemes: ['Nature'], weekSeries: true }));
+        expect(result.targetWords).toEqual({ min: 900, max: 1100 });
+        expect(result.weekPlan).toBeNull();
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.objectContaining({ age: '13-15', weekSeries: true }),
+            expect.objectContaining({ model: 'gemini-3.8-flash', parsed: true, stories: 1, words: [4], targetWords: { min: 900, max: 1100 } }));
+    });
+
+    it('should return the plan of the week written by the first day', async () => {
+        const { geminiService } = await import('../../services/gemini.service.js');
+        const { themeService } = await import('../../services/theme.service.js');
+        const { logger } = await import('../../services/logger.service.js');
+        vi.spyOn(themeService, 'findAll').mockResolvedValue([]);
+        vi.spyOn(logger, 'ai').mockImplementation(() => {});
+        const plan = ['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six', 'Sept'];
+        vi.spyOn(geminiService, 'generateStory').mockResolvedValue({
+            text: JSON.stringify({ week_plan: plan, stories: [{ day: 'Lundi', title: 'T', summary: 'S', themes: [], paragraphs: ['Texte'], illustration_prompt: 'I' }] }),
+            model: 'm', finishReason: 'STOP', truncated: false, skipped: []
+        });
+
+        const result = await storyService.generateFromAI({ theme: 'Pluie', age: '4-6', day: 'Lundi', weekSeries: true }, 'gemini');
+
+        expect(result.weekPlan).toEqual(plan);
+        expect(result.stories).toHaveLength(1);
+    });
+
+    it('should return the character sheets and remove an opening copied from the previous day', async () => {
+        const { geminiService } = await import('../../services/gemini.service.js');
+        const { themeService } = await import('../../services/theme.service.js');
+        const { logger } = await import('../../services/logger.service.js');
+        vi.spyOn(themeService, 'findAll').mockResolvedValue([]);
+        const ai = vi.spyOn(logger, 'ai').mockImplementation(() => {});
+        const ending = 'Papouin regarde le sable mouillé qui garde sa forme ronde.';
+        vi.spyOn(geminiService, 'generateStory').mockResolvedValue({
+            text: JSON.stringify({
+                characters: [{ name: 'Papouin', description: 'Garçon de 5 ans' }],
+                stories: [{ day: 'Mardi', title: 'T', summary: 'S', themes: [], paragraphs: [ending, 'Ce mardi, Papouin revient à la plage.'], illustration_prompt: 'I' }]
+            }),
+            model: 'm', finishReason: 'STOP', truncated: false, skipped: []
+        });
+
+        const result = await storyService.generateFromAI({ theme: 'Sable', age: '4-6', day: 'Mardi', weekSeries: true, previousEnding: ending }, 'gemini');
+
+        expect(result.characters).toEqual([{ name: 'Papouin', description: 'Garçon de 5 ans' }]);
+        expect(result.stories[0].paragraphs).toEqual(['Ce mardi, Papouin revient à la plage.']);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ repeatedOpeningRemoved: 1 }));
+    });
+
+    const storyText = (words, day = 'Mardi') => JSON.stringify({
+        stories: [{ day, title: 'T', summary: 'S', themes: [], paragraphs: [Array.from({ length: words }, (_, i) => `mot${i}`).join(' ')], illustration_prompt: 'I' }]
+    });
+
+    const mockGeneration = async (...texts) => {
+        const { geminiService } = await import('../../services/gemini.service.js');
+        const { themeService } = await import('../../services/theme.service.js');
+        const { logger } = await import('../../services/logger.service.js');
+        vi.spyOn(themeService, 'findAll').mockResolvedValue([]);
+        const ai = vi.spyOn(logger, 'ai').mockImplementation(() => {});
+        const generate = vi.spyOn(geminiService, 'generateStory');
+        generate.mockReset();
+        texts.forEach(text => generate.mockResolvedValueOnce({ text, model: 'm', finishReason: 'STOP', truncated: false, skipped: [] }));
+        return { generate, ai };
+    };
+
+    it('should ask once more for a story far too short for its age and keep the longer one', async () => {
+        const { generate, ai } = await mockGeneration(storyText(100), storyText(650));
+
+        const result = await storyService.generateFromAI({ theme: 'Bateaux', age: '10-12', day: 'Mardi', weekSeries: true }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(generate.mock.calls[1][0].lengthHint).toContain('100 mots');
+        expect(generate.mock.calls[1][0].lengthHint).toContain('au moins 700 mots');
+        expect(result.stories[0].paragraphs[0].split(' ')).toHaveLength(650);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ lengthRetry: { before: 100, after: 650, storiesBefore: 1, storiesAfter: 1 } }));
+    });
+
+    it('should not ask again for a story long enough', async () => {
+        const { generate } = await mockGeneration(storyText(500));
+
+        await storyService.generateFromAI({ theme: 'Bateaux', age: '10-12', day: 'Mardi' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(1);
+    });
+
+    const weekText = (wordsPerDay, paragraphsOf = () => null) => JSON.stringify({
+        stories: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((day, index) => ({
+            day, title: `T${index}`, summary: 'S', themes: [], illustration_prompt: 'I',
+            paragraphs: paragraphsOf(index) || [Array.from({ length: wordsPerDay }, (_, i) => `mot${i}`).join(' ')]
+        }))
+    });
+
+    it('should not ask again for a whole week long enough', async () => {
+        const { generate } = await mockGeneration(weekText(320));
+
+        await storyService.generateFromAI({ theme: 'Bateaux', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ask once more for a whole week whose stories are far too short', async () => {
+        const { generate, ai } = await mockGeneration(weekText(100), weekText(330));
+
+        const result = await storyService.generateFromAI({ theme: 'Bateaux', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(generate.mock.calls[1][0].lengthHint).toContain('pour chacune des 7 histoires');
+        expect(result.stories).toHaveLength(7);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ lengthRetry: { before: 100, after: 330, storiesBefore: 7, storiesAfter: 7 } }));
+    });
+
+    it('should remove, in a whole week, an opening copied from the previous day', async () => {
+        const monday = 'Le petit bateau file vers le pont de pierre, emporté par le courant.';
+        const { generate } = await mockGeneration(weekText(320, index => (index === 1
+            ? [`${monday} Ce mardi matin, Léo retrouve le bateau coincé dans les roseaux.`, 'Suite.']
+            : index === 0 ? ['Début du lundi.', monday] : null)));
+
+        const result = await storyService.generateFromAI({ theme: 'Bateaux', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(1);
+        expect(result.stories[1].paragraphs[0]).toBe('Ce mardi matin, Léo retrouve le bateau coincé dans les roseaux.');
+    });
+
+    it('should count words after removing filler paragraphs, so a padded story is asked again', async () => {
+        const words = (count) => Array.from({ length: count }, (_, i) => `mot${i}`).join(' ');
+        const padded = JSON.stringify({ stories: [{ day: 'Dimanche', title: 'T', summary: 'S', themes: [], illustration_prompt: 'I', paragraphs: [
+            words(300),
+            Array.from({ length: 40 }, () => 'Un paragraphe de transition pour atteindre la longueur minimale requise.').join(' ')
+        ] }] });
+        const { generate, ai } = await mockGeneration(padded, storyText(800, 'Dimanche'));
+
+        const result = await storyService.generateFromAI({ theme: 'Forêt', age: '13-15', day: 'Dimanche', weekSeries: true }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(result.stories[0].paragraphs[0].split(' ')).toHaveLength(800);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ lengthRetry: { before: 300, after: 800, storiesBefore: 1, storiesAfter: 1 } }));
+    });
+
+    it('should log the stories that open with the reminder of the previous day', async () => {
+        const opening = (index) => (index === 0 ? null : [`Hier, Léonie et Antonin avaient trouvé la bogue numéro ${index}.`, Array.from({ length: 320 }, (_, i) => `mot${i}`).join(' ')]);
+        const { ai } = await mockGeneration(weekText(320, opening));
+
+        await storyService.generateFromAI({ theme: 'Châtaignes', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ repetitiveOpenings: 6 }));
+    });
+
+    it('should keep the complete week when the first answer has a single story (real Halloween case)', async () => {
+        const single = JSON.stringify({ stories: [{ day: 'Lundi', title: 'Le costume magique de Sweety', summary: 'S', themes: [], illustration_prompt: 'I',
+            paragraphs: [Array.from({ length: 167 }, (_, i) => `mot${i}`).join(' ')] }] });
+        const { generate, ai } = await mockGeneration(single, weekText(240));
+
+        const result = await storyService.generateFromAI({ theme: 'Halloween', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(generate.mock.calls[1][0].lengthHint).toContain('ne contenait que 1 histoire(s)');
+        expect(result.stories).toHaveLength(7);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ incomplete: null }));
+    });
+
+    it('should keep a complete week of short stories rather than a single longer story', async () => {
+        const single = JSON.stringify({ stories: [{ day: 'Lundi', title: 'T', summary: 'S', themes: [], illustration_prompt: 'I',
+            paragraphs: [Array.from({ length: 400 }, (_, i) => `mot${i}`).join(' ')] }] });
+        const { result } = await mockGeneration(weekText(100), single).then(async (mocks) => ({
+            ...mocks, result: await storyService.generateFromAI({ theme: 'Halloween', age: '4-6', day: 'Toute la semaine' }, 'gemini')
+        }));
+
+        expect(result.stories).toHaveLength(7);
+    });
+
+    it('should log a week that stays incomplete after the second try', async () => {
+        const single = JSON.stringify({ stories: [{ day: 'Lundi', title: 'T', summary: 'S', themes: [], illustration_prompt: 'I',
+            paragraphs: [Array.from({ length: 320 }, (_, i) => `mot${i}`).join(' ')] }] });
+        const { ai } = await mockGeneration(single, single);
+
+        await storyService.generateFromAI({ theme: 'Halloween', age: '4-6', day: 'Toute la semaine' }, 'gemini');
+
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ incomplete: { stories: 1, expected: 7 } }));
+    });
+});
+

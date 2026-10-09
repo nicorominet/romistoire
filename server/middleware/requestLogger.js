@@ -5,11 +5,12 @@ import { ENV_CONFIG } from '../config/env.config.js';
 const LOGS_DIR = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
 
 // Ensure logs directory exists
-if (!fs.existsSync(LOGS_DIR)) {
+if (ENV_CONFIG.FILE_LOGGING && !fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
 export const requestLogger = (req, res, next) => {
+  if (!ENV_CONFIG.FILE_LOGGING) return next();
   const start = Date.now();
   const date = new Date();
   const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD

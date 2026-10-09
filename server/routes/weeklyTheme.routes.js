@@ -5,25 +5,25 @@ const router = express.Router();
 
 /**
  * GET /api/weekly-themes
- * All configured weeks, with the linked theme (name, color, icon).
+ * Topics of the configured weeks: [{ week_number, theme_name, theme_description }].
  */
 router.get('/', weeklyThemeController.getWeeklyThemes);
 
 /**
  * POST /api/weekly-themes
- * Batch update: [{ week_number, theme_id?, theme_name? }] (used by imports).
+ * Batch update: [{ week_number, theme_name, theme_description? }] (legacy).
  */
 router.post('/', weeklyThemeController.updateWeeklyThemes);
 
 /**
  * PUT /api/weekly-themes/:week
- * Link one week to a theme: { themeId } or { themeName } (theme created if needed).
+ * Set the topic of a week (1-53): { name, description? }.
  */
 router.put('/:week', weeklyThemeController.setWeekTheme);
 
 /**
  * DELETE /api/weekly-themes/:week
- * Remove the theme of a week.
+ * Remove the topic of a week (any week, so legacy weeks > 53 can be cleaned up).
  */
 router.delete('/:week', weeklyThemeController.clearWeekTheme);
 

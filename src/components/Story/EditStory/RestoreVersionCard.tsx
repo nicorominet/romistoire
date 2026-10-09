@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { History } from "lucide-react";
 import { i18n } from "@/lib/i18n";
-import { truncateText } from "@/lib/utils";
+import { storyPreview } from "@/lib/utils";
 
 interface RestoreVersionCardProps {
     versions: any[];
@@ -26,10 +26,7 @@ interface RestoreVersionCardProps {
 }
 
 /** Plain-text preview of stored content (editor HTML or markdown). */
-const previewText = (content: string) => truncateText(
-    (content || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\*\*/g, "").replace(/\s+/g, " ").trim(),
-    300
-);
+const previewText = (content: string) => storyPreview(content, 300);
 
 const RestoreVersionCard = ({
     versions,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { ExportOptions, Story, AgeGroup, AGE_GROUPS } from "@/types/Story";
+import { PDF_STYLES, PdfStyle, resolvePdfStyle } from "@/utils/pdfStyle";
 import { i18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
     coverPage: true,
     tableOfContents: true,
     fontSize: "medium",
-    fontFamily: "helvetica",
+    style: "auto",
     pageSize: "a4",
     orientation: "portrait",
   });
@@ -56,7 +57,17 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
   const [dateTo, setDateTo] = useState<string>("");
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [generating, setGenerating] = useState<boolean>(false);
+  // Object URL of the last generated PDF (revoked when replaced or when leaving the page)
   const [pdfUrl, setPdfUrl] = useState<string>("");
+  const [pdfFilename, setPdfFilename] = useState<string>("");
+  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+
+  // Style used in "auto": from the age groups of the selected stories
+  const resolvedStyle = useMemo(() => {
+    const selected = new Set(selectedStories);
+    const ages = availableStories.filter((story) => selected.has(story.id)).map((story) => String(story.age_group));
+    return resolvePdfStyle(exportOptions.style ?? "auto", ages);
+  }, [availableStories, selectedStories, exportOptions.style]);
 
   // The export covers the loaded stories: only offer their themes (with full theme data for the picker)
   const themes: Theme[] = useMemo(() => {
@@ -166,13 +177,14 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
           `${t("pdf.exportDate")}: ${formatDate(new Date())}`,
       };
 
-      const data: any = await systemApi.exportPdf(options);
-
-      if (!data?.url) {
+      // The server sends the PDF file itself
+      const file = await systemApi.exportPdf(options);
+      if (!(file instanceof Blob) || file.type !== "application/pdf") {
         throw new Error(t("pdf.invalidResponse"));
       }
 
-      setPdfUrl(data.url);
+      setPdfFilename(`histoires_${new Date().toISOString().slice(0, 10)}.pdf`);
+      setPdfUrl(URL.createObjectURL(file));
       toast.success(t("pdf.success"), { description: t("pdf.readyToDownload"), duration: 5000 });
     } catch (error) {
       console.error("PDF generation error:", error);
@@ -363,22 +375,27 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fontFamily">{t("pdf.fontFamily")}</Label>
+                <Label htmlFor="pdfStyle">{t("pdf.style")}</Label>
                 <Select
-                  value={exportOptions.fontFamily}
+                  value={exportOptions.style ?? "auto"}
                   onValueChange={(value) =>
-                    setExportOptions({ ...exportOptions, fontFamily: value })
+                    setExportOptions({ ...exportOptions, style: value as PdfStyle })
                   }
                 >
-                  <SelectTrigger id="fontFamily">
-                    <SelectValue placeholder={t("pdf.selectFont")} />
+                  <SelectTrigger id="pdfStyle">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="helvetica">Helvetica</SelectItem>
-                    <SelectItem value="courier">Courier</SelectItem>
-                    <SelectItem value="times">Times</SelectItem>
+                    {PDF_STYLES.map((style) => (
+                      <SelectItem key={style} value={style}>{t(`pdf.styles.${style}`)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {(exportOptions.style ?? "auto") === "auto"
+                    ? `${t("pdf.styleAuto", { style: t(`pdf.styles.${resolvedStyle}`) })} — ${t("pdf.styles.autoDesc")}`
+                    : t(`pdf.styles.${exportOptions.style}Desc`)}
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -559,12 +576,11 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
           </Button>
 
           {pdfUrl && (
-            <Button
-              variant="outline"
-              onClick={() => window.open(pdfUrl, "_blank")}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {t("pdf.download")}
+            <Button variant="outline" asChild>
+              <a href={pdfUrl} download={pdfFilename}>
+                <Download className="mr-2 h-4 w-4" />
+                {t("pdf.download")}
+              </a>
             </Button>
           )}
         </div>

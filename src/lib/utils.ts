@@ -88,4 +88,27 @@ function truncateText(text: string, maxLength: number): string {
   return text.substring(0, maxLength) + '...';
 }
 
-export { cn, getAgeGroupColor, stripHtmlTags, optimizeImage, formatDate, truncateText };
+const HTML_ENTITIES: Record<string, string> = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&apos;": "'" };
+
+/**
+ * Plain text of stored story content, for previews: editor HTML (generated stories are saved as
+ * <p>…</p>), markdown bold and [Illustration: …] tags removed, entities decoded, spaces collapsed.
+ * Parsed with regular expressions, never through the DOM (no markup is ever interpreted).
+ */
+function storyPlainText(content: string | null | undefined): string {
+  return (content || "")
+    .replace(/<\/(p|div|h[1-6]|li|blockquote)>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39|apos);/g, entity => HTML_ENTITIES[entity] ?? entity)
+    .replace(/\[\s*(?:Illustration|Description)[^\]]*\]/gi, "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Short plain-text preview of a story, for cards. */
+function storyPreview(content: string | null | undefined, maxLength: number): string {
+  return truncateText(storyPlainText(content), maxLength);
+}
+
+export { cn, getAgeGroupColor, stripHtmlTags, optimizeImage, formatDate, truncateText, storyPlainText, storyPreview };

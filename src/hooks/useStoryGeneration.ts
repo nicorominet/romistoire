@@ -11,6 +11,10 @@ import client from "@/api/client";
 import { Theme, WeeklyTheme } from "@/types/Theme";
 import { findSimilarThemes } from "@/utils/themeName";
 import { parseHexColor } from "@/utils/themeColors";
+import {
+    buildDayParams, countWords, emptyWeekContext, isIterativeGeneration, isShortStory, missingWeekStories, pacingDelay, storyEnding, storyOpening,
+    WEEK_STORY_COUNT, WrittenDay, CharacterSheet
+} from "@/utils/generationPlan";
 
 /** A story returned as structured JSON by the server (see server/services/helpers/story_output.helper.js). */
 interface StructuredStory {
@@ -27,6 +31,11 @@ interface GenerationResult {
     model?: string;
     truncated?: boolean;
     stories?: StructuredStory[] | null;
+    /** Length asked for the age group */
+    targetWords?: { min: number; max: number };
+    /** Plan of the week and character sheets, returned by the first day of a week generated day by day */
+    weekPlan?: string[] | null;
+    characters?: CharacterSheet[] | null;
 }
 
 interface GeneratedStory extends ParsedStory {
@@ -84,6 +93,8 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
 
     // Themes created during the current run (the themes query is not refreshed between stories)
     const createdThemesRef = useRef<Map<string, Theme>>(new Map());
+    // Start time of the previous cloud request (rate limit of the free tier)
+    const lastCloudCallRef = useRef<number | null>(null);
 
     // Fetch local models
     const { data: availableModels = [] } = useQuery({
@@ -130,7 +141,9 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
     };
 
     /**
-     * Story themes: the week's theme first, as primary theme, then the AI's themes (reused when similar).
+     * Story themes (tags) chosen by the AI, reused when similar; the first one is the primary theme.
+     * The topic of the week is not a tag: it is used only when the AI returned no theme at all,
+     * because a story needs at least one theme.
      */
     const resolveStoryThemes = async (story: GeneratedStory, week: WeeklyTheme | undefined) => {
         const themes: { id: string; isPrimary: boolean }[] = [];
@@ -138,11 +151,12 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
             if (id && !themes.some(theme => theme.id === id)) themes.push({ id, isPrimary: themes.length === 0 });
         };
 
-        if (week?.theme_id) add(week.theme_id);
-        else if (week?.theme_name) add((await resolveTheme({ name: week.theme_name, description: t("create.generate.weeklyThemeDescription") }, 'manual'))?.id);
-
         for (const theme of story.associatedThemes || []) {
             add((await resolveTheme(theme))?.id);
+        }
+        if (themes.length === 0 && week?.theme_name) {
+            addToLog(t("create.generate.logs.topicAsTheme", { name: week.theme_name }));
+            add((await resolveTheme({ name: week.theme_name, description: week.theme_description }))?.id);
         }
         return themes;
     };
@@ -186,10 +200,18 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
 
     /**
      * Generates and saves the stories of one request.
-     * @returns The summary of the last saved story (context for the next day), and the stories created.
+     * @returns The stories created, the last saved story as context for the next day, and the plan of the week (first day).
      */
     const generateAndProcess = async (params: any, weekNum: string, age: string, day: string, week: WeeklyTheme, source: string) => {
         const isWeek = day === ALL_WEEK;
+        if (params.aiProvider !== "local") {
+            const delay = pacingDelay(lastCloudCallRef.current, Date.now());
+            if (delay > 0) {
+                addToLog(t("create.generate.logs.pacing", { seconds: String(Math.ceil(delay / 1000)) }));
+                await wait(delay);
+            }
+            lastCloudCallRef.current = Date.now();
+        }
         const result = await generateAI.mutateAsync(params) as GenerationResult;
         if (result.truncated) {
             addToLog(t("create.generate.logs.truncated", { model: result.model || params.aiProvider }));
@@ -198,7 +220,7 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
         const created: CreatedStorySummary[] = [];
         let skipped = 0;
         let failed = 0;
-        let lastSummary = "";
+        let lastDay: WrittenDay | null = null;
 
         for (const story of toStories(result, isWeek)) {
             // A weekly answer without a day cannot be placed: tell the user instead of dropping it silently
@@ -211,17 +233,30 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
             }
 
             const finalStory = { ...story, dayOfWeek: isWeek ? story.dayOfWeek : (story.dayOfWeek || day) };
+            const words = countWords(story.content || "");
+            if (isShortStory(words, result.targetWords)) {
+                addToLog(t("create.generate.logs.shortStory", {
+                    title: finalStory.title, words: String(words),
+                    min: String(result.targetWords!.min), max: String(result.targetWords!.max)
+                }));
+            }
             try {
                 const saved = await saveStoryToDb(finalStory, week, age, weekNum, source);
                 addToLog(`✅ ${t("create.generate.logs.saved", { title: finalStory.title, age: t("ages." + age), day: finalStory.dayOfWeek || "" })}`);
                 created.push({ id: saved?.id, title: finalStory.title, day: finalStory.dayOfWeek || "", age, week: weekNum });
-                lastSummary = story.summary || story.content;
+                lastDay = {
+                    day: isWeek ? (finalStory.dayOfWeek || day) : day,
+                    title: finalStory.title,
+                    summary: story.summary || "",
+                    ending: storyEnding(story.content || ""),
+                    opening: storyOpening(story.content || ""),
+                };
             } catch (error) {
                 failed++;
                 addToLog(t("create.generate.logs.error", { error: errorMessage(error) }));
             }
         }
-        return { created, skipped, failed, lastSummary };
+        return { created, skipped, failed, lastDay, weekPlan: result.weekPlan ?? null, characters: result.characters ?? null };
     };
 
     const handleGenerate = async (config: {
@@ -243,12 +278,14 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
         setProgress(0);
         setReport(null);
         createdThemesRef.current = new Map();
+        lastCloudCallRef.current = null;
 
         const source = config.aiProvider === 'local' ? 'ollama' : 'gemini';
-        // Ollama generates a week day by day (small context), cloud models in one request
-        const iterative = config.dayOfWeek === ALL_WEEK && config.aiProvider === "local";
-        const unitsPerItem = iterative ? GENERATION_DAYS_FR.length : 1;
-        const totalUnits = config.selectedWeeks.length * config.selectedAgeRanges.length * unitsPerItem;
+        // A week is one request for young ages, day by day from 10-12 (and always with Ollama)
+        const isIterative = (age: string) => isIterativeGeneration(config.dayOfWeek, age, config.aiProvider);
+        const unitsFor = (age: string) => (isIterative(age) ? GENERATION_DAYS_FR.length : 1);
+        const unitsPerWeek = config.selectedAgeRanges.reduce((total, age) => total + unitsFor(age), 0);
+        const totalUnits = config.selectedWeeks.length * unitsPerWeek;
         let doneUnits = 0;
         const advance = (units = 1) => {
             doneUnits += units;
@@ -277,35 +314,53 @@ export const useStoryGeneration = ({ onStoryGenerated, seriesName }: UseStoryGen
             if (!currentWeekTheme) {
                 addToLog(t("create.generate.logs.weekNotFound", { week: weekNum }));
                 runReport.skipped += config.selectedAgeRanges.length;
-                advance(config.selectedAgeRanges.length * unitsPerItem);
+                advance(unitsPerWeek);
                 continue;
             }
             const themeName = currentWeekTheme.theme_name;
+            // The topic of the week guides the writing; story tags are chosen by the AI
+            // The week number gives the season of the story
+            const topicParams = {
+                theme: themeName,
+                themeDescription: currentWeekTheme.theme_description || undefined,
+                weekNumber: parseInt(weekNum, 10) || undefined,
+            };
 
             for (const age of config.selectedAgeRanges) {
-                if (iterative) {
-                    let previousSummary = "";
+                if (isIterative(age)) {
+                    // What the week knows so far: plan (from Monday), days written, last scene
+                    const weekContext = emptyWeekContext();
                     for (const day of GENERATION_DAYS_FR) {
                         addToLog(t("create.generate.logs.generatingIterative", { week: weekNum, day: t(`days.${mapFrToEnDay(day).toLowerCase()}`), age: t("ages." + age) }));
                         try {
                             const outcome = await generateAndProcess({
-                                ...baseParams, theme: themeName, age, day, previousSummary
+                                ...baseParams, ...topicParams, age, day, ...buildDayParams(weekContext)
                             }, weekNum, age, day, currentWeekTheme, source);
                             collect(outcome);
-                            if (outcome.lastSummary) previousSummary = outcome.lastSummary;
+                            if (outcome.weekPlan && !weekContext.weekPlan) {
+                                weekContext.weekPlan = outcome.weekPlan;
+                                addToLog(t("create.generate.logs.weekPlan"));
+                            }
+                            if (outcome.characters && !weekContext.characters) weekContext.characters = outcome.characters;
+                            if (outcome.lastDay) weekContext.days.push(outcome.lastDay);
                         } catch (error) {
                             runReport.failed++;
                             addToLog(t("create.generate.logs.error", { error: errorMessage(error) }));
                         }
                         advance();
-                        await wait(500);
                     }
                 } else {
                     addToLog(t("create.generate.logs.generating", { week: weekNum, theme: themeName, age: t("ages." + age) }));
                     try {
-                        collect(await generateAndProcess({
-                            ...baseParams, theme: themeName, age, day: config.dayOfWeek
-                        }, weekNum, age, config.dayOfWeek, currentWeekTheme, source));
+                        const outcome = await generateAndProcess({
+                            ...baseParams, ...topicParams, age, day: config.dayOfWeek
+                        }, weekNum, age, config.dayOfWeek, currentWeekTheme, source);
+                        // A week in one request must give 7 stories: say so when some are missing
+                        const missing = missingWeekStories(config.dayOfWeek, outcome.created.length + outcome.failed + outcome.skipped);
+                        if (missing > 0) {
+                            addToLog(t("create.generate.logs.incompleteWeek", { count: String(outcome.created.length), total: String(WEEK_STORY_COUNT) }));
+                        }
+                        collect({ ...outcome, failed: outcome.failed + missing });
                     } catch (error) {
                         // One failing request must not cancel the remaining weeks and ages
                         runReport.failed++;

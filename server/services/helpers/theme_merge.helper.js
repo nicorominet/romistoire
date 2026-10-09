@@ -27,24 +27,20 @@ const moveLinks = async (connection, table, ownerColumn, sourceId, targetId) => 
 };
 
 /**
- * Merges `sourceIds` into `targetId`: story links, version links and weekly themes move to the target,
+ * Merges `sourceIds` into `targetId`: story links and version links move to the target,
  * then the source themes are deleted. No story nor version loses a theme.
  * @param {Object} connection - mysql2 connection (in a transaction).
  * @param {string[]} sourceIds - Themes to merge (deleted afterwards).
  * @param {string} targetId - Theme kept.
- * @param {{weeklyThemeLink?: boolean}} [options] - weeklyThemeLink: weekly_themes.theme_id exists.
  * @returns {Promise<{merged: number, movedStories: number}>}
  */
-export const mergeThemesOnConnection = async (connection, sourceIds, targetId, { weeklyThemeLink = true } = {}) => {
+export const mergeThemesOnConnection = async (connection, sourceIds, targetId) => {
   let merged = 0;
   let movedStories = 0;
   for (const sourceId of [...new Set(sourceIds)]) {
     if (!sourceId || sourceId === targetId) continue;
     movedStories += await moveLinks(connection, 'story_themes', 'story_id', sourceId, targetId);
     await moveLinks(connection, 'story_version_themes', 'story_version_id', sourceId, targetId);
-    if (weeklyThemeLink) {
-      await connection.query('UPDATE weekly_themes SET theme_id = ? WHERE theme_id = ?', [targetId, sourceId]);
-    }
     await connection.query('DELETE FROM themes WHERE id = ?', [sourceId]);
     merged++;
   }

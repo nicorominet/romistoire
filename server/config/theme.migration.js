@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { normalizeThemeName } from '../services/helpers/theme_name.helper.js';
 import { mergeThemesOnConnection } from '../services/helpers/theme_merge.helper.js';
 
@@ -8,13 +7,12 @@ const columnExists = async (pool, table, column) =>
 const indexExists = async (pool, table, index) =>
   (await pool.query(`SHOW INDEX FROM ${table} WHERE Key_name = ?`, [index]))[0].length > 0;
 
-const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
-
 /**
  * Theme model migration (idempotent, run at startup):
  * - themes: normalized_name (unique), updated_at, source, needs_review, longer icon;
  * - existing duplicates ("Nature" / "nature") merged without losing story or version links;
- * - weekly_themes.theme_id: each week linked to a theme (created from the week's name if needed).
+ * - weekly_themes.theme_id (briefly added, then dropped): a week's topic is free text, not a story theme.
+ *   The linked theme's current name/description are copied back into the week before the column is dropped.
  * @param {import('mysql2/promise').Pool} pool
  */
 export async function migrateThemes(pool) {
@@ -32,15 +30,6 @@ export async function migrateThemes(pool) {
     }
   }
   await pool.query('ALTER TABLE themes MODIFY COLUMN icon VARCHAR(16) NULL');
-
-  if (!(await columnExists(pool, 'weekly_themes', 'theme_id'))) {
-    await pool.query(`
-      ALTER TABLE weekly_themes
-      ADD COLUMN theme_id VARCHAR(36) NULL AFTER week_number,
-      ADD CONSTRAINT fk_weekly_themes_theme FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE SET NULL
-    `);
-    console.log('Migration: weekly_themes.theme_id added.');
-  }
 
   // 2. Normalized names (also refreshes rows written by older code)
   const [themes] = await pool.query(`
@@ -89,23 +78,18 @@ export async function migrateThemes(pool) {
     console.log('Migration: unique index on themes.normalized_name added.');
   }
 
-  // 5. Link weeks to themes
-  const [unlinkedWeeks] = await pool.query(
-    "SELECT week_number, theme_name, theme_description FROM weekly_themes WHERE theme_id IS NULL AND TRIM(theme_name) <> ''"
-  );
-  for (const week of unlinkedWeeks) {
-    const normalized = normalizeThemeName(week.theme_name);
-    if (!normalized) continue;
-    const [[existing]] = await pool.query('SELECT id FROM themes WHERE normalized_name = ?', [normalized]);
-    let themeId = existing?.id;
-    if (!themeId) {
-      themeId = uuidv4();
-      await pool.query(
-        'INSERT INTO themes (id, name, normalized_name, description, color, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [themeId, String(week.theme_name).trim().slice(0, 100), normalized, week.theme_description || '', '#6366f1', now()]
-      );
-    }
-    await pool.query('UPDATE weekly_themes SET theme_id = ? WHERE week_number = ?', [themeId, week.week_number]);
+  // 5. Weeks are free topics again: unlink them from themes
+  if (await columnExists(pool, 'weekly_themes', 'theme_id')) {
+    await pool.query(`
+      UPDATE weekly_themes w INNER JOIN themes t ON t.id = w.theme_id
+      SET w.theme_name = t.name, w.theme_description = COALESCE(NULLIF(t.description, ''), w.theme_description)
+    `);
+    const [[fk]] = await pool.query(
+      `SELECT CONSTRAINT_NAME AS name FROM information_schema.TABLE_CONSTRAINTS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'weekly_themes' AND CONSTRAINT_NAME = 'fk_weekly_themes_theme'`
+    );
+    if (fk) await pool.query('ALTER TABLE weekly_themes DROP FOREIGN KEY fk_weekly_themes_theme');
+    await pool.query('ALTER TABLE weekly_themes DROP COLUMN theme_id');
+    console.log('Migration: weekly_themes.theme_id dropped (week topics are free text).');
   }
-  if (unlinkedWeeks.length > 0) console.log(`Migration: ${unlinkedWeeks.length} week(s) linked to a theme.`);
 }

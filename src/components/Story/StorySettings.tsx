@@ -11,6 +11,7 @@ import { Series } from "@/types/Series";
 import { SeriesSelector } from "@/components/Story/SeriesSelector";
 import { ThemeMultiSelect, SelectedTheme } from "@/components/Theme/ThemeSelect";
 import { useThemeMutations } from "@/hooks/useThemes";
+import { MAX_ISO_WEEKS } from "@/utils/weekUtils";
 
 const STORY_LANGUAGES = ["fr", "en"] as const;
 
@@ -30,12 +31,8 @@ const StorySettings: React.FC<StorySettingsProps> = ({
   availableSeries,
 }) => {
   const { t } = i18n;
-  const { control, setValue, watch } = useFormContext();
+  const { control, setValue } = useFormContext();
   const { createTheme } = useThemeMutations();
-
-  // Theme of the selected week: pinned on top of the theme picker
-  const weekTheme = weeklyThemes.find(week => String(week.week_number) === String(watch("weekNumber")));
-  const pinned = weekTheme?.theme_id ? [{ themeId: weekTheme.theme_id, label: t("themes.weekTheme") }] : [];
 
   const handleCreateTheme = async (name: string): Promise<Theme | void> => {
     try {
@@ -81,7 +78,6 @@ const StorySettings: React.FC<StorySettingsProps> = ({
                 value={(field.value || []) as SelectedTheme[]}
                 onChange={(value) => setValue("themes", value, { shouldDirty: true, shouldValidate: true })}
                 onCreate={handleCreateTheme}
-                pinned={pinned}
               />
             </FormControl>
             <FormMessage />
@@ -204,7 +200,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
                   <SelectValue placeholder={t("create.selectWeekNumber")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.from({ length: 52 }, (_, i) => i + 1).map((week) => (
+                  {Array.from({ length: MAX_ISO_WEEKS }, (_, i) => i + 1).map((week) => (
                     <SelectItem key={week} value={week.toString()}>
                       {week} - {weeklyThemes.find((theme) => theme.week_number === week)?.theme_name || t("common.noTheme")}
                     </SelectItem>

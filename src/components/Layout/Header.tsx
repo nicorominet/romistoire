@@ -74,6 +74,12 @@ const Header = () => {
           <Link to="/themes" className={getNavLinkClass("/themes")}>
                {t("nav.themes")}
           </Link>
+          <Link to="/weekly-themes" className={getNavLinkClass("/weekly-themes")}>
+               {t("nav.program")}
+          </Link>
+          <Link to="/illustrations" className={getNavLinkClass("/illustrations")}>
+               {t("nav.illustrations")}
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">

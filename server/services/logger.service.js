@@ -51,7 +51,7 @@ class LoggerService {
     const fullMeta = { ...meta, provider, type, input, output };
     
     // Console log for immediate feedback (brief)
-    console.log(`[AI] ${provider} ${type} - ${meta.duration}ms`);
+    console.log(`[AI] ${provider} ${type}${meta.duration !== undefined ? ` - ${meta.duration}ms` : ''}`);
 
     this._writeToFile('AI', message, fullMeta, 'ai');
   }
@@ -65,6 +65,7 @@ class LoggerService {
    * @param {string} [logType='access'] - Type of log file prefix (access or ai).
    */
   _writeToFile(level, message, meta = {}, logType = 'access') {
+    if (!ENV_CONFIG.FILE_LOGGING) return;
     try {
       const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const logFile = path.join(this.logsDir, `${logType}-${dateStr}.log`); 

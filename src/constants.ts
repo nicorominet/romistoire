@@ -42,6 +42,7 @@ export const API_ENDPOINTS = {
     SERIES: '/api/series',
     SERIES_STORIES_BATCH: '/api/series/:id/stories/batch', // :id will be replaced dynamically
     WEEKLY_THEMES: '/api/weekly-themes',
+    ILLUSTRATIONS: '/api/illustrations',
     GENERATE: '/api/generate',
 
 } as const;
@@ -55,8 +56,12 @@ export const APP_ROUTES = {
     SERIES_MANAGEMENT: '/series-management',
     SETTINGS: '/settings',
     TIMELINE: '/timeline',
-    // Themes page: "themes" tab, and the weekly calendar with ?tab=calendar
+    // Story themes (tags)
     THEMES: '/themes',
+    // Topics of the weeks (free text guiding generation)
+    WEEKLY_THEMES: '/weekly-themes',
+    // Illustration workshop (prompts, batch import)
+    ILLUSTRATIONS: '/illustrations',
 } as const;
 
 // Must match the server whitelist (server/config/upload.config.js)

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Illustrations par lots</title>
+    <!--
+        Générateur d'illustrations par lots pour l'appli d'histoires, à coller dans Gemini Canvas.
+        Dans Canvas, la clé API vide ("") est fournie par Google : les modèles d'image y sont utilisables
+        alors que l'API gratuite de l'appli n'y a pas accès. Hors de Canvas, les appels échouent (403).
+        Entrée : le JSON exporté par l'appli (page Illustrations, « Exporter pour Canvas »).
+        Sortie : un ZIP d'images nommées par leur code (IMG-xxxxxxxx.png), que l'appli rattache toute seule.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f0f4f8; }
+        textarea { resize: vertical; }
+        .card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
+        .placeholder { width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: 13px; }
+        .spinner { width: 28px; height: 28px; border-radius: 9999px; border: 3px solid #c7d2fe; border-top-color: #4f46e5; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+<div class="mx-auto max-w-5xl space-y-6">
+    <header class="rounded-2xl bg-white p-6 shadow">
+        <h1 class="text-2xl font-bold text-gray-800">Illustrations par lots</h1>
+        <p class="mt-1 text-sm text-gray-600">
+            Chargez le fichier JSON exporté par l'appli, générez les images, puis téléchargez le ZIP
+            et importez-le dans l'appli (page Illustrations, « Importer des images »).
+        </p>
+    </header>
+
+    <section class="space-y-4 rounded-2xl bg-white p-6 shadow">
+        <div>
+            <label for="jsonFile" class="mb-1 block text-sm font-medium text-gray-700">1. Fichier JSON des prompts</label>
+            <input type="file" id="jsonFile" accept=".json,application/json"
+                   class="w-full cursor-pointer rounded-lg border border-gray-300 p-2 text-sm">
+        </div>
+        <details>
+            <summary class="cursor-pointer text-sm text-gray-600">… ou collez le contenu du JSON</summary>
+            <textarea id="jsonText" rows="6" class="mt-2 w-full rounded-lg border border-gray-300 p-2 font-mono text-xs"
+                      placeholder='[{"code":"IMG-7f3a2c91","title":"…","week":42,"day":"Lundi","age":"4-6","prompt":"…"}]'></textarea>
+            <button id="loadText" class="mt-2 rounded-lg bg-gray-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-gray-800">Charger</button>
+        </details>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label for="model" class="mb-1 block text-sm font-medium text-gray-700">2. Modèle d'image</label>
+                <select id="model" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    <option value="gemini-2.5-flash-image-preview">Gemini 2.5 Flash Image (Nano Banana)</option>
+                    <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image (version stable)</option>
+                    <option value="imagen-4.0-generate-001">Imagen 4</option>
+                    <option value="imagen-3.0-generate-002">Imagen 3 (ancien)</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Si le modèle choisi est refusé, les suivants de la liste sont essayés.</p>
+            </div>
+            <div>
+                <label for="extraStyle" class="mb-1 block text-sm font-medium text-gray-700">Ajout au style (facultatif)</label>
+                <input id="extraStyle" type="text" class="w-full rounded-lg border border-gray-300 p-2 text-sm"
+                       placeholder="Ex. : trait de crayon, fond blanc">
+                <p class="mt-1 text-xs text-gray-500">Les prompts contiennent déjà le style de l'âge et « aucun texte ».</p>
+            </div>
+        </div>
+        <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input id="keepCharacters" type="checkbox" checked class="mt-1">
+            <span>Garder les mêmes personnages dans une semaine : l'image précédente de la semaine est donnée en modèle
+                (modèles Gemini seulement).</span>
+        </label>
+
+        <div class="flex flex-wrap gap-2">
+            <button id="generate" class="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50" disabled>
+                3. Générer les images
+            </button>
+            <button id="stop" class="hidden rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700">Arrêter</button>
+            <button id="downloadZip" class="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700 disabled:opacity-50" disabled>
+                4. Télécharger le ZIP
+            </button>
+        </div>
+        <p id="status" class="text-sm text-gray-700"></p>
+    </section>
+
+    <section id="cards" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></section>
+</div>
+
+<script>
+    const MODELS = ['gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image', 'imagen-4.0-generate-001', 'imagen-3.0-generate-002'];
+    const API = 'https://generativelanguage.googleapis.com/v1beta/models';
+    const apiKey = ''; // Fournie par l'environnement Canvas
+    const PAUSE_MS = 2000;
+    const RATE_LIMIT_WAIT_MS = 30000;
+
+    const $ = (id) => document.getElementById(id);
+    let items = [];       // { code, title, week, day, age, prompt, image?: {data, mimeType}, include: true, state }
+    let stopRequested = false;
+    let running = false;
+    const refusedModels = new Set();
+
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const setStatus = (text) => { $('status').textContent = text; };
+    const extensionOf = (mimeType) => (mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png');
+    const fileNameOf = (item) => `${item.code}.${extensionOf(item.image.mimeType)}`;
+
+    class ModelRefused extends Error {}
+
+    function loadJson(text) {
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (error) {
+            setStatus('Ce fichier n\'est pas un JSON valide.');
+            return;
+        }
+        const list = Array.isArray(data) ? data : data.items;
+        if (!Array.isArray(list)) {
+            setStatus('Le JSON doit être une liste de prompts.');
+            return;
+        }
+        items = list
+            .filter(item => item && typeof item.prompt === 'string' && item.prompt.trim() && /^IMG-[0-9a-f]{8}$/i.test(item.code || ''))
+            .map(item => ({ ...item, include: true, state: 'waiting' }));
+        render();
+        $('generate').disabled = items.length === 0;
+        setStatus(items.length ? `${items.length} prompt(s) chargé(s).` : 'Aucun prompt utilisable (code IMG-… et prompt requis).');
+    }
+
+    $('jsonFile').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (file) loadJson(await file.text());
+    });
+    $('loadText').addEventListener('click', () => loadJson($('jsonText').value));
+
+    function render() {
+        const container = $('cards');
+        container.innerHTML = '';
+        items.forEach((item, index) => {
+            const card = document.createElement('article');
+            card.className = 'card flex flex-col gap-2 rounded-xl bg-white p-3 shadow';
+
+            if (item.image) {
+                const img = document.createElement('img');
+                img.src = `data:${item.image.mimeType};base64,${item.image.data}`;
+                img.alt = item.title || item.code;
+                card.appendChild(img);
+            } else {
+                const box = document.createElement('div');
+                box.className = 'placeholder ' + (item.state === 'error' ? 'bg-red-50 text-red-700' : 'bg-indigo-50 text-indigo-700');
+                if (item.state === 'running') {
+                    box.innerHTML = '<div class="spinner"></div>';
+                } else {
+                    box.textContent = item.state === 'error' ? `Échec : ${item.error}` : 'En attente';
+                }
+                card.appendChild(box);
+            }
+
+            const title = document.createElement('p');
+            title.className = 'text-sm font-semibold text-gray-800';
+            title.textContent = `${item.code} · ${item.title || ''}`;
+            card.appendChild(title);
+
+            const meta = document.createElement('p');
+            meta.className = 'text-xs text-gray-500';
+            meta.textContent = [item.week ? `Semaine ${item.week}` : '', item.day, item.age ? `${item.age} ans` : ''].filter(Boolean).join(' · ');
+            card.appendChild(meta);
+
+            const details = document.createElement('details');
+            details.className = 'text-xs text-gray-600';
+            details.innerHTML = '<summary class="cursor-pointer">Prompt</summary>';
+            const promptText = document.createElement('p');
+            promptText.className = 'mt-1 whitespace-pre-line';
+            promptText.textContent = item.prompt;
+            details.appendChild(promptText);
+            card.appendChild(details);
+
+            const actions = document.createElement('div');
+            actions.className = 'mt-auto flex items-center justify-between gap-2';
+            const include = document.createElement('label');
+            include.className = 'flex items-center gap-1 text-xs text-gray-700';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = item.include;
+            checkbox.disabled = !item.image;
+            checkbox.addEventListener('change', () => { item.include = checkbox.checked; updateZipButton(); });
+            include.append(checkbox, document.createTextNode('Dans le ZIP'));
+            const retry = document.createElement('button');
+            retry.className = 'rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50';
+            retry.textContent = item.image ? 'Régénérer' : 'Générer';
+            retry.disabled = running;
+            retry.addEventListener('click', async () => {
+                running = true;
+                render();
+                await generateOne(index);
+                running = false;
+                render();
+            });
+            actions.append(include, retry);
+            card.appendChild(actions);
+
+            container.appendChild(card);
+        });
+        updateZipButton();
+    }
+
+    function updateZipButton() {
+        const count = items.filter(item => item.image && item.include).length;
+        $('downloadZip').disabled = count === 0 || running;
+        $('downloadZip').textContent = count ? `4. Télécharger le ZIP (${count})` : '4. Télécharger le ZIP';
+    }
+
+    /** Image modèle : la dernière image déjà faite de la même semaine et du même âge. */
+    function referenceFor(index) {
+        if (!$('keepCharacters').checked) return null;
+        const item = items[index];
+        for (let i = index - 1; i >= 0; i--) {
+            const other = items[i];
+            if (other.week === item.week && other.age === item.age && other.image) return other.image;
+        }
+        return null;
+    }
+
+    function finalPrompt(item) {
+        const extra = $('extraStyle').value.trim();
+        return extra ? `${item.prompt}\n\nStyle supplémentaire : ${extra}` : item.prompt;
+    }
+
+    async function callModel(model, prompt, reference) {
+        const isImagen = model.startsWith('imagen');
+        const url = `${API}/${model}:${isImagen ? 'predict' : 'generateContent'}?key=${apiKey}`;
+        const parts = [];
+        if (reference) {
+            parts.push({ inlineData: { mimeType: reference.mimeType, data: reference.data } });
+            parts.push({ text: 'Image de référence : garde exactement les mêmes personnages (visage, coiffure, vêtements, couleurs) et le même style de dessin. Nouvelle scène :' });
+        }
+        parts.push({ text: prompt });
+        const body = isImagen
+            ? { instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '4:3' } }
+            : { contents: [{ role: 'user', parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } };
+
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            let message = text;
+            try { message = JSON.parse(text).error.message || text; } catch (error) { /* texte brut */ }
+            const refused = response.status === 403 || response.status === 404
+                || (response.status === 400 && /model|not (found|supported)|responseModalities/i.test(message));
+            const error = refused ? new ModelRefused(`${response.status} ${message}`) : new Error(`${response.status} ${message}`);
+            error.status = response.status;
+            throw error;
+        }
+        const result = await response.json();
+        if (isImagen) {
+            const prediction = result.predictions && result.predictions[0];
+            if (prediction && prediction.bytesBase64Encoded) {
+                return { data: prediction.bytesBase64Encoded, mimeType: prediction.mimeType || 'image/png' };
+            }
+        } else {
+            const candidateParts = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts) || [];
+            const image = candidateParts.find(part => part.inlineData && part.inlineData.data);
+            if (image) return { data: image.inlineData.data, mimeType: image.inlineData.mimeType || 'image/png' };
+            const reason = (result.candidates && result.candidates[0] && result.candidates[0].finishReason) || (result.promptFeedback && result.promptFeedback.blockReason);
+            throw new Error(`pas d'image dans la réponse${reason ? ` (${reason})` : ''}`);
+        }
+        throw new Error('pas d\'image dans la réponse');
+    }
+
+    /** Essaie le modèle choisi puis les suivants ; attend et réessaie une fois après un 429. */
+    async function generateImage(prompt, reference) {
+        const start = MODELS.indexOf($('model').value);
+        const candidates = MODELS.slice(Math.max(start, 0)).filter(model => !refusedModels.has(model));
+        let lastError = new Error('aucun modèle disponible');
+        for (const model of candidates) {
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    // Imagen ne prend pas d'image de référence
+                    return await callModel(model, prompt, model.startsWith('imagen') ? null : reference);
+                } catch (error) {
+                    lastError = error;
+                    if (error instanceof ModelRefused) {
+                        refusedModels.add(model);
+                        break;
+                    }
+                    if (error.status === 429 && attempt === 0) {
+                        setStatus(`Limite atteinte sur ${model} : nouvel essai dans ${RATE_LIMIT_WAIT_MS / 1000} s…`);
+                        await wait(RATE_LIMIT_WAIT_MS);
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+        }
+        throw lastError;
+    }
+
+    async function generateOne(index) {
+        const item = items[index];
+        item.state = 'running';
+        item.error = '';
+        render();
+        try {
+            item.image = await generateImage(finalPrompt(item), referenceFor(index));
+            item.include = true;
+            item.state = 'done';
+        } catch (error) {
+            item.state = 'error';
+            item.error = error.message;
+        }
+        render();
+    }
+
+    $('generate').addEventListener('click', async () => {
+        running = true;
+        stopRequested = false;
+        $('generate').disabled = true;
+        $('stop').classList.remove('hidden');
+        render();
+        let done = 0;
+        const todo = items.map((item, index) => index).filter(index => !items[index].image);
+        for (const index of todo) {
+            if (stopRequested) break;
+            setStatus(`Image ${done + 1} sur ${todo.length}…`);
+            await generateOne(index);
+            done++;
+            if (!stopRequested && done < todo.length) await wait(PAUSE_MS);
+        }
+        running = false;
+        $('generate').disabled = false;
+        $('stop').classList.add('hidden');
+        const failed = items.filter(item => item.state === 'error').length;
+        setStatus(`${items.filter(item => item.image).length} image(s) prête(s)` + (failed ? `, ${failed} échec(s) : utilisez « Générer » sur la carte.` : '.'));
+        render();
+    });
+
+    $('stop').addEventListener('click', () => {
+        stopRequested = true;
+        setStatus('Arrêt après l\'image en cours…');
+    });
+
+    $('downloadZip').addEventListener('click', async () => {
+        const selected = items.filter(item => item.image && item.include);
+        if (!selected.length) return;
+        const zip = new JSZip();
+        selected.forEach(item => zip.file(fileNameOf(item), item.image.data, { base64: true }));
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `illustrations-${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        setStatus(`${selected.length} image(s) dans le ZIP. Importez-le dans l'appli : page Illustrations, « Importer des images ».`);
+    });
+</script>
+</body>
+</html>

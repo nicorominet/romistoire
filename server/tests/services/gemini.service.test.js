@@ -7,7 +7,7 @@ vi.mock('../../services/logger.service.js', () => ({
 
 process.env.GEMINI_API_KEY = 'test-key';
 process.env.GEMINI_MODELS = 'model-a,model-b';
-const { geminiService, GeminiFatalError, toPlayableAudio, buildStoryRequestBody } = await import('../../services/gemini.service.js');
+const { geminiService, GeminiFatalError, toPlayableAudio, buildStoryRequestBody, modelCooldowns, DEFAULT_MODELS, modelsForAge } = await import('../../services/gemini.service.js');
 // The service reads the key at construction time
 geminiService.apiKey = 'test-key';
 
@@ -24,6 +24,8 @@ describe('GeminiService', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout'] });
     global.fetch = vi.fn();
+    modelCooldowns.clear();
+    geminiService.noThinking.clear();
   });
 
   afterEach(() => {
@@ -79,6 +81,17 @@ describe('GeminiService', () => {
     expect(value.text).toBe('{"stories":[]}');
   });
 
+  it('should give a whole week in one answer a longer timeout', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    fetch.mockResolvedValue(jsonResponse(200, storyBody('{"stories":[]}')));
+
+    await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Toute la semaine' }));
+    await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([240000, 120000]);
+    timeout.mockRestore();
+  });
+
   it('should flag a truncated answer and send a bigger budget for a week', async () => {
     fetch.mockResolvedValue(jsonResponse(200, storyBody('Début...', 'MAX_TOKENS')));
 
@@ -87,6 +100,68 @@ describe('GeminiService', () => {
     expect(value.truncated).toBe(true);
     const body = JSON.parse(fetch.mock.calls[0][1].body);
     expect(body.generationConfig.maxOutputTokens).toBe(32768);
+  });
+
+  it('should skip a saturated model after one retry, also on the next call', async () => {
+    fetch
+      .mockResolvedValueOnce(jsonResponse(503, { error: { message: 'high demand' } }))
+      .mockResolvedValueOnce(jsonResponse(503, { error: { message: 'high demand' } }))
+      .mockResolvedValue(jsonResponse(200, storyBody('Histoire')));
+
+    const first = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+    expect(first.value.model).toBe('model-b');
+    expect(first.value.skipped).toEqual([{ model: 'model-a', reason: '503' }]);
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    const second = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Mardi' }));
+    expect(second.value.model).toBe('model-b');
+    expect(second.value.skipped).toEqual([{ model: 'model-a', reason: 'skipped (overloaded)' }]);
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('should skip a model whose daily quota is exhausted', async () => {
+    fetch
+      .mockResolvedValueOnce(jsonResponse(429, { error: { message: 'Quota exceeded for metric generate_content_free_tier_requests, limit: 20', details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }] } }))
+      .mockResolvedValue(jsonResponse(200, storyBody('Histoire')));
+
+    const { value } = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+
+    expect(value.model).toBe('model-b');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(modelCooldowns.reason('model-a')).toBe('daily quota');
+  });
+
+  it('should wait the short delay suggested on a per-minute rate limit', async () => {
+    fetch
+      .mockResolvedValueOnce(jsonResponse(429, { error: { message: 'rate', details: [{ retryDelay: '5s' }] } }))
+      .mockResolvedValue(jsonResponse(200, storyBody('Histoire')));
+
+    const { value } = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+
+    expect(value.model).toBe('model-a');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('should skip a model that timed out', async () => {
+    const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' });
+    fetch.mockRejectedValueOnce(timeout).mockResolvedValue(jsonResponse(200, storyBody('Histoire')));
+
+    const { value } = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+
+    expect(value.model).toBe('model-b');
+    expect(modelCooldowns.reason('model-a')).toBe('timeout');
+  });
+
+  it('should call a model again without thinking config when it rejects it', async () => {
+    fetch
+      .mockResolvedValueOnce(jsonResponse(400, { error: { message: 'Thinking level is not supported for this model.' } }))
+      .mockResolvedValue(jsonResponse(200, storyBody('Histoire')));
+
+    const { value } = await run(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' }));
+
+    expect(value.model).toBe('model-a');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(geminiService.noThinking.has('model-a')).toBe(true);
   });
 
   it('should refuse a blocked answer', async () => {
@@ -98,7 +173,58 @@ describe('GeminiService', () => {
   });
 });
 
+describe('modelsForAge', () => {
+  it('should put the Flash models first for teenagers, keeping the configured order otherwise', () => {
+    const ordered = modelsForAge(DEFAULT_MODELS, '16-18 ans');
+    expect(ordered.slice(0, 6)).toEqual(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash']);
+    expect(ordered.slice(6)).toEqual(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it']);
+    expect(modelsForAge(DEFAULT_MODELS, '13-15')[0]).toBe('gemini-3.8-flash');
+
+    expect(modelsForAge(DEFAULT_MODELS, '4-6')).toEqual(DEFAULT_MODELS);
+    expect(modelsForAge(['model-a', 'model-b'], '16-18')).toEqual(['model-a', 'model-b']);
+  });
+});
+
+describe('default models', () => {
+  it('should try Flash Lite, then Flash, then Gemma', () => {
+    const indexes = (test) => DEFAULT_MODELS.map((model, index) => (test(model) ? index : -1)).filter(index => index >= 0);
+    const lite = indexes(model => model.endsWith('flash-lite'));
+    const flash = indexes(model => /flash(-preview)?$/.test(model));
+    const gemma = indexes(model => model.startsWith('gemma-'));
+    expect(Math.max(...lite)).toBeLessThan(Math.min(...flash));
+    expect(Math.max(...flash)).toBeLessThan(Math.min(...gemma));
+  });
+});
+
 describe('buildStoryRequestBody', () => {
+  it('should require exactly 7 stories for a whole week, and no count otherwise', () => {
+    const week = buildStoryRequestBody('gemini-3.5-flash-lite', 'S', 'P', 32768, { storyCount: 7 }).generationConfig.responseSchema;
+    expect(week.properties.stories.minItems).toBe(7);
+    expect(week.properties.stories.maxItems).toBe(7);
+
+    const day = buildStoryRequestBody('gemini-3.5-flash-lite', 'S', 'P', 8192).generationConfig.responseSchema;
+    expect(day.properties.stories.minItems).toBeUndefined();
+  });
+
+  it('should require the paragraphs of the age group, and the week context on the first day', () => {
+    const body = buildStoryRequestBody('gemini-3.5-flash-lite', 'S', 'P', 8192, { minParagraphs: 5, withWeekPlan: true });
+    const schema = body.generationConfig.responseSchema;
+    expect(schema.properties.stories.items.properties.paragraphs.minItems).toBe(5);
+    expect(schema.required).toEqual(['week_plan', 'characters', 'stories']);
+    expect(schema.propertyOrdering).toEqual(['week_plan', 'characters', 'stories']);
+
+    const plain = buildStoryRequestBody('gemini-3.5-flash-lite', 'S', 'P', 8192).generationConfig.responseSchema;
+    expect(plain.properties.stories.items.properties.paragraphs.minItems).toBeUndefined();
+    expect(plain.properties.characters).toBeUndefined();
+  });
+
+  it('should keep thinking low for storytelling, per model family', () => {
+    expect(buildStoryRequestBody('gemini-3.8-flash', 'S', 'P', 8192).generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+    expect(buildStoryRequestBody('gemini-2.5-flash', 'S', 'P', 8192).generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(buildStoryRequestBody('gemma-4-31b-it', 'S', 'P', 8192).generationConfig.thinkingConfig).toBeUndefined();
+    expect(buildStoryRequestBody('gemini-3.8-flash', 'S', 'P', 8192, { thinking: false }).generationConfig.thinkingConfig).toBeUndefined();
+  });
+
   it('should send systemInstruction and a JSON schema to Gemini models', () => {
     const body = buildStoryRequestBody('gemini-3.5-flash', 'SYSTEM', 'PROMPT', 8192);
 

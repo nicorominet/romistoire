@@ -99,9 +99,11 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
    # AI (cloud)
    GEMINI_API_KEY=your_gemini_api_key
    # Optional: model fallback order, comma separated
-   # GEMINI_MODELS=gemma-4-31b-it,gemini-3.5-flash,gemini-2.5-flash
+   # Default: Flash Lite (500 req/day), then Flash (20 req/day each), then Gemma (slow, last resort)
+   # Stories for 13-15 and 16-18 (900+ words) start with the Flash models: Flash Lite stops around 700 words
+   # GEMINI_MODELS=gemini-3.5-flash-lite,gemini-3.8-flash,gemini-2.5-flash
    # GEMINI_AUDIO_MODELS=gemini-2.5-flash-preview-tts
-   # GEMINI_TIMEOUT_MS=180000
+   # GEMINI_TIMEOUT_MS=120000
 
    # AI (local, optional)
    # AI_PROVIDER=gemini            # default provider: gemini | local
@@ -144,9 +146,13 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 - Models answer with **JSON** (`server/services/helpers/story_schema.js`): `{ "stories": [{ day, title, summary, themes, paragraphs, illustration_prompt }] }`.
   - Gemini models: `responseSchema` (constrained output) and `systemInstruction`.
   - Gemma models: the schema is described in the prompt (they do not support JSON mode).
-  - Ollama: `format` = JSON schema (Ollama ≥ 0.5). A full week is generated day by day, each day receiving the previous day's summary.
+  - Ollama: `format` = JSON schema (Ollama ≥ 0.5).
+  - A full week for **2-3, 4-6 and 7-9** is generated in **one request** (short stories, 7 times fewer requests, 240 s timeout). From **10-12**, and always with Ollama, it is generated **day by day** (7 requests): the first day writes the week plan and the character sheets, each next day receives them with the days already told and the previous ending, which keeps the length asked for long stories.
+  - Cloud requests start at least 12 s apart (free tier: 5 requests/min on Flash models). A story (or the median story of a week) under 60 % of its age's minimum length is asked once more.
   - If the answer is not valid JSON, the client falls back to the text parser (`src/utils/storyParser.ts`).
-- Gemini errors: 400/401/403 stop immediately, 429/5xx are retried, 404/timeouts move to the next model.
+- Gemini errors: 400/401/403 stop immediately; 5xx get one more try then the next model; 429 waits the short delay suggested by the API, or moves on (daily quota: model skipped until the Pacific-time reset); 404/timeouts move to the next model. Failing models are skipped for a while (`server/services/helpers/model_cooldown.helper.js`), so a saturated model does not slow down every call.
+- Gemini thinking is kept low for storytelling (`thinkingLevel: low` for Gemini 3.x, no thinking budget for 2.5).
+- The AI log (`server/logs/ai-<date>.log`) records, for each answer, the model used, the models skipped and why, and a `Story-Parsed` entry with the word count of each story against the target of the age. Test runs do not write log files.
 
 *Les histoires sont générées en français, au format JSON ; en cas de réponse non structurée, l'application lit le texte en mode de secours.*
 
@@ -155,11 +161,31 @@ A slot is (week, day, age group, language, series). When a story is saved into a
 
 *Un créneau déjà occupé dans la même série range l'histoire dans une série « Alias » ; l'utilisateur en est averti.*
 
-### Themes / Thèmes
-- Theme names are unique, ignoring case, accents, leading articles and plurals ("L'Océan" = "les océans").
-- Each story has exactly one **primary theme** (star in the editor), shown first everywhere.
-- The **Themes** page (`/themes`) has two tabs: the theme library (search, sort, "to review" / "unused" filters, duplicate merge, delete with reassignment) and the **weekly calendar** (one theme per ISO week, saved immediately).
-- AI generation reuses existing themes; a new AI theme is flagged "to review" until someone edits or merges it.
+### PDF export
+- **Mes histoires → Exporter en PDF** builds a book on the server (jsPDF, `server/lib/pdf`): optional cover and table of contents, then each story (header with week, day, age and tags, main illustration, text, other illustrations), numbered pages.
+- Three styles (`server/lib/pdf/themes.js`), chosen in the export options or **Automatic** (Kids when a story is for ages 2-6, Teen otherwise):
+  - **Kids**: Andika reading font, large text, soft colors, rounded frames;
+  - **Teen**: Poppins, navy and teal, "Day 1" markers;
+  - **Pro**: Crimson Text, justified text with indents, running headers.
+- Fonts are free fonts (SIL Open Font License) in `server/assets/fonts`, each with its `OFL.txt`.
+
+### Illustrations workshop / Atelier d'illustrations
+The image models of the Gemini API have no free quota, so images are made outside the app and attached back. Page **Illustrations** (`/illustrations`):
+- lists the stories without image with a ready-to-paste prompt (style of the age group + `illustration_prompt` + "no text", `server/services/helpers/image_prompt.helper.js`);
+- **Create the prompt**: Flash Lite writes the description of a story that has none (one short text call, saved without a new version);
+- paste an image on a row (click then Ctrl+V), drop it, or pick a file;
+- **Export** the prompts as `.txt` (by hand) or `.json` (Gemini Canvas tool);
+- **Import** images or a ZIP: a file named with the story code (`IMG-7f3a2c91.png`) goes to its story, the others to the stories without image in download order;
+- **Gemini Canvas tool** (`public/tools/canvas-illustrations.html`): pasted into Gemini Canvas, where the image models are available, it generates the images of the JSON export and downloads a ZIP named by code.
+
+### Story tags vs. topic of the week
+Two distinct notions:
+- **Story themes (tags)** (`themes` table, page **Étiquettes** `/themes`): reusable labels, several per story.
+  - Names are unique, ignoring case, accents, leading articles and plurals ("L'Océan" = "les océans").
+  - Each story has exactly one **primary theme** (star in the editor), shown first everywhere.
+  - The page offers search, sort, "to review" / "unused" filters, the stories of each tag (expand the card), duplicate merge, delete with reassignment and **bulk deletion of unused tags**.
+  - AI generation reuses existing tags; a new AI tag is flagged "to review" until someone edits or merges it.
+- **Topic of the week** (`weekly_themes` table, page **Programme** `/weekly-themes`): free text (topic + optional description) per ISO week (1-53), saved when the field loses focus. It guides story writing in the AI prompt; it is **not** a tag.
 - Reusable UI lives in `src/components/Theme/` (`ThemeBadge`, `ThemeBadgeList`, `ThemeSelect`, `ThemeMultiSelect`, dialogs); rules live in `server/services/theme.service.js`.
 
 *Les noms de thèmes sont uniques ; chaque histoire a un thème principal ; la page « Thèmes » regroupe la bibliothèque et le calendrier hebdomadaire.*

@@ -35,6 +35,12 @@ router.post('/', themeController.createTheme);
 router.post('/merge', themeController.mergeThemes);
 
 /**
+ * POST /api/themes/bulk-delete
+ * Delete the unused themes among { ids }. Returns { deleted: ids, skipped: [{ id, storyCount }] }.
+ */
+router.post('/bulk-delete', themeController.deleteThemes);
+
+/**
  * PUT /api/themes/:id
  * Partial update. 404 unknown theme, 409 { conflictWith } when the name is taken.
  */

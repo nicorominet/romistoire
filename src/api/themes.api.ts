@@ -1,7 +1,6 @@
 import client from './client';
 import { API_ENDPOINTS } from '@/constants';
-import { Theme, ThemeFilters, ThemeInput, WeeklyTheme } from '../types/Theme';
-import { Story } from '../types/Story';
+import { Theme, ThemeFilters, ThemeInput, ThemeStory, WeeklyTheme } from '../types/Theme';
 
 /** Query string of the theme list: only the active filters. */
 const listParams = ({ search, sort, needsReview, unused }: ThemeFilters = {}) => ({
@@ -23,15 +22,18 @@ export const themeApi = {
     client.delete<{ success: boolean; movedStories: number }>(`${API_ENDPOINTS.THEMES}/${id}`, { params: reassignTo ? { reassignTo } : {} }),
   merge: (sourceIds: string[], targetId: string) =>
     client.post<{ success: boolean; merged: number; movedStories: number; target: Theme }>(`${API_ENDPOINTS.THEMES}/merge`, { sourceIds, targetId }),
-  getStories: (themeId: string) => client.get<Story[]>(`${API_ENDPOINTS.THEMES}/${themeId}/stories`),
+  /** Deletes the unused themes among `ids`; themes still used are reported in `skipped`. */
+  deleteMany: (ids: string[]) =>
+    client.post<{ success: boolean; deleted: string[]; skipped: { id: string; storyCount: number }[] }>(`${API_ENDPOINTS.THEMES}/bulk-delete`, { ids }),
+  getStories: (themeId: string) => client.get<ThemeStory[]>(`${API_ENDPOINTS.THEMES}/${themeId}/stories`),
 };
 
 export const weeklyThemeApi = {
   getAll: () => client.get<WeeklyTheme[]>(API_ENDPOINTS.WEEKLY_THEMES),
-  /** Link a week to a theme: an existing id, or a name (theme created if needed). */
-  setWeek: (weekNumber: number, data: { themeId?: string; themeName?: string }) =>
+  /** Set the topic of a week (1-53). */
+  setWeek: (weekNumber: number, data: { name: string; description?: string }) =>
     client.put<WeeklyTheme>(`${API_ENDPOINTS.WEEKLY_THEMES}/${weekNumber}`, data),
   clearWeek: (weekNumber: number) => client.delete<{ success: boolean }>(`${API_ENDPOINTS.WEEKLY_THEMES}/${weekNumber}`),
-  /** Batch update (imports). */
+  /** Batch update (legacy). */
   update: (weeks: Array<Partial<WeeklyTheme>>) => client.post(API_ENDPOINTS.WEEKLY_THEMES, weeks),
 };

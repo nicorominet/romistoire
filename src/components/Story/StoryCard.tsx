@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { i18n } from "@/lib/i18n";
 import { Story } from "@/types/Story";
 import { BookOpen, Clock, Calendar, ListOrdered, FileText, Sparkles, Cpu, User } from "lucide-react";
-import { getAgeGroupColor, formatDate, truncateText } from "@/lib/utils";
+import { getAgeGroupColor, formatDate, storyPreview } from "@/lib/utils";
 import SafeImage from "@/components/ui/SafeImage";
 import { ThemeBadgeList } from "@/components/Theme/ThemeBadgeList";
 
@@ -36,8 +36,8 @@ const StoryCard = ({ story }: StoryCardProps) => {
   }, [story.created_at, i18n]);
 
 
-  // Raccourci pour l'aperçu du contenu
-  const contentPreview = truncateText(story.content, 100);
+  // Plain-text preview (generated stories are stored as editor HTML)
+  const contentPreview = storyPreview(story.content, 100);
 
   // Illustration principale
   const imageUrl = story.illustrations?.[0]?.image_path

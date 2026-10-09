@@ -20,6 +20,7 @@ vi.mock('../services/theme.service.js', () => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    deleteMany: vi.fn(),
     mergeThemes: vi.fn(),
     invalidateCache: vi.fn(),
   }
@@ -144,6 +145,27 @@ describe('Theme API', () => {
       expect(res.status).toBe(200);
       expect(res.body.merged).toBe(2);
       expect(themeService.mergeThemes).toHaveBeenCalledWith(['a', 'b'], 't');
+    });
+  });
+
+  describe('POST /api/themes/bulk-delete', () => {
+    it('should delete the unused themes and report the skipped ones', async () => {
+      themeService.deleteMany.mockResolvedValue({ deleted: ['a'], skipped: [{ id: 'b', storyCount: 2 }] });
+
+      const res = await request(app).post('/api/themes/bulk-delete').send({ ids: ['a', 'b'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.deleted).toEqual(['a']);
+      expect(res.body.skipped).toEqual([{ id: 'b', storyCount: 2 }]);
+      expect(themeService.deleteMany).toHaveBeenCalledWith(['a', 'b']);
+    });
+
+    it('should answer 400 for an empty list', async () => {
+      themeService.deleteMany.mockRejectedValue(new ValidationError('empty'));
+
+      const res = await request(app).post('/api/themes/bulk-delete').send({ ids: [] });
+
+      expect(res.status).toBe(400);
     });
   });
 });

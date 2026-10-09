@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitMerge, Plus, Search, X } from "lucide-react";
+import { GitMerge, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { i18n } from "@/lib/i18n";
-import { useDebouncedValue, useThemeDuplicates, useThemes } from "@/hooks/useThemes";
+import { getApiError } from "@/lib/apiError";
+import { useDebouncedValue, useThemeDuplicates, useThemeMutations, useThemes } from "@/hooks/useThemes";
 import { Theme, ThemeSort } from "@/types/Theme";
 import { ThemeGridSkeleton } from "./ThemeSkeleton";
 import { ThemeListItem } from "./ThemeListItem";
 import { ThemeFormDialog } from "./ThemeFormDialog";
 import { ThemeDeleteDialog } from "./ThemeDeleteDialog";
 import { ThemeMergeDialog } from "./ThemeMergeDialog";
+import { ThemeBadge } from "./ThemeBadge";
 
 export type ThemeQuickFilter = "all" | "review" | "unused";
 
@@ -26,9 +33,12 @@ interface ThemeLibraryProps {
   onFiltersChange: (patch: Partial<ThemeLibraryFilters>) => void;
 }
 
+/** Names listed in the bulk deletion confirmation. */
+const CONFIRM_NAMES_MAX = 5;
+
 /**
- * Themes tab: search, sort, quick filters ("to review", "unused"), duplicate banner,
- * list with edit / merge / delete actions.
+ * Story themes library: search, sort, quick filters ("to review", "unused"), duplicate banner,
+ * list with edit / merge / delete actions, and bulk deletion of unused themes.
  */
 export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) => {
   const { t } = i18n;
@@ -54,6 +64,39 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<{ theme: Theme; mode: "delete" | "merge"; replacementId: string | null } | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const { deleteThemes } = useThemeMutations();
+
+  // A new filter shows other themes: start a new selection
+  useEffect(() => { setSelectedIds(new Set()); }, [filters.search, filters.filter]);
+
+  const unusedShown = useMemo(() => themes.filter(theme => (theme.storyCount ?? 0) === 0), [themes]);
+  const selectedThemes = useMemo(() => allThemes.filter(theme => selectedIds.has(theme.id)), [allThemes, selectedIds]);
+
+  const toggleSelected = (theme: Theme, selected: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (selected) next.add(theme.id);
+      else next.delete(theme.id);
+      return next;
+    });
+  };
+  const selectAllUnused = () => setSelectedIds(new Set(unusedShown.map(theme => theme.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    try {
+      const result = await deleteThemes.mutateAsync([...selectedIds]);
+      if (result.deleted.length > 0) toast.success(t("themes.bulk.deleted", { count: String(result.deleted.length) }));
+      if (result.skipped.length > 0) toast.info(t("themes.bulk.skipped", { count: String(result.skipped.length) }));
+      clearSelection();
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    } finally {
+      setConfirmBulk(false);
+    }
+  };
 
   const counts = useMemo(() => ({
     all: allThemes.length,
@@ -114,6 +157,26 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
         ))}
       </div>
 
+      {(selectedIds.size > 0 || (filters.filter === "unused" && unusedShown.length > 0)) && (
+        <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-4 py-2 shadow-sm backdrop-blur"
+          role="region" aria-label={t("themes.bulk.region")}>
+          <span className="text-sm font-medium tabular-nums">{t("themes.bulk.selected", { count: String(selectedIds.size) })}</span>
+          {selectedIds.size < unusedShown.length && (
+            <Button type="button" size="sm" variant="ghost" onClick={selectAllUnused}>
+              {t("themes.bulk.selectAllUnused", { count: String(unusedShown.length) })}
+            </Button>
+          )}
+          {selectedIds.size > 0 && (
+            <>
+              <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>{t("themes.bulk.clearSelection")}</Button>
+              <Button type="button" size="sm" variant="destructive" className="ml-auto" onClick={() => setConfirmBulk(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />{t("themes.bulk.delete", { count: String(selectedIds.size) })}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
       {duplicateGroups.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
           <span>{t("themes.duplicatesBanner", { count: String(duplicateGroups.length) })}</span>
@@ -131,9 +194,11 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
           </Button>
         </div>
       ) : (
-        <ul className={cn("grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3", isFetching && "opacity-70")} aria-busy={isFetching}>
+        <ul className={cn("grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3", isFetching && "opacity-70")} aria-busy={isFetching}>
           {themes.map(theme => (
             <ThemeListItem key={theme.id} theme={theme}
+              selected={selectedIds.has(theme.id)}
+              onSelectedChange={toggleSelected}
               onEdit={openForm}
               onMerge={(source) => setDeleting({ theme: source, mode: "merge", replacementId: null })}
               onDelete={(target) => setDeleting({ theme: target, mode: "delete", replacementId: null })}
@@ -147,6 +212,29 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
       <ThemeDeleteDialog theme={deleting?.theme ?? null} themes={allThemes} mode={deleting?.mode}
         defaultReplacementId={deleting?.replacementId} onClose={() => setDeleting(null)} />
       <ThemeMergeDialog open={mergeOpen} onOpenChange={setMergeOpen} />
+
+      <AlertDialog open={confirmBulk} onOpenChange={setConfirmBulk}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("themes.bulk.confirmTitle", { count: String(selectedThemes.length) })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("themes.bulk.confirmDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="flex flex-wrap gap-1.5">
+            {selectedThemes.slice(0, CONFIRM_NAMES_MAX).map(theme => <li key={theme.id}><ThemeBadge theme={theme} /></li>)}
+            {selectedThemes.length > CONFIRM_NAMES_MAX && (
+              <li className="text-sm text-muted-foreground">{t("themes.bulk.andMore", { count: String(selectedThemes.length - CONFIRM_NAMES_MAX) })}</li>
+            )}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={(event) => { event.preventDefault(); void handleBulkDelete(); }} disabled={deleteThemes.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteThemes.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

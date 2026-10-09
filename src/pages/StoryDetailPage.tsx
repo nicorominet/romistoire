@@ -48,12 +48,10 @@ const StoryDetailPage = (): JSX.Element => {
   const { deleteStory, generateAudio } = useStoryMutations();
   const { data: weeklyThemes } = useWeeklyThemes();
 
-  // Theme of the story's week (a linked theme, or the week's label for weeks not linked yet)
-  const weekTheme = useMemo(() => {
+  // Topic of the story's week (free text, not a story theme)
+  const weekTopic = useMemo(() => {
      if (!story || !weeklyThemes) return null;
-     const week = (weeklyThemes as WeeklyTheme[]).find((wt) => wt.week_number === story.week_number);
-     if (!week) return null;
-     return { id: week.theme_id ?? '', name: week.theme_name, color: week.color ?? undefined, icon: week.icon };
+     return (weeklyThemes as WeeklyTheme[]).find((wt) => wt.week_number === story.week_number)?.theme_name || null;
   }, [story, weeklyThemes]);
 
   const handleDelete = async () => {
@@ -196,7 +194,7 @@ const StoryDetailPage = (): JSX.Element => {
                 <StoryMeta 
                     ageGroup={story.age_group}
 
-                    weeklyTheme={weekTheme}
+                    weekTopic={weekTopic}
                     seriesName={story.series_name}
                     createdAt={story.created_at}
                     weekNumber={story.week_number}
@@ -216,7 +214,7 @@ const StoryDetailPage = (): JSX.Element => {
         </div>
 
         {/* AI illustration prompt, useful until an illustration has been added */}
-        {!story.illustrations?.length && <IllustrationPromptCard prompt={story.illustration_prompt} />}
+        {!story.illustrations?.length && <IllustrationPromptCard prompt={story.illustration_prompt} storyId={story.id} />}
 
         {/* Navigation Footer */}
         <StoryNavigation 

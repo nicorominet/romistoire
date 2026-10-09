@@ -62,6 +62,15 @@ export const deleteTheme = async (req, res) => {
     }
 };
 
+export const deleteThemes = async (req, res) => {
+    try {
+        const result = await themeService.deleteMany(req.body?.ids);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 export const mergeThemes = async (req, res) => {
     try {
         const { sourceIds, targetId } = req.body || {};

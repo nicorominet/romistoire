@@ -19,7 +19,10 @@ export const ENV_CONFIG = {
   
   // Absolute path to uploads directory
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),
-  PROJECT_ROOT // Exporting for use where paths are relative to root
+  PROJECT_ROOT, // Exporting for use where paths are relative to root
+
+  // Test runs (Vitest) must not write into the real log files
+  FILE_LOGGING: !process.env.VITEST
 };
 
 console.log('Using Uploads Directory:', ENV_CONFIG.UPLOADS_DIR);

@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Book, FileText } from 'lucide-react';
 import 'flag-icons/css/flag-icons.min.css';
 import { APP_ROUTES } from '@/constants';
-import { currentIsoWeek } from '@/utils/weekUtils';
 
 // New Components
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader';
@@ -104,12 +103,6 @@ const StoriesPage = (): JSX.Element => {
       return map;
   }, [weeklyThemes]);
 
-  // Theme of the current week: pinned on top of the theme filter
-  const currentWeekThemeId = useMemo(
-      () => weeklyThemes.find((wt: WeeklyTheme) => wt.week_number === currentIsoWeek().week)?.theme_id ?? null,
-      [weeklyThemes]
-  );
-
   const observerTarget = useRef<HTMLDivElement>(null);
 
   // Intersection Observer for Infinite Scroll
@@ -194,7 +187,6 @@ const StoriesPage = (): JSX.Element => {
             selectedTheme={selectedTheme}
             handleThemeChange={handleThemeChange}
             themes={themes}
-            currentWeekThemeId={currentWeekThemeId}
             weeklyThemesMap={weeklyThemesMap}
             selectedAgeGroup={selectedAgeGroup}
             handleAgeGroupChange={handleAgeGroupChange}

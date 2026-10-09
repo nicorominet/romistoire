@@ -16,6 +16,9 @@ export const isoWeekRange = (week: number, year: number) => {
 /** ISO week and week-year of a date. */
 export const currentIsoWeek = (date = new Date()) => ({ week: getISOWeek(date), year: getISOWeekYear(date) });
 
+/** Highest ISO week number (long years). */
+export const MAX_ISO_WEEKS = 53;
+
 /** 52 or 53. */
 export const weeksInIsoYear = (year: number) => getISOWeeksInYear(new Date(year, 5, 1));
 

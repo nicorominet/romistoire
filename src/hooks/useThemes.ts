@@ -8,15 +8,15 @@ export const themeKeys = {
   all: ['themes'] as const,
   list: (filters: ThemeFilters = {}) => ['themes', 'list', filters] as const,
   duplicates: ['themes', 'duplicates'] as const,
+  stories: (themeId: string) => ['themes', 'stories', themeId] as const,
   weekly: ['weeklyThemes'] as const,
 };
 
 /**
- * A theme change shows up on every story badge, filter and week: refresh them all.
+ * A theme change shows up on every story badge and filter: refresh them all.
  */
 const invalidateThemeData = (queryClient: QueryClient) => {
   queryClient.invalidateQueries({ queryKey: themeKeys.all });
-  queryClient.invalidateQueries({ queryKey: themeKeys.weekly });
   queryClient.invalidateQueries({ queryKey: ['stories'] });
   queryClient.invalidateQueries({ queryKey: ['story'] });
 };
@@ -48,6 +48,15 @@ export const useThemeDuplicates = (enabled = true) => {
   });
 };
 
+/** Stories of a theme, loaded when its card is expanded. */
+export const useThemeStories = (themeId: string, enabled: boolean) => {
+  return useQuery({
+    queryKey: themeKeys.stories(themeId),
+    queryFn: async () => await themeApi.getStories(themeId),
+    enabled,
+  });
+};
+
 export const useThemeMutations = () => {
   const queryClient = useQueryClient();
   const onSuccess = () => invalidateThemeData(queryClient);
@@ -67,12 +76,17 @@ export const useThemeMutations = () => {
     onSuccess,
   });
 
+  const deleteThemes = useMutation({
+    mutationFn: async (ids: string[]) => await themeApi.deleteMany(ids),
+    onSuccess,
+  });
+
   const mergeThemes = useMutation({
     mutationFn: async ({ sourceIds, targetId }: { sourceIds: string[]; targetId: string }) => await themeApi.merge(sourceIds, targetId),
     onSuccess,
   });
 
-  return { createTheme, updateTheme, deleteTheme, mergeThemes };
+  return { createTheme, updateTheme, deleteTheme, deleteThemes, mergeThemes };
 };
 
 export const useWeeklyThemes = () => {
@@ -83,13 +97,14 @@ export const useWeeklyThemes = () => {
   });
 };
 
+/** Topics of the weeks (free text, independent from story themes). */
 export const useWeeklyThemeMutations = () => {
   const queryClient = useQueryClient();
-  const onSuccess = () => invalidateThemeData(queryClient);
+  const onSuccess = () => queryClient.invalidateQueries({ queryKey: themeKeys.weekly });
 
   const setWeekTheme = useMutation({
-    mutationFn: async ({ weekNumber, themeId, themeName }: { weekNumber: number; themeId?: string; themeName?: string }) =>
-      await weeklyThemeApi.setWeek(weekNumber, { themeId, themeName }),
+    mutationFn: async ({ weekNumber, name, description }: { weekNumber: number; name: string; description?: string }) =>
+      await weeklyThemeApi.setWeek(weekNumber, { name, description }),
     onSuccess,
   });
 

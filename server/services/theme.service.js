@@ -117,11 +117,13 @@ class ThemeService {
   }
 
   /**
-   * Stories linked to a theme.
+   * Stories linked to a theme (light columns, for the expandable list of the themes page).
    */
   async getStories(themeId) {
     return await query(
-      `SELECT s.* FROM stories s JOIN story_themes st ON s.id = st.story_id WHERE st.theme_id = ? ORDER BY s.week_number, s.day_order, s.title`,
+      `SELECT s.id, s.title, s.age_group, s.week_number, s.day_order, s.locale
+       FROM stories s JOIN story_themes st ON s.id = st.story_id
+       WHERE st.theme_id = ? ORDER BY s.week_number, s.day_order, s.title`,
       [themeId]
     );
   }
@@ -208,16 +210,41 @@ class ThemeService {
       return { deleted: true, movedStories: theme.storyCount };
     }
 
-    await this._inTransaction(async (connection) => {
-      await connection.query('UPDATE weekly_themes SET theme_id = NULL WHERE theme_id = ?', [id]);
-      await connection.query('DELETE FROM themes WHERE id = ?', [id]);
-    });
+    await query('DELETE FROM themes WHERE id = ?', [id]);
     this.invalidateCache();
     return { deleted: true, movedStories: 0 };
   }
 
   /**
-   * Merge themes into one. Story and version links, primary flags and weekly themes are kept.
+   * Delete several unused themes at once. Themes still used by stories are skipped, never reassigned.
+   * @param {string[]} ids
+   * @returns {Promise<{deleted: string[], skipped: {id: string, storyCount: number}[]}>}
+   * @throws {ValidationError} Empty list.
+   */
+  async deleteMany(ids) {
+    const unique = Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string' && id))] : [];
+    if (unique.length === 0) throw new ValidationError('A non-empty list of theme ids is expected');
+
+    const placeholders = unique.map(() => '?').join(', ');
+    const result = await this._inTransaction(async (connection) => {
+      const [rows] = await connection.query(
+        `SELECT t.id, (SELECT COUNT(*) FROM story_themes st WHERE st.theme_id = t.id) AS storyCount
+         FROM themes t WHERE t.id IN (${placeholders}) FOR UPDATE`,
+        unique
+      );
+      const deleted = rows.filter(row => Number(row.storyCount) === 0).map(row => row.id);
+      const skipped = rows.filter(row => Number(row.storyCount) > 0).map(row => ({ id: row.id, storyCount: Number(row.storyCount) }));
+      if (deleted.length > 0) {
+        await connection.query(`DELETE FROM themes WHERE id IN (${deleted.map(() => '?').join(', ')})`, deleted);
+      }
+      return { deleted, skipped };
+    });
+    if (result.deleted.length > 0) this.invalidateCache();
+    return result;
+  }
+
+  /**
+   * Merge themes into one. Story and version links and primary flags are kept.
    * @throws {ValidationError|NotFoundError}
    */
   async mergeThemes(sourceIds, targetId) {

@@ -2,15 +2,13 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, BookOpen, User, Sparkles, Cpu } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { formatDate } from '@/lib/utils';
-import { ThemeLike } from '@/types/Theme';
-import { ThemeBadge } from '@/components/Theme/ThemeBadge';
 import { DAY_NAMES_EN, getDayLabel } from '@/utils/dayUtils';
 
 interface StoryMetaProps {
   ageGroup: string;
 
-  /** Theme of the story's week (linked theme, or the week's label) */
-  weeklyTheme?: ThemeLike | null;
+  /** Topic of the story's week (free text, not a story theme) */
+  weekTopic?: string | null;
   seriesName?: string;
   createdAt?: string;
   weekNumber?: number;
@@ -21,7 +19,7 @@ interface StoryMetaProps {
   is_manually_edited?: boolean;
 }
 
-const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, dayOrder, version, locale, source, is_manually_edited }: StoryMetaProps) => {
+const StoryMeta = ({ ageGroup, weekTopic, seriesName, createdAt, weekNumber, dayOrder, version, locale, source, is_manually_edited }: StoryMetaProps) => {
   const { t } = i18n;
 
 
@@ -102,14 +100,12 @@ const StoryMeta = ({ ageGroup, weeklyTheme, seriesName, createdAt, weekNumber, d
 
       </div>
 
-      {(weeklyTheme || seriesName) && (
+      {(weekTopic || seriesName) && (
           <div className="flex flex-wrap justify-center gap-3 pt-4 border-t border-border/50 w-full">
-            {weeklyTheme && (
+            {weekTopic && (
                 <span className="inline-flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">{t('themes.weekTheme')} :</span>
-                    {weeklyTheme.id
-                      ? <ThemeBadge theme={weeklyTheme} linkToStories size="md" />
-                      : <Badge variant="outline">{weeklyTheme.name}</Badge>}
+                    <span className="text-muted-foreground">{t('weeklyTopics.topicOfWeek')} :</span>
+                    <span className="font-medium">{weekTopic}</span>
                 </span>
             )}
             {seriesName && (

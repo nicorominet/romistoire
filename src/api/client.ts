@@ -59,7 +59,18 @@ client.interceptors.response.use(
         });
     }
 
-    const message = error.response?.data?.error || error.message || 'Something went wrong';
+    // File requests (responseType "blob") receive the JSON error as a Blob: read it to show the real message
+    const data = error.response?.data;
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      return data.text()
+        .then((text) => {
+          let message = error.message || 'Something went wrong';
+          try { message = JSON.parse(text)?.error || message; } catch { /* not JSON */ }
+          return Promise.reject(new Error(message));
+        });
+    }
+
+    const message = data?.error || error.message || 'Something went wrong';
     return Promise.reject(new Error(message));
   }
 );

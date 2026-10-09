@@ -87,7 +87,8 @@ class SystemService {
       }
       const mapThemeId = (row) => (row.theme_id && themeIdMap.has(row.theme_id) ? { ...row, theme_id: themeIdMap.get(row.theme_id) } : row);
       const storyThemes = (rawStoryThemes || []).map(mapThemeId);
-      const weeklyThemes = (rawWeeklyThemes || []).map(mapThemeId);
+      // Week topics are free text: unknown columns (theme_id from older exports) are ignored by insertData
+      const weeklyThemes = rawWeeklyThemes || [];
 
       const insertData = async (tableName, data) => {
         if (!data || data.length === 0) return;

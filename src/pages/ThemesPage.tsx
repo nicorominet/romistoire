@@ -1,28 +1,22 @@
 import { useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
-import { CalendarDays, Tags } from "lucide-react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import PageLayout from "@/components/Layout/PageLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { i18n } from "@/lib/i18n";
+import { APP_ROUTES } from "@/constants";
 import { ThemeLibrary, ThemeLibraryFilters, ThemeQuickFilter } from "@/components/Theme/ThemeLibrary";
-import { WeeklyThemeCalendar } from "@/components/Theme/WeeklyThemeCalendar";
-import { currentIsoWeek } from "@/utils/weekUtils";
 import { ThemeSort } from "@/types/Theme";
-
-type ThemesTab = "themes" | "calendar";
 
 const SORTS: ThemeSort[] = ["name", "usage", "recent"];
 const QUICK_FILTERS: ThemeQuickFilter[] = ["all", "review", "unused"];
 
 /**
- * Themes page: the theme library and the weekly calendar, as two tabs.
- * Tab, search, sort, quick filter and calendar year live in the URL.
+ * Story themes (tags) page. Search, sort and quick filter live in the URL.
+ * The topics of the weeks have their own page (/weekly-themes).
  */
 const ThemesPage = () => {
   const { t } = i18n;
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const tab: ThemesTab = searchParams.get("tab") === "calendar" ? "calendar" : "themes";
   const sortParam = searchParams.get("sort") as ThemeSort;
   const filterParam = searchParams.get("filter") as ThemeQuickFilter;
   const filters: ThemeLibraryFilters = {
@@ -30,26 +24,23 @@ const ThemesPage = () => {
     sort: SORTS.includes(sortParam) ? sortParam : "name",
     filter: QUICK_FILTERS.includes(filterParam) ? filterParam : "all",
   };
-  const year = Number(searchParams.get("year")) || currentIsoWeek().year;
 
-  const setParams = useCallback((patch: Record<string, string | null>) => {
+  const handleFiltersChange = useCallback((patch: Partial<ThemeLibraryFilters>) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
-      for (const [key, value] of Object.entries(patch)) {
-        if (value === null || value === "") next.delete(key);
-        else next.set(key, value);
-      }
+      const set = (key: string, value: string | null) => (value ? next.set(key, value) : next.delete(key));
+      if (patch.search !== undefined) set("q", patch.search);
+      if (patch.sort !== undefined) set("sort", patch.sort === "name" ? null : patch.sort);
+      if (patch.filter !== undefined) set("filter", patch.filter === "all" ? null : patch.filter);
       return next;
     }, { replace: true });
   }, [setSearchParams]);
 
-  const handleFiltersChange = useCallback((patch: Partial<ThemeLibraryFilters>) => {
-    setParams({
-      ...(patch.search !== undefined ? { q: patch.search } : {}),
-      ...(patch.sort !== undefined ? { sort: patch.sort === "name" ? null : patch.sort } : {}),
-      ...(patch.filter !== undefined ? { filter: patch.filter === "all" ? null : patch.filter } : {}),
-    });
-  }, [setParams]);
+  // Old link to the calendar tab
+  if (searchParams.get("tab") === "calendar") {
+    const year = searchParams.get("year");
+    return <Navigate to={`${APP_ROUTES.WEEKLY_THEMES}${year ? `?year=${year}` : ""}`} replace />;
+  }
 
   return (
     <PageLayout>
@@ -58,19 +49,7 @@ const ThemesPage = () => {
           <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">{t("themes.pageTitle")}</h1>
           <p className="text-muted-foreground">{t("themes.pageSubtitle")}</p>
         </header>
-
-        <Tabs value={tab} onValueChange={(value) => setParams({ tab: value === "themes" ? null : value })}>
-          <TabsList>
-            <TabsTrigger value="themes" className="gap-1.5"><Tags className="h-4 w-4" />{t("themes.tabs.themes")}</TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="h-4 w-4" />{t("themes.tabs.calendar")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="themes" className="mt-4">
-            <ThemeLibrary filters={filters} onFiltersChange={handleFiltersChange} />
-          </TabsContent>
-          <TabsContent value="calendar" className="mt-4">
-            <WeeklyThemeCalendar year={year} onYearChange={(value) => setParams({ year: value === currentIsoWeek().year ? null : String(value) })} />
-          </TabsContent>
-        </Tabs>
+        <ThemeLibrary filters={filters} onFiltersChange={handleFiltersChange} />
       </div>
     </PageLayout>
   );

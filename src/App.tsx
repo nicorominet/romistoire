@@ -16,6 +16,8 @@ const EditStoryPage = lazy(() => import("./pages/EditStoryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const TimelinePage = lazy(() => import("@/pages/TimelinePage"));
 const ThemesPage = lazy(() => import("@/pages/ThemesPage"));
+const WeeklyTopicsPage = lazy(() => import("@/pages/WeeklyTopicsPage"));
+const IllustrationsPage = lazy(() => import("@/pages/IllustrationsPage"));
 const SeriesManagementPage = lazy(() => import("@/pages/SeriesManagementPage"));
 const DebugConsole = lazy(() => import("@/components/Debug/DebugConsole"));
 
@@ -136,9 +138,10 @@ const router = createBrowserRouter([
       { path: "/edit/:id", element: <EditStoryPage /> },
       { path: "/series-management", element: <SeriesManagementPage /> },
       { path: "/settings", element: <SettingsPage /> },
-      // Old URLs of the theme pages
-      { path: "/weekly-themes", element: <Navigate to="/themes?tab=calendar" replace /> },
+      // Old URL of the themes page
       { path: "/theme", element: <Navigate to="/themes" replace /> },
+      { path: "/weekly-themes", element: <WeeklyTopicsPage /> },
+      { path: "/illustrations", element: <IllustrationsPage /> },
       { path: "/timeline", element: <TimelinePage /> },
       { path: "/themes", element: <ThemesPage /> },
       { path: "*", element: <NotFound /> },

@@ -60,7 +60,7 @@ export const systemApi = {
    * @param {any} options - PDF generation options.
    * @returns {Promise<Blob>} Binary blob of the PDF file.
    */
-  exportPdf: (options: any) => client.post(API_ENDPOINTS.EXPORT_PDF, options, { responseType: 'blob' }),
+  exportPdf: (options: any) => client.post<Blob>(API_ENDPOINTS.EXPORT_PDF, options, { responseType: 'blob' }),
   
   /**
    * Retrieves system debug logs.

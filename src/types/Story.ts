@@ -111,9 +111,8 @@ export interface ExportOptions {
   orientation?: 'portrait' | 'landscape';
   pageSize?: 'a4' | 'a5' | 'letter';
   fontSize?: 'small' | 'normal' | 'large' | 'medium';
-  fontStyle?: 'serif' | 'sans' | 'mono';
-  fontFamily?: string; // Add this line
-  customFonts?: Record<string, string>;
+  /** Visual style of the PDF; "auto" follows the youngest age group of the stories */
+  style?: 'auto' | 'kids' | 'teen' | 'pro';
   includeIllustrations?: boolean;
   coverPage?: boolean;
   tableOfContents?: boolean;

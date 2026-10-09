@@ -9,6 +9,7 @@ import { AgeGroup, AGE_GROUPS } from "@/types/Story";
 import { Series } from "@/types/Series";
 import { Theme } from "@/types/Theme";
 import { ThemeSelect } from "@/components/Theme/ThemeSelect";
+import { MAX_ISO_WEEKS } from "@/utils/weekUtils";
 
 interface StoriesSearchProps {
   searchTerm: string;
@@ -17,8 +18,6 @@ interface StoriesSearchProps {
   selectedTheme: string;
   handleThemeChange: (theme: string) => void;
   themes: Theme[];
-  /** Theme of the current week, pinned on top of the theme filter */
-  currentWeekThemeId?: string | null;
   weeklyThemesMap: { [week: number]: string };
   selectedAgeGroup: AgeGroup | 'all';
   handleAgeGroupChange: (ageGroup: AgeGroup | 'all') => void;
@@ -48,7 +47,6 @@ const StoriesSearch = ({
   selectedTheme,
   handleThemeChange,
   themes,
-  currentWeekThemeId = null,
   weeklyThemesMap,
   selectedAgeGroup,
   handleAgeGroupChange,
@@ -154,7 +152,6 @@ const StoriesSearch = ({
                 onChange={(themeId) => handleThemeChange(themeId ?? 'all')}
                 placeholder={t('stories.allThemes')}
                 clearLabel={t('stories.allThemes')}
-                pinned={currentWeekThemeId ? [{ themeId: currentWeekThemeId, label: t('themes.thisWeek') }] : []}
                 className="bg-white/50 dark:bg-slate-800/50"
               />
 
@@ -195,7 +192,7 @@ const StoriesSearch = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('stories.allWeeks')}</SelectItem>
-                  {Array.from({ length: 104 }, (_, i) => i + 1).map(week => (
+                  {Array.from({ length: MAX_ISO_WEEKS }, (_, i) => i + 1).map(week => (
                     <SelectItem key={week} value={week.toString()}>
                       {t("timeline.weekNumber", { number: week })} {weeklyThemesMap && weeklyThemesMap[week] ? `- ${weeklyThemesMap[week]}` : ''}
                     </SelectItem>

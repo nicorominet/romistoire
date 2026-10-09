@@ -114,14 +114,39 @@ describe('ThemeService', () => {
       expect(connection.commit).toHaveBeenCalled();
     });
 
-    it('should unlink the weeks of an unused theme', async () => {
+    it('should delete an unused theme directly', async () => {
       db.query.mockResolvedValue([row()]);
-      const connection = mockConnection();
 
       await themeService.delete('t1');
 
-      expect(connection.query).toHaveBeenCalledWith('UPDATE weekly_themes SET theme_id = NULL WHERE theme_id = ?', ['t1']);
-      expect(connection.query).toHaveBeenCalledWith('DELETE FROM themes WHERE id = ?', ['t1']);
+      expect(db.query).toHaveBeenCalledWith('DELETE FROM themes WHERE id = ?', ['t1']);
+    });
+  });
+
+  describe('deleteMany', () => {
+    it('should delete only the unused themes', async () => {
+      const connection = mockConnection(() => [{ id: 'a', storyCount: 0 }, { id: 'b', storyCount: '3' }]);
+
+      const result = await themeService.deleteMany(['a', 'b', 'a']);
+
+      expect(result).toEqual({ deleted: ['a'], skipped: [{ id: 'b', storyCount: 3 }] });
+      expect(connection.query.mock.calls[0][1]).toEqual(['a', 'b']);
+      expect(connection.query).toHaveBeenCalledWith('DELETE FROM themes WHERE id IN (?)', ['a']);
+      expect(connection.commit).toHaveBeenCalled();
+    });
+
+    it('should not delete anything when every theme is used', async () => {
+      const connection = mockConnection(() => [{ id: 'b', storyCount: 1 }]);
+
+      const result = await themeService.deleteMany(['b']);
+
+      expect(result.deleted).toEqual([]);
+      expect(connection.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reject an empty list', async () => {
+      await expect(themeService.deleteMany([])).rejects.toBeInstanceOf(ValidationError);
+      await expect(themeService.deleteMany('a')).rejects.toBeInstanceOf(ValidationError);
     });
   });
 
@@ -173,7 +198,7 @@ describe('mergeThemesOnConnection', () => {
     expect(calls).toContainEqual(['UPDATE story_themes SET is_primary = TRUE WHERE story_id = ? AND theme_id = ?', ['s1', 'dst']]);
     expect(calls).toContainEqual(['DELETE FROM story_themes WHERE story_id = ? AND theme_id = ?', ['s1', 'src']]);
     expect(calls).toContainEqual(['UPDATE story_version_themes SET theme_id = ? WHERE theme_id = ?', ['dst', 'src']]);
-    expect(calls).toContainEqual(['UPDATE weekly_themes SET theme_id = ? WHERE theme_id = ?', ['dst', 'src']]);
+    expect(calls.some(([sql]) => sql.includes('weekly_themes'))).toBe(false);
     expect(calls).toContainEqual(['DELETE FROM themes WHERE id = ?', ['src']]);
     expect(result.merged).toBe(1);
   });

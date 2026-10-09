@@ -26,14 +26,24 @@ export interface StoryTheme extends Partial<Theme> {
 /** Theme fields shown by badges and pickers. */
 export type ThemeLike = Pick<Theme, 'id' | 'name'> & Partial<Pick<Theme, 'color' | 'icon' | 'description' | 'storyCount'>>;
 
-/** A week of the calendar and its theme. */
+/**
+ * Topic of a week: free text that guides story writing.
+ * Not a story theme (tag): it is never linked to the `themes` table.
+ */
 export interface WeeklyTheme {
   week_number: number;
-  theme_id?: string | null;
   theme_name: string;
   theme_description?: string;
-  color?: string | null;
-  icon?: string | null;
+}
+
+/** Light story row of a theme's expandable list. */
+export interface ThemeStory {
+  id: string;
+  title: string;
+  age_group: string;
+  week_number: number;
+  day_order: number;
+  locale?: string;
 }
 
 export type ThemeSort = 'name' | 'usage' | 'recent';

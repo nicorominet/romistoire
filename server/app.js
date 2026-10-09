@@ -10,6 +10,7 @@ import weeklyThemeRoutes from './routes/weeklyTheme.routes.js';
 import generationRoutes from './routes/generation.routes.js';
 import systemRoutes from './routes/system.routes.js';
 import pdfRoutes from './routes/pdf.routes.js';
+import illustrationRoutes from './routes/illustration.routes.js';
 import configRoutes from './routes/config.routes.js';
 
 import logsRoutes from './routes/logs.js';
@@ -54,6 +55,7 @@ app.use('/api/series', seriesRoutes);
 app.use('/api/weekly-themes', weeklyThemeRoutes);
 app.use('/api/generate', generationRoutes);
 app.use('/api/export', pdfRoutes);
+app.use('/api/illustrations', illustrationRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api', systemRoutes);
 app.use('/api', configRoutes);

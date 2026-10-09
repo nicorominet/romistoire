@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ENV_CONFIG } from './env.config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,11 +61,13 @@ export function log(category, message, data = {}, level = 'INFO') {
     // Ensure directory exists (sync check is fast enough for low freq logging, 
     // but better to rely on startup creation. We added mkdir in previous step)
     
-    fs.appendFile(LOG_FILE, line, (err) => {
-        if (err) {
-            console.error('Failed to write to log file:', err);
-        }
-    });
+    if (ENV_CONFIG.FILE_LOGGING) {
+        fs.appendFile(LOG_FILE, line, (err) => {
+            if (err) {
+                console.error('Failed to write to log file:', err);
+            }
+        });
+    }
 
     // Also log to console in dev
     if (process.env.NODE_ENV !== 'production') {

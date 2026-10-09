@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { logger } from './logger.service.js';
-import { PromptHelper } from './helpers/prompt.helper.js';
-import { JSON_SCHEMA } from './helpers/story_schema.js';
+import { PromptHelper, ALL_WEEK } from './helpers/prompt.helper.js';
+import { jsonSchema, STORY_DAYS } from './helpers/story_schema.js';
 dotenv.config();
 
 /**
@@ -43,7 +43,8 @@ class LocalLLMService {
                 model: targetModel,
                 system,
                 prompt: prompt,
-                format: JSON_SCHEMA, // Constrained JSON output (Ollama >= 0.5)
+                // Constrained JSON output (Ollama >= 0.5); the first day of a week also returns the week plan
+                format: jsonSchema({ withWeekPlan: PromptHelper.wantsWeekPlan(params), storyCount: day === ALL_WEEK ? STORY_DAYS.length : 0 }),
                 stream: false, // We want full response
                 options: {
                     temperature: 0.8,
@@ -77,6 +78,34 @@ class LocalLLMService {
         const duration = Date.now() - startTime;
         logger.ai('Ollama', 'Story-Error', { theme, age, day, model: targetModel }, { error: error.message }, { duration, success: false });
         throw error;
+    }
+  }
+
+  /**
+   * Short plain-text answer from the local model.
+   * @param {string} system
+   * @param {string} prompt
+   * @param {string} label - Label for the AI logs.
+   * @returns {Promise<{text: string, model: string}>}
+   */
+  async generateText(system, prompt, label) {
+    const startTime = Date.now();
+    try {
+      const response = await fetch(`${this.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: this.model, system, prompt, stream: false, options: { temperature: 0.7, num_predict: 600 } }),
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+      if (!response.ok) throw new Error(`Ollama API Error: ${response.statusText}`);
+      const data = await response.json();
+      const text = String(data.response ?? '').trim();
+      if (!text) throw new Error(`Empty response from Ollama (model ${this.model}).`);
+      logger.ai('Ollama', label, { model: this.model, promptLength: prompt.length }, { text }, { duration: Date.now() - startTime });
+      return { text, model: this.model };
+    } catch (error) {
+      logger.ai('Ollama', `${label}-Error`, { model: this.model }, { error: error.message }, { duration: Date.now() - startTime, success: false });
+      throw error;
     }
   }
 

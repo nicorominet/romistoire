@@ -22,8 +22,6 @@ interface ThemeOptionListProps {
   onPick: (theme: Theme) => void;
   /** Creates a theme from the search text; no "Create" entry when absent */
   onCreate?: (name: string) => Promise<Theme | void>;
-  /** Themes pinned on top (e.g. the theme of the week), with a label */
-  pinned?: { themeId: string; label: string }[];
   /** Extra entry on top (e.g. "All themes" in a filter) */
   header?: ReactNode;
   showCounts?: boolean;
@@ -33,16 +31,12 @@ interface ThemeOptionListProps {
  * Searchable theme list (accents ignored), with color, icon, story count and "Create" entry.
  * Shared by the single and the multiple pickers.
  */
-const ThemeOptionList = ({ themes, isSelected, onPick, onCreate, pinned = [], header, showCounts = true }: ThemeOptionListProps) => {
+const ThemeOptionList = ({ themes, isSelected, onPick, onCreate, header, showCounts = true }: ThemeOptionListProps) => {
   const { t } = i18n;
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
 
   const filtered = useMemo(() => themes.filter(theme => matchesThemeSearch(theme.name, search)), [themes, search]);
-  const pinnedThemes = pinned
-    .map(pin => ({ ...pin, theme: themes.find(theme => theme.id === pin.themeId) }))
-    .filter((pin): pin is { themeId: string; label: string; theme: Theme } => Boolean(pin.theme) && matchesThemeSearch(pin.theme!.name, search));
-  const pinnedIds = new Set(pinnedThemes.map(pin => pin.themeId));
 
   const trimmed = search.trim();
   const similar = trimmed ? findSimilarThemes(trimmed, themes) : [];
@@ -59,12 +53,11 @@ const ThemeOptionList = ({ themes, isSelected, onPick, onCreate, pinned = [], he
     }
   };
 
-  const renderItem = (theme: Theme, label?: string) => (
-    <CommandItem key={`${label ?? "all"}-${theme.id}`} value={`${label ?? ""}${theme.id}`} onSelect={() => onPick(theme)} className="gap-2">
+  const renderItem = (theme: Theme) => (
+    <CommandItem key={theme.id} value={theme.id} onSelect={() => onPick(theme)} className="gap-2">
       <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: safeThemeColor(theme.color) }} aria-hidden="true" />
       {theme.icon && <span aria-hidden="true">{theme.icon}</span>}
       <span className="flex-1 truncate">{theme.name}</span>
-      {label && <span className="text-xs text-muted-foreground">{label}</span>}
       {showCounts && <span className="text-xs tabular-nums text-muted-foreground">{theme.storyCount ?? 0}</span>}
       <Check className={cn("h-4 w-4", isSelected(theme.id) ? "opacity-100" : "opacity-0")} />
     </CommandItem>
@@ -75,11 +68,8 @@ const ThemeOptionList = ({ themes, isSelected, onPick, onCreate, pinned = [], he
       <CommandInput placeholder={t("themes.searchThemes")} value={search} onValueChange={setSearch} />
       <CommandList className="max-h-72">
         {header}
-        {pinnedThemes.length > 0 && (
-          <CommandGroup>{pinnedThemes.map(pin => renderItem(pin.theme, pin.label))}</CommandGroup>
-        )}
         <CommandGroup>
-          {filtered.filter(theme => !pinnedIds.has(theme.id)).map(theme => renderItem(theme))}
+          {filtered.map(theme => renderItem(theme))}
         </CommandGroup>
         {filtered.length === 0 && !onCreate && <CommandEmpty>{t("themes.noResults")}</CommandEmpty>}
         {onCreate && trimmed && !exactExists && (
@@ -110,7 +100,6 @@ interface ThemeSelectProps {
   /** Label of the entry that clears the selection (filters: "All themes") */
   clearLabel?: string;
   onCreate?: (name: string) => Promise<Theme | void>;
-  pinned?: { themeId: string; label: string }[];
   showCounts?: boolean;
   disabled?: boolean;
   id?: string;
@@ -118,9 +107,9 @@ interface ThemeSelectProps {
 }
 
 /**
- * Single theme picker (library filter, PDF filter, week of the calendar).
+ * Single theme picker (library filter, PDF filter, replacement theme).
  */
-export const ThemeSelect = ({ themes, value, onChange, placeholder, clearLabel, onCreate, pinned, showCounts, disabled, id, className }: ThemeSelectProps) => {
+export const ThemeSelect = ({ themes, value, onChange, placeholder, clearLabel, onCreate, showCounts, disabled, id, className }: ThemeSelectProps) => {
   const [open, setOpen] = useState(false);
   const selected = themes.find(theme => theme.id === value);
 
@@ -144,7 +133,6 @@ export const ThemeSelect = ({ themes, value, onChange, placeholder, clearLabel, 
             setOpen(false);
             return created;
           })}
-          pinned={pinned}
           showCounts={showCounts}
           header={clearLabel ? (
             <CommandGroup>
@@ -165,7 +153,6 @@ interface ThemeMultiSelectProps {
   value: SelectedTheme[];
   onChange: (value: SelectedTheme[]) => void;
   onCreate?: (name: string) => Promise<Theme | void>;
-  pinned?: { themeId: string; label: string }[];
   disabled?: boolean;
   id?: string;
 }
@@ -190,7 +177,7 @@ export const withOnePrimary = (value: SelectedTheme[]): SelectedTheme[] => {
 /**
  * Story themes editor: chips (star = primary theme, × = remove) and a searchable picker with creation.
  */
-export const ThemeMultiSelect = ({ themes, value, onChange, onCreate, pinned, disabled, id }: ThemeMultiSelectProps) => {
+export const ThemeMultiSelect = ({ themes, value, onChange, onCreate, disabled, id }: ThemeMultiSelectProps) => {
   const { t } = i18n;
   const [open, setOpen] = useState(false);
   const selected = value
@@ -237,7 +224,6 @@ export const ThemeMultiSelect = ({ themes, value, onChange, onCreate, pinned, di
               if (created && !value.some(theme => theme.id === created.id)) onChange(toggleSelectedTheme(value, created.id));
               return created;
             })}
-            pinned={pinned}
           />
         </PopoverContent>
       </Popover>
