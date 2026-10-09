@@ -244,6 +244,26 @@ class ThemeService {
   }
 
   /**
+   * Mark several AI-created themes as reviewed without changing their content.
+   * @param {string[]} ids
+   * @returns {Promise<number>} Number of themes newly validated.
+   * @throws {ValidationError} Empty list.
+   */
+  async approveMany(ids) {
+    const unique = Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string' && id))] : [];
+    if (unique.length === 0) throw new ValidationError('A non-empty list of theme ids is expected');
+
+    const result = await query(
+      `UPDATE themes SET needs_review = FALSE, updated_at = ?
+       WHERE needs_review = TRUE AND id IN (${unique.map(() => '?').join(', ')})`,
+      [now(), ...unique]
+    );
+    const validated = Number(result[0]?.affectedRows || 0);
+    if (validated > 0) this.invalidateCache();
+    return validated;
+  }
+
+  /**
    * Merge themes into one. Story and version links and primary flags are kept.
    * @throws {ValidationError|NotFoundError}
    */

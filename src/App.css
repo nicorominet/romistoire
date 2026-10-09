@@ -240,18 +240,18 @@ body.dark .bg-story-pink-50 {
   background-color: #2d3748; /* bg-gray-800 */
 }
 
-body.dark .hover:bg-story-green-200:hover {
+body.dark .hover\:bg-story-green-200:hover {
   background-color: #48bb78; /* hover:bg-story-green-700 */
 }
 
-body.dark .hover:bg-story-blue-200:hover {
+body.dark .hover\:bg-story-blue-200:hover {
   background-color: #3182ce; /* hover:bg-story-blue-700 */
 }
 
-body.dark .hover:bg-story-yellow-200:hover {
+body.dark .hover\:bg-story-yellow-200:hover {
   background-color: #d69e2e; /* hover:bg-story-yellow-700 */
 }
 
-body.dark .hover:bg-story-pink-200:hover {
+body.dark .hover\:bg-story-pink-200:hover {
   background-color: #d53f8c; /* hover:bg-story-pink-700 */
 }

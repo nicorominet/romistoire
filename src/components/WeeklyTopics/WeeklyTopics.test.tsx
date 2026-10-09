@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode } from "react";
 import { weeklyThemeApi } from "@/api/themes.api";
+import { weekMonth, weeksInIsoYear } from "@/utils/weekUtils";
 import { WeeklyTopicCalendar } from "./WeeklyTopicCalendar";
 import { WeeklyTopicRow } from "./WeeklyTopicRow";
 
@@ -28,7 +29,7 @@ const wrap = (ui: ReactNode) => {
 describe("WeeklyTopicCalendar", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("shows the weeks of the ISO year only and lists legacy weeks apart", async () => {
+  it("opens a single navigable month and lists legacy weeks apart", async () => {
     vi.mocked(weeklyThemeApi.getAll).mockResolvedValue([
       { week_number: 1, theme_name: "La neige" },
       { week_number: 88, theme_name: "Ancienne semaine" },
@@ -36,9 +37,12 @@ describe("WeeklyTopicCalendar", () => {
 
     wrap(<WeeklyTopicCalendar year={2026} onYearChange={vi.fn()} />);
 
+    const monthSelect = await screen.findByRole("combobox");
+    fireEvent.change(monthSelect, { target: { value: String(weekMonth(1, 2026)) } });
     expect(await screen.findByDisplayValue("La neige")).toBeInTheDocument();
-    // 2026 has 53 ISO weeks
-    expect(screen.getAllByPlaceholderText("weeklyTopics.topicPlaceholder")).toHaveLength(53);
+    const expectedMonthWeeks = Array.from({ length: weeksInIsoYear(2026) }, (_, index) => index + 1)
+      .filter(week => weekMonth(week, 2026) === weekMonth(1, 2026)).length;
+    expect(screen.getAllByPlaceholderText("weeklyTopics.topicPlaceholder")).toHaveLength(expectedMonthWeeks);
     expect(screen.getByText("weeklyTopics.invalidWeeks")).toBeInTheDocument();
     expect(screen.getByText(/Ancienne semaine/)).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Ancienne semaine")).not.toBeInTheDocument();
@@ -54,6 +58,27 @@ describe("WeeklyTopicCalendar", () => {
     await waitFor(() => expect(weeklyThemeApi.clearWeek).toHaveBeenCalledTimes(2));
     expect(weeklyThemeApi.clearWeek).toHaveBeenCalledWith(88);
     expect(weeklyThemeApi.clearWeek).toHaveBeenCalledWith(96);
+  });
+
+  it("filters the week list to configured topics or weeks still to plan", async () => {
+    vi.mocked(weeklyThemeApi.getAll).mockResolvedValue([
+      { week_number: 1, theme_name: "La neige" },
+      { week_number: 2, theme_name: "" },
+    ]);
+
+    wrap(<WeeklyTopicCalendar year={2026} onYearChange={vi.fn()} />);
+
+    fireEvent.change(await screen.findByRole("combobox"), { target: { value: String(weekMonth(1, 2026)) } });
+    expect(await screen.findByDisplayValue("La neige")).toBeInTheDocument();
+    const monthWeekCount = Array.from({ length: weeksInIsoYear(2026) }, (_, index) => index + 1)
+      .filter(week => weekMonth(week, 2026) === weekMonth(1, 2026)).length;
+    expect(screen.getAllByPlaceholderText("weeklyTopics.topicPlaceholder")).toHaveLength(monthWeekCount);
+
+    fireEvent.click(screen.getByText("weeklyTopics.view.configured"));
+    expect(screen.getAllByPlaceholderText("weeklyTopics.topicPlaceholder")).toHaveLength(1);
+
+    fireEvent.click(screen.getByText("weeklyTopics.view.empty"));
+    expect(screen.getAllByPlaceholderText("weeklyTopics.topicPlaceholder")).toHaveLength(monthWeekCount - 1);
   });
 });
 

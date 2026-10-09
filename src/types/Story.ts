@@ -71,11 +71,11 @@ export interface StoryVersion {
   story_id: string;
   title: string;
   content: string;
-  theme_id: string;
-  age_group: string;
-  created_at: string;
+  themes: Array<Pick<Theme, "id" | "name" | "color" | "icon"> & { isPrimary: boolean }>;
+  ageGroup: string;
+  createdAt: string;
   version: number;
-  illustrations: Illustration[];
+  isManuallyEdited: boolean;
 }
 
 /**
@@ -131,4 +131,3 @@ export interface ExportOptions {
 export interface StoryWithIllustrations extends Story {
   illustrations: Illustration[];
 }
-

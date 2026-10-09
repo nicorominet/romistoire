@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Check, ChevronsUpDown, Plus, Star, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -180,6 +180,9 @@ export const withOnePrimary = (value: SelectedTheme[]): SelectedTheme[] => {
 export const ThemeMultiSelect = ({ themes, value, onChange, onCreate, disabled, id }: ThemeMultiSelectProps) => {
   const { t } = i18n;
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
   const selected = value
     .map(item => ({ ...item, theme: themes.find(theme => theme.id === item.id) }))
     .filter((item): item is SelectedTheme & { theme: Theme } => Boolean(item.theme));

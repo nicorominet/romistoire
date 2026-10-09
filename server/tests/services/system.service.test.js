@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import AdmZip from 'adm-zip';
 import { ENV_CONFIG } from '../../config/env.config.js';
 import { systemService } from '../../services/system.service.js';
 import * as db from '../../config/database.js';
@@ -70,6 +71,42 @@ describe('SystemService (settings > data)', () => {
     }
   });
 
+  it('cleanupImages should preserve recent uploads when a grace period is supplied', async () => {
+    const originalRoot = ENV_CONFIG.PROJECT_ROOT;
+    const originalDir = ENV_CONFIG.UPLOADS_DIR;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'imagitales-cleanup-'));
+    const uploadsDir = path.join(tmpDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    const recentImage = path.join(uploadsDir, 'recent.png');
+    const oldOrphan = path.join(uploadsDir, 'old.png');
+    const referencedAudio = path.join(uploadsDir, 'used.mp3');
+    fs.writeFileSync(recentImage, 'recent');
+    fs.writeFileSync(oldOrphan, 'old');
+    fs.writeFileSync(referencedAudio, 'audio');
+    const olderThanGrace = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    fs.utimesSync(oldOrphan, olderThanGrace, olderThanGrace);
+    ENV_CONFIG.PROJECT_ROOT = tmpDir;
+    ENV_CONFIG.UPLOADS_DIR = uploadsDir;
+    db.query.mockImplementation(async (sql) => {
+      if (sql === 'SELECT image_path FROM illustrations') return [];
+      if (sql === 'SELECT audio_path FROM stories WHERE audio_path IS NOT NULL') return [{ audio_path: '/uploads/used.mp3' }];
+      return [];
+    });
+
+    try {
+      const result = await systemService.cleanupImages({ minAgeMs: 24 * 60 * 60 * 1000 });
+
+      expect(result).toEqual({ success: true, deletedCount: 1, reclaimedSpace: 3 });
+      expect(fs.existsSync(recentImage)).toBe(true);
+      expect(fs.existsSync(oldOrphan)).toBe(false);
+      expect(fs.existsSync(referencedAudio)).toBe(true);
+    } finally {
+      ENV_CONFIG.PROJECT_ROOT = originalRoot;
+      ENV_CONFIG.UPLOADS_DIR = originalDir;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it('resetData should also empty the generation history, which points at the deleted stories', async () => {
     const connection = { query: vi.fn(async () => [[]]), beginTransaction: vi.fn(), commit: vi.fn(), rollback: vi.fn(), release: vi.fn() };
     db.getConnection.mockResolvedValue(connection);
@@ -94,7 +131,36 @@ describe('SystemService (settings > data)', () => {
     const data = JSON.parse(result.buffer.toString());
 
     expect(data.versionThemes).toEqual([{ id: 'svt-1' }]);
+    expect(data).not.toHaveProperty('settings');
     expect(result.filename).toMatch(/^imagitales-data-export-/);
+  });
+
+  it('full export should include library data and files from uploads, not application settings', async () => {
+    const originalRoot = ENV_CONFIG.PROJECT_ROOT;
+    const originalDir = ENV_CONFIG.UPLOADS_DIR;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'imagitales-export-'));
+    const uploadsDir = path.join(tmpDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    fs.writeFileSync(path.join(uploadsDir, 'story.png'), 'image');
+    fs.writeFileSync(path.join(uploadsDir, 'story.mp3'), 'audio');
+    ENV_CONFIG.PROJECT_ROOT = tmpDir;
+    ENV_CONFIG.UPLOADS_DIR = uploadsDir;
+
+    try {
+      const result = await systemService.exportData(true);
+      const archive = new AdmZip(result.buffer);
+      const data = JSON.parse(archive.readAsText('data.json'));
+
+      expect(data).toHaveProperty('weeklyThemes');
+      expect(data).toHaveProperty('generationJobs');
+      expect(data).not.toHaveProperty('settings');
+      expect(archive.getEntry('images/story.png')).not.toBeNull();
+      expect(archive.getEntry('images/story.mp3')).not.toBeNull();
+    } finally {
+      ENV_CONFIG.PROJECT_ROOT = originalRoot;
+      ENV_CONFIG.UPLOADS_DIR = originalDir;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('importData should run every statement on one connection, with foreign key checks off', async () => {

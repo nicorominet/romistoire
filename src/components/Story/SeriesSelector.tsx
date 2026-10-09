@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { i18n } from '@/lib/i18n';
@@ -25,6 +25,7 @@ interface SeriesSelectorProps {
   value?: string;
   onChange: (value: string) => void;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
 /** Comparison key of a series name: case, accents and extra spaces ignored (like the database). */
@@ -41,10 +42,13 @@ const cleanName = (name: string) => name.replace(/\s+/g, " ").trim();
  * story is saved, see storySeriesHelper.resolveSeriesId). A typed name matching an existing series
  * (case and accents ignored) selects that series.
  */
-export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, onChange, isLoading }) => {
+export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, onChange, isLoading, disabled = false }) => {
   const { t } = i18n;
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   const typed = cleanName(inputValue);
   const existing = (name: string) => series.find((s) => seriesKey(s.name) === seriesKey(name));
@@ -70,7 +74,7 @@ export const SeriesSelector: React.FC<SeriesSelectorProps> = ({ series, value, o
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between"
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           >
             <span className="truncate">
               {value

@@ -150,6 +150,24 @@ describe('ThemeService', () => {
     });
   });
 
+  describe('approveMany', () => {
+    it('should validate only pending review themes and invalidate the cache', async () => {
+      db.query.mockResolvedValue([{ affectedRows: 2 }]);
+
+      const result = await themeService.approveMany(['a', 'b', 'a']);
+
+      expect(result).toBe(2);
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE needs_review = TRUE AND id IN (?, ?)'),
+        [expect.any(String), 'a', 'b']
+      );
+    });
+
+    it('should reject an empty list', async () => {
+      await expect(themeService.approveMany([])).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
   describe('mergeThemes', () => {
     it('should require a target and another theme', async () => {
       await expect(themeService.mergeThemes(['t1'], 't1')).rejects.toBeInstanceOf(ValidationError);

@@ -188,7 +188,9 @@ export class GenerationWorker {
       }
       await repo.updateJob(job.id, { currentLabel: `Week ${unit.weekNumber} · ${unit.ageGroup} · ${day}` });
 
-      const outcome = await this._generate(job, unit, { ...request, day, ...buildDayParams(context) }, day, storyIds, errors);
+      const dayIndex = GENERATION_DAYS_FR.indexOf(day);
+      const priorContext = { ...context, days: context.days.filter(({ day: contextDay }) => GENERATION_DAYS_FR.indexOf(contextDay) < dayIndex) };
+      const outcome = await this._generate(job, unit, { ...request, day, ...buildDayParams(priorContext) }, day, storyIds, errors);
       if (outcome.weekPlan && !context.weekPlan) context.weekPlan = outcome.weekPlan;
       if (outcome.characters && !context.characters) context.characters = outcome.characters;
       if (outcome.lastDay) {

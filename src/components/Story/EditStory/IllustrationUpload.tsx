@@ -4,9 +4,10 @@ import { ACCEPTED_IMAGE_TYPES } from "@/constants";
 
 interface IllustrationUploadProps {
   onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  disabled?: boolean;
 }
 
-const IllustrationUpload = ({ onImageChange }: IllustrationUploadProps) => {
+const IllustrationUpload = ({ onImageChange, disabled = false }: IllustrationUploadProps) => {
   const { t } = i18n;
 
   return (
@@ -17,6 +18,7 @@ const IllustrationUpload = ({ onImageChange }: IllustrationUploadProps) => {
       {/* The upload starts as soon as a file is picked */}
       <Input
         type="file"
+        disabled={disabled}
         accept={ACCEPTED_IMAGE_TYPES.join(",")}
         onChange={onImageChange}
         className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 file:bg-story-purple-500 file:border-0 file:text-white file:hover:bg-story-purple-700"

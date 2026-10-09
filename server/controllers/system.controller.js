@@ -1,5 +1,6 @@
 import { systemService } from '../services/system.service.js';
 import { handleError } from '../middleware/error.middleware.js';
+import { settingsService } from '../services/settings.service.js';
 
 export const importData = async (req, res) => {
     try {
@@ -35,7 +36,8 @@ export const exportFull = async (req, res) => {
 
 export const cleanupImages = async (req, res) => {
   try {
-    const result = await systemService.cleanupImages();
+    const { maxAgeHours } = settingsService.storage.orphanPurge;
+    const result = await systemService.cleanupImages({ minAgeMs: maxAgeHours * 60 * 60 * 1000 });
     res.json(result);
   } catch (error) {
     handleError(res, error);

@@ -5,7 +5,7 @@ import RichTextEditor from "@/components/Common/RichTextEditor";
 import { i18n } from "@/lib/i18n";
 import { stripHtmlTags } from "@/lib/utils";
 
-const StoryContent = () => {
+const StoryContent = ({ disabled = false }: { disabled?: boolean }) => {
   const { t } = i18n;
   const { control, watch } = useFormContext();
   const content = watch("content");
@@ -42,9 +42,11 @@ const StoryContent = () => {
                 content={field.value || ""}
                 onChange={field.onChange}
                 placeholder={t("story.contentPlaceholder")}
+                disabled={disabled}
               />
             </FormControl>
             <FormMessage />
+            <p className="text-xs text-muted-foreground">{t("story.inlineImageHint")}</p>
           </FormItem>
         )}
       />

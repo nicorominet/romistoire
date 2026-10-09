@@ -21,6 +21,7 @@ vi.mock('../services/theme.service.js', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     deleteMany: vi.fn(),
+    approveMany: vi.fn(),
     mergeThemes: vi.fn(),
     invalidateCache: vi.fn(),
   }
@@ -166,6 +167,26 @@ describe('Theme API', () => {
       const res = await request(app).post('/api/themes/bulk-delete').send({ ids: [] });
 
       expect(res.status).toBe(400);
+    });
+
+    describe('POST /api/themes/bulk-approve', () => {
+      it('should approve the selected themes and return the validated count', async () => {
+        themeService.approveMany.mockResolvedValue(3);
+
+        const res = await request(app).post('/api/themes/bulk-approve').send({ ids: ['a', 'b', 'c'] });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ success: true, validated: 3 });
+        expect(themeService.approveMany).toHaveBeenCalledWith(['a', 'b', 'c']);
+      });
+
+      it('should answer 400 for an empty list', async () => {
+        themeService.approveMany.mockRejectedValue(new ValidationError('empty'));
+
+        const res = await request(app).post('/api/themes/bulk-approve').send({ ids: [] });
+
+        expect(res.status).toBe(400);
+      });
     });
   });
 });

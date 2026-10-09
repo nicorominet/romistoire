@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { ExportOptions, Story, AgeGroup, AGE_GROUPS } from "@/types/Story";
+import { ExportOptions, Story, AGE_GROUPS, PaginationParams } from "@/types/Story";
 import { PDF_STYLES, PdfStyle, resolvePdfStyle } from "@/utils/pdfStyle";
+import { fetchAllPdfStories, filterPdfStories } from "@/utils/pdfExport";
 import { i18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,15 +16,14 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Download, FileText, Filter, Book, Settings } from "lucide-react";
+import { Download, FileText, Filter, Search, Settings, X } from "lucide-react";
 import { toast } from "sonner";
 import { systemApi } from "@/api/system.api";
 import { useThemes } from "@/hooks/useThemes";
@@ -33,11 +33,16 @@ import { ThemeBadgeList } from "@/components/Theme/ThemeBadgeList";
 
 interface PDFExportProps {
   availableStories: Story[];
+  storyQuery: Partial<PaginationParams>;
 }
 
-const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
+const PDFExport = ({ availableStories, storyQuery }: PDFExportProps): JSX.Element => {
   const { t } = i18n;
 
+  const [exportStories, setExportStories] = useState<Story[]>(availableStories);
+  const [loadingStories, setLoadingStories] = useState<boolean>(true);
+  const [storyLoadError, setStoryLoadError] = useState<string>("");
+  const [reloadStories, setReloadStories] = useState<number>(0);
   const [selectedStories, setSelectedStories] = useState<string[]>([]);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
     stories: [],
@@ -56,31 +61,84 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
+  const [storySearch, setStorySearch] = useState<string>("");
   const [generating, setGenerating] = useState<boolean>(false);
   // Object URL of the last generated PDF (revoked when replaced or when leaving the page)
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [pdfFilename, setPdfFilename] = useState<string>("");
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingStories(true);
+    setStoryLoadError("");
+    setSelectedStories([]);
+
+    fetchAllPdfStories(storyQuery)
+      .then((stories) => {
+        if (cancelled) return;
+        setExportStories(stories);
+        setSelectedWeeks([...new Set(stories.map((story) => story.week_number))]);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : t("pdf.unknownError");
+        setStoryLoadError(message);
+        toast.error(t("pdf.error"), { description: message, duration: 5000 });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStories(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [storyQuery, reloadStories, t]);
+
   // Style used in "auto": from the age groups of the selected stories
   const resolvedStyle = useMemo(() => {
     const selected = new Set(selectedStories);
-    const ages = availableStories.filter((story) => selected.has(story.id)).map((story) => String(story.age_group));
+    const ages = exportStories.filter((story) => selected.has(story.id)).map((story) => String(story.age_group));
     return resolvePdfStyle(exportOptions.style ?? "auto", ages);
-  }, [availableStories, selectedStories, exportOptions.style]);
+  }, [exportStories, selectedStories, exportOptions.style]);
 
-  // The export covers the loaded stories: only offer their themes (with full theme data for the picker)
   const themes: Theme[] = useMemo(() => {
-    const ids = new Set(availableStories.flatMap((story) => (story.themes || []).map((theme) => theme.id)));
+    const ids = new Set(exportStories.flatMap((story) => (story.themes || []).map((theme) => theme.id)));
     return allThemes.filter((theme) => ids.has(theme.id));
-  }, [availableStories, allThemes]);
+  }, [exportStories, allThemes]);
 
-  useEffect(() => {
-    const uniqueWeeks = [
-      ...new Set(availableStories.map((story) => story.week_number)),
-    ];
-    setSelectedWeeks(uniqueWeeks);
-  }, [availableStories]);
+  const availableWeeks = useMemo(
+    () => [...new Set(exportStories.map((story) => story.week_number))].sort((a, b) => a - b),
+    [exportStories],
+  );
+
+  const filteredStories = useMemo(() => filterPdfStories(exportStories, {
+    themeId: selectedTheme,
+    ageGroup: selectedAgeGroup,
+    dateFrom,
+    dateTo,
+    weeks: selectedWeeks,
+  }), [exportStories, selectedTheme, selectedAgeGroup, dateFrom, dateTo, selectedWeeks]);
+
+  const visibleStories = useMemo(() => {
+    const search = storySearch.trim().toLocaleLowerCase();
+    if (!search) return filteredStories;
+    return filteredStories.filter((story) => [
+      story.title,
+      story.series_name ?? "",
+      ...(story.themes ?? []).map((theme) => theme.name),
+    ].some((value) => value.toLocaleLowerCase().includes(search)));
+  }, [filteredStories, storySearch]);
+
+  const visibleStoryIds = useMemo(() => new Set(visibleStories.map((story) => story.id)), [visibleStories]);
+  const selectedOutsideVisibleCount = selectedStories.reduce(
+    (count, storyId) => count + Number(!visibleStoryIds.has(storyId)),
+    0,
+  );
+
+  const activeFilterCount = Number(Boolean(selectedTheme && selectedTheme !== "default"))
+    + Number(Boolean(selectedAgeGroup && selectedAgeGroup !== "default"))
+    + Number(Boolean(dateFrom))
+    + Number(Boolean(dateTo))
+    + Number(availableWeeks.length > 0 && selectedWeeks.length < availableWeeks.length);
 
   useEffect(() => {
     setExportOptions((prev) => ({
@@ -98,64 +156,29 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
   };
 
   const selectAllStories = () => {
-    const allStoryIds = availableStories.map((story) => story.id);
+    const allStoryIds = exportStories.map((story) => story.id);
     setSelectedStories(allStoryIds);
+  };
+
+  const addVisibleStories = () => {
+    setSelectedStories((current) => [...new Set([...current, ...visibleStories.map((story) => story.id)])]);
+  };
+
+  const keepVisibleStoriesOnly = () => {
+    setSelectedStories(visibleStories.map((story) => story.id));
   };
 
   const deselectAllStories = () => {
     setSelectedStories([]);
   };
 
-  const applyFilters = () => {
-    let filteredStories = [...availableStories];
-
-    if (selectedTheme && selectedTheme !== "default") {
-      filteredStories = filteredStories.filter(
-        (story) =>
-          Array.isArray(story.themes) &&
-          story.themes.some((theme) => theme.id === selectedTheme)
-      );
-    }
-
-    if (selectedAgeGroup && selectedAgeGroup !== "default") {
-      filteredStories = filteredStories.filter(
-        (story) => story.age_group === selectedAgeGroup
-      );
-    }
-
-    if (dateFrom || dateTo) {
-      const fromDate = dateFrom ? new Date(dateFrom) : new Date(0);
-      const toDate = dateTo ? new Date(dateTo) : new Date();
-
-      filteredStories = filteredStories.filter((story) => {
-        const storyDate = new Date(story.created_at);
-        return storyDate >= fromDate && storyDate <= toDate;
-      });
-    }
-
-    if (selectedWeeks.length > 0) {
-      filteredStories = filteredStories.filter((story) =>
-        selectedWeeks.includes(story.week_number)
-      );
-    }
-
-    const filteredIds = filteredStories.map((story) => story.id);
-    setSelectedStories(filteredIds);
-
-    setExportOptions((prev) => ({
-      ...prev,
-      stories: filteredIds,
-      theme: selectedTheme,
-      ageGroups:
-        selectedAgeGroup && selectedAgeGroup !== "default"
-          ? [selectedAgeGroup as AgeGroup]
-          : undefined,
-      dateFrom,
-      dateTo,
-      weekNumbers: selectedWeeks.length > 0 ? selectedWeeks : undefined,
-    }));
-
-    toast.success(t("pdf.filtersApplied"), { description: t("pdf.filtersAppliedDesc", { count: String(filteredIds.length) }), duration: 3000 });
+  const resetFilters = () => {
+    setSelectedTheme("");
+    setSelectedAgeGroup("");
+    setDateFrom("");
+    setDateTo("");
+    setSelectedWeeks(availableWeeks);
+    setStorySearch("");
   };
 
   const generatePDF = async () => {
@@ -196,393 +219,280 @@ const PDFExport = ({ availableStories }: PDFExportProps): JSX.Element => {
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="gap-2">
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
           {t("pdf.title")}
         </CardTitle>
+        <CardDescription>{t("pdf.exportDescription")}</CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="stories" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="stories" className="flex items-center gap-1">
-              <Book className="h-4 w-4" />
-              {t("pdf.selectStories")}
-            </TabsTrigger>
-            <TabsTrigger value="options" className="flex items-center gap-1">
-              <Settings className="h-4 w-4" />
-              {t("pdf.options")}
-            </TabsTrigger>
-            <TabsTrigger value="filters" className="flex items-center gap-1">
-              <Filter className="h-4 w-4" />
-              {t("pdf.filters")}
-            </TabsTrigger>
-          </TabsList>
+      <CardContent className="space-y-6">
+        {(loadingStories || storyLoadError) && (
+          <div className="rounded-lg border p-4" role={storyLoadError ? "alert" : "status"}>
+            {loadingStories && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
+            {storyLoadError && (
+              <div className="flex items-center justify-between gap-3 text-sm text-destructive">
+                <span>{storyLoadError}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => setReloadStories((attempt) => attempt + 1)}>
+                  {t("common.retry")}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
-          <TabsContent value="stories">
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <Button variant="outline" size="sm" onClick={selectAllStories}>
+        <section aria-labelledby="pdf-filters-heading" className="space-y-4 rounded-xl border bg-muted/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 id="pdf-filters-heading" className="flex items-center gap-2 font-semibold">
+                <Filter className="h-4 w-4 text-primary" />
+                {t("pdf.filters")}
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                    {t("pdf.activeFilters", { count: String(activeFilterCount) })}
+                  </span>
+                )}
+              </h4>
+              <p className="text-xs text-muted-foreground">{t("pdf.filtersHint")}</p>
+            </div>
+            {activeFilterCount > 0 && (
+              <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>
+                <X className="h-4 w-4" />
+                {t("pdf.clearFilters")}
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label>{t("pdf.filterByTheme")}</Label>
+              <ThemeSelect
+                themes={themes}
+                value={selectedTheme && selectedTheme !== "default" ? selectedTheme : null}
+                onChange={(themeId) => setSelectedTheme(themeId ?? "default")}
+                placeholder={t("pdf.selectTheme")}
+                clearLabel={t("stories.allThemes")}
+                showCounts={false}
+                disabled={loadingStories || Boolean(storyLoadError)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pdf-age">{t("pdf.filterByAge")}</Label>
+              <Select value={selectedAgeGroup || "default"} onValueChange={setSelectedAgeGroup} disabled={loadingStories || Boolean(storyLoadError)}>
+                <SelectTrigger id="pdf-age"><SelectValue placeholder={t("pdf.selectAgeGroup")} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">{t("stories.allAges")}</SelectItem>
+                  {AGE_GROUPS.map((age) => <SelectItem key={age} value={age}>{t(`ages.${age}`)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateFrom">{t("pdf.dateFrom")}</Label>
+              <Input id="dateFrom" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} disabled={loadingStories} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateTo">{t("pdf.dateTo")}</Label>
+              <Input id="dateTo" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} disabled={loadingStories} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label>{t("pdf.filterByWeek")}</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{t("pdf.weeksSelected", { selected: String(selectedWeeks.length), total: String(availableWeeks.length) })}</span>
+                <Button type="button" variant="ghost" size="sm" className="h-8 px-2" disabled={loadingStories || selectedWeeks.length === availableWeeks.length} onClick={() => setSelectedWeeks(availableWeeks)}>
                   {t("pdf.selectAll")}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={deselectAllStories}
-                >
+                <Button type="button" variant="ghost" size="sm" className="h-8 px-2" disabled={loadingStories || selectedWeeks.length === 0} onClick={() => setSelectedWeeks([])}>
                   {t("pdf.deselectAll")}
                 </Button>
               </div>
-
-              <div className="grid gap-2 max-h-80 overflow-y-auto p-2">
-                {availableStories.map((story) => (
-                  <div
-                    key={story.id}
-                    className="flex items-center space-x-2 p-2 border rounded-md hover:bg-accent/50"
-                  >
-                    <Checkbox
-                      id={`story-${story.id}`}
-                      checked={selectedStories.includes(story.id)}
-                      onCheckedChange={() => handleStorySelection(story.id)}
-                    />
-                    <Label
-                      htmlFor={`story-${story.id}`}
-                      className="flex flex-col cursor-pointer flex-1"
-                    >
-                      <span className="font-medium">{story.title}</span>
-                      <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
-                        <ThemeBadgeList themes={story.themes} max={3} />
-                        <span>•</span>
-                        <span>{t(`ages.${story.age_group}`)}</span>
-                        <span>•</span>
-                        <span>
-                          {t("week.title")} {story.week_number} /{" "}
-                          {t(`week.day.${story.day_order}`)}
-                        </span>
-                        {story.series_name && (
-                          <>
-                            <span>•</span>
-                            <span className="font-semibold text-story-purple-600 dark:text-story-purple-400">
-                              {story.series_name}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </Label>
-                  </div>
-                ))}
-
-                {availableStories.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {t("stories.empty")}
-                  </div>
-                )}
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                Selected: {selectedStories.length} / {availableStories.length}{" "}
-                stories
-              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="options">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label>{t("pdf.includeIllustrations")}</Label>
-                <div className="flex items-center space-x-2">
+            <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto rounded-md border bg-background p-2">
+              {availableWeeks.map((week) => (
+                <label key={week} htmlFor={`week-${week}`} className="flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm hover:bg-accent">
                   <Checkbox
-                    id="includeIllustrations"
-                    checked={exportOptions.includeIllustrations}
-                    onCheckedChange={(checked) =>
-                      setExportOptions({
-                        ...exportOptions,
-                        includeIllustrations: !!checked,
-                      })
-                    }
-                  />
-                  <Label htmlFor="includeIllustrations">
-                    {t("pdf.includeIllustrations")}
-                  </Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("pdf.coverPage")}</Label>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="coverPage"
-                    checked={exportOptions.coverPage}
-                    onCheckedChange={(checked) =>
-                      setExportOptions({
-                        ...exportOptions,
-                        coverPage: !!checked,
-                      })
-                    }
-                  />
-                  <Label htmlFor="coverPage">{t("pdf.coverPage")}</Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("pdf.tableOfContents")}</Label>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="tableOfContents"
-                    checked={exportOptions.tableOfContents}
-                    onCheckedChange={(checked) =>
-                      setExportOptions({
-                        ...exportOptions,
-                        tableOfContents: !!checked,
-                      })
-                    }
-                  />
-                  <Label htmlFor="tableOfContents">
-                    {t("pdf.tableOfContents")}
-                  </Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="fontSize">{t("pdf.fontSize")}</Label>
-                <RadioGroup
-                  id="fontSize"
-                  value={exportOptions.fontSize}
-                  onValueChange={(value: any) =>
-                    setExportOptions({ ...exportOptions, fontSize: value })
-                  }
-                  className="flex space-x-4"
-                >
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="small" id="fontSize-small" />
-                    <Label htmlFor="fontSize-small">
-                      {t("pdf.fontSizeSmall")}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="medium" id="fontSize-medium" />
-                    <Label htmlFor="fontSize-medium">
-                      {t("pdf.fontSizeMedium")}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="large" id="fontSize-large" />
-                    <Label htmlFor="fontSize-large">
-                      {t("pdf.fontSizeLarge")}
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="pdfStyle">{t("pdf.style")}</Label>
-                <Select
-                  value={exportOptions.style ?? "auto"}
-                  onValueChange={(value) =>
-                    setExportOptions({ ...exportOptions, style: value as PdfStyle })
-                  }
-                >
-                  <SelectTrigger id="pdfStyle">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PDF_STYLES.map((style) => (
-                      <SelectItem key={style} value={style}>{t(`pdf.styles.${style}`)}</SelectItem>
+                    id={`week-${week}`}
+                    checked={selectedWeeks.includes(week)}
+                    disabled={loadingStories}
+                    onCheckedChange={(checked) => setSelectedWeeks((current) => (
+                      checked ? [...new Set([...current, week])] : current.filter((item) => item !== week)
                     ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {(exportOptions.style ?? "auto") === "auto"
-                    ? `${t("pdf.styleAuto", { style: t(`pdf.styles.${resolvedStyle}`) })} — ${t("pdf.styles.autoDesc")}`
-                    : t(`pdf.styles.${exportOptions.style}Desc`)}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="pageSize">{t("pdf.pageSize")}</Label>
-                <Select
-                  value={exportOptions.pageSize}
-                  onValueChange={(value: any) =>
-                    setExportOptions({ ...exportOptions, pageSize: value })
-                  }
-                >
-                  <SelectTrigger id="pageSize">
-                    <SelectValue placeholder={t("pdf.selectPageSize")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a4">A4</SelectItem>
-                    <SelectItem value="a5">A5</SelectItem>
-                    <SelectItem value="letter">Letter</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="orientation">{t("pdf.orientation")}</Label>
-                <RadioGroup
-                  id="orientation"
-                  value={exportOptions.orientation}
-                  onValueChange={(value: any) =>
-                    setExportOptions({ ...exportOptions, orientation: value })
-                  }
-                  className="flex space-x-4"
-                >
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem
-                      value="portrait"
-                      id="orientation-portrait"
-                    />
-                    <Label htmlFor="orientation-portrait">
-                      {t("pdf.portrait")}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem
-                      value="landscape"
-                      id="orientation-landscape"
-                    />
-                    <Label htmlFor="orientation-landscape">
-                      {t("pdf.landscape")}
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="filters">
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="theme">
-                <AccordionTrigger>{t("pdf.filterByTheme")}</AccordionTrigger>
-                <AccordionContent>
-                  <ThemeSelect
-                    themes={themes}
-                    value={selectedTheme && selectedTheme !== "default" ? selectedTheme : null}
-                    onChange={(themeId) => setSelectedTheme(themeId ?? "default")}
-                    placeholder={t("pdf.selectTheme")}
-                    clearLabel={t("stories.allThemes")}
-                    showCounts={false}
                   />
-                </AccordionContent>
-              </AccordionItem>
+                  <span>{t("week.title")} {week}</span>
+                </label>
+              ))}
+              {!loadingStories && availableWeeks.length === 0 && (
+                <span className="p-2 text-sm text-muted-foreground">{t("stories.empty")}</span>
+              )}
+            </div>
+          </div>
+        </section>
 
-              <AccordionItem value="ageGroup">
-                <AccordionTrigger>{t("pdf.filterByAge")}</AccordionTrigger>
-                <AccordionContent>
-                  <Select
-                    value={selectedAgeGroup || "default"}
-                    onValueChange={(value: any) => setSelectedAgeGroup(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("pdf.selectAgeGroup")} />
-                    </SelectTrigger>
+        <section aria-labelledby="pdf-stories-heading" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h4 id="pdf-stories-heading" className="font-semibold">{t("pdf.selectStories")}</h4>
+              <p className="text-sm text-muted-foreground">
+                {t("pdf.selectionSummary", {
+                  selected: String(selectedStories.length),
+                  visible: String(visibleStories.length),
+                  total: String(exportStories.length),
+                  hidden: String(selectedOutsideVisibleCount),
+                })}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={selectAllStories} disabled={loadingStories || Boolean(storyLoadError) || exportStories.length === 0 || selectedStories.length === exportStories.length}>
+                {t("pdf.selectAllCount", { count: String(exportStories.length) })}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={addVisibleStories} disabled={loadingStories || Boolean(storyLoadError) || visibleStories.length === 0 || visibleStories.every((story) => selectedStories.includes(story.id))}>
+                {t("pdf.addVisible", { count: String(visibleStories.length) })}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={keepVisibleStoriesOnly} disabled={loadingStories || Boolean(storyLoadError) || visibleStories.length === 0 || (selectedStories.length === visibleStories.length && selectedOutsideVisibleCount === 0)}>
+                {t("pdf.keepVisible", { count: String(visibleStories.length) })}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={deselectAllStories} disabled={selectedStories.length === 0}>
+                {t("pdf.deselectAll")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={storySearch} onChange={(event) => setStorySearch(event.target.value)} placeholder={t("pdf.searchStories")} className="pl-9" aria-label={t("pdf.searchStories")} />
+          </div>
+
+          <div className="grid max-h-[28rem] gap-2 overflow-y-auto rounded-lg border bg-muted/10 p-2">
+            {visibleStories.map((story) => {
+              const checked = selectedStories.includes(story.id);
+              return (
+                <label key={story.id} htmlFor={`story-${story.id}`} className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent/30 ${checked ? "border-primary/50 bg-primary/5" : ""}`}>
+                  <Checkbox id={`story-${story.id}`} checked={checked} onCheckedChange={() => handleStorySelection(story.id)} className="mt-0.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{story.title}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <ThemeBadgeList themes={story.themes} max={3} />
+                      <span>{t(`ages.${story.age_group}`)}</span>
+                      <span>{t("week.title")} {story.week_number} / {t(`week.day.${story.day_order}`)}</span>
+                      {story.series_name && <span className="font-semibold text-story-purple-600 dark:text-story-purple-400">{story.series_name}</span>}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+            {!loadingStories && !storyLoadError && visibleStories.length === 0 && (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                {storySearch ? t("pdf.noMatchingStories") : t("stories.empty")}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <Accordion type="single" collapsible>
+          <AccordionItem value="options" className="rounded-lg border px-4">
+            <AccordionTrigger className="py-4">
+              <span className="flex items-center gap-2"><Settings className="h-4 w-4" />{t("pdf.options")}</span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid gap-5 pb-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-3">
+                  <Label>{t("pdf.documentContents")}</Label>
+                  {([
+                    ["includeIllustrations", "includeIllustrations"],
+                    ["coverPage", "coverPage"],
+                    ["tableOfContents", "tableOfContents"],
+                  ] as const).map(([key, labelKey]) => (
+                    <label key={key} htmlFor={key} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        id={key}
+                        checked={Boolean(exportOptions[key])}
+                        onCheckedChange={(checked) => setExportOptions((current) => ({ ...current, [key]: Boolean(checked) }))}
+                      />
+                      {t(`pdf.${labelKey}`)}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pdfStyle">{t("pdf.style")}</Label>
+                  <Select value={exportOptions.style ?? "auto"} onValueChange={(value) => setExportOptions((current) => ({ ...current, style: value as PdfStyle }))}>
+                    <SelectTrigger id="pdfStyle"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">{t("stories.allAges")}</SelectItem>
-                      {AGE_GROUPS.map((age) => (
-                        <SelectItem key={age} value={age}>{t(`ages.${age}`)}</SelectItem>
-                      ))}
+                      {PDF_STYLES.map((style) => <SelectItem key={style} value={style}>{t(`pdf.styles.${style}`)}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </AccordionContent>
-              </AccordionItem>
+                  <p className="text-xs text-muted-foreground">
+                    {(exportOptions.style ?? "auto") === "auto"
+                      ? `${t("pdf.styleAuto", { style: t(`pdf.styles.${resolvedStyle}`) })} — ${t("pdf.styles.autoDesc")}`
+                      : t(`pdf.styles.${exportOptions.style}Desc`)}
+                  </p>
+                </div>
 
-              <AccordionItem value="date">
-                <AccordionTrigger>{t("pdf.filterByDate")}</AccordionTrigger>
-                <AccordionContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dateFrom">{t("pdf.dateFrom")}</Label>
-                      <Input
-                        id="dateFrom"
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dateTo">{t("pdf.dateTo")}</Label>
-                      <Input
-                        id="dateTo"
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="week">
-                <AccordionTrigger>{t("pdf.filterByWeek")}</AccordionTrigger>
-                <AccordionContent>
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>{t("pdf.selectWeeks")}</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[...new Set(availableStories.map((s) => s.week_number))]
-                        .sort((a, b) => a - b)
-                        .map((week) => (
-                          <div
-                            key={week}
-                            className="flex items-center space-x-1"
-                          >
-                            <Checkbox
-                              id={`week-${week}`}
-                              checked={selectedWeeks.includes(week)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedWeeks([...selectedWeeks, week]);
-                                } else {
-                                  setSelectedWeeks(
-                                    selectedWeeks.filter((w) => w !== week)
-                                  );
-                                }
-                              }}
-                            />
-                            <Label htmlFor={`week-${week}`}>
-                              {t("week.title")} {week}
-                            </Label>
-                          </div>
-                        ))}
+                    <Label htmlFor="fontSize">{t("pdf.fontSize")}</Label>
+                    <Select value={exportOptions.fontSize} onValueChange={(value) => setExportOptions((current) => ({ ...current, fontSize: value as ExportOptions["fontSize"] }))}>
+                      <SelectTrigger id="fontSize"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">{t("pdf.fontSizeSmall")}</SelectItem>
+                        <SelectItem value="medium">{t("pdf.fontSizeMedium")}</SelectItem>
+                        <SelectItem value="large">{t("pdf.fontSizeLarge")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="pageSize">{t("pdf.pageSize")}</Label>
+                      <Select value={exportOptions.pageSize} onValueChange={(value) => setExportOptions((current) => ({ ...current, pageSize: value as ExportOptions["pageSize"] }))}>
+                        <SelectTrigger id="pageSize"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="a4">A4</SelectItem>
+                          <SelectItem value="a5">A5</SelectItem>
+                          <SelectItem value="letter">Letter</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="orientation">{t("pdf.orientation")}</Label>
+                      <Select value={exportOptions.orientation} onValueChange={(value) => setExportOptions((current) => ({ ...current, orientation: value as ExportOptions["orientation"] }))}>
+                        <SelectTrigger id="orientation"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="portrait">{t("pdf.portrait")}</SelectItem>
+                          <SelectItem value="landscape">{t("pdf.landscape")}</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
-            <Button className="w-full mt-4" onClick={applyFilters}>
-              <Filter className="mr-2 h-4 w-4" />
-              Apply Filters
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            {t("pdf.selectionSummary", {
+              selected: String(selectedStories.length),
+              visible: String(visibleStories.length),
+              total: String(exportStories.length),
+              hidden: String(selectedOutsideVisibleCount),
+            })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={selectedStories.length === 0 || generating || loadingStories || Boolean(storyLoadError)} onClick={generatePDF} className="bg-story-purple hover:bg-story-purple-600">
+              {generating ? <><div className="spinner mr-2" />{t("pdf.downloading")}</> : <><FileText className="mr-2 h-4 w-4" />{t("pdf.generatePdf")}</>}
             </Button>
-          </TabsContent>
-        </Tabs>
-
-        <div className="mt-6 flex justify-between">
-          <Button
-            disabled={selectedStories.length === 0 || generating}
-            onClick={generatePDF}
-            className="bg-story-purple hover:bg-story-purple-600"
-          >
-            {generating ? (
-              <>
-                <div className="spinner mr-2" />
-                {t("pdf.downloading")}
-              </>
-            ) : (
-              <>
-                <FileText className="mr-2 h-4 w-4" />
-                {t("pdf.generatePdf")}
-              </>
+            {pdfUrl && (
+              <Button variant="outline" asChild>
+                <a href={pdfUrl} download={pdfFilename}><Download className="mr-2 h-4 w-4" />{t("pdf.download")}</a>
+              </Button>
             )}
-          </Button>
-
-          {pdfUrl && (
-            <Button variant="outline" asChild>
-              <a href={pdfUrl} download={pdfFilename}>
-                <Download className="mr-2 h-4 w-4" />
-                {t("pdf.download")}
-              </a>
-            </Button>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>

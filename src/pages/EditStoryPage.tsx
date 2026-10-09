@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "@/constants";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import PageLayout from "@/components/Layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import StoryContent from "@/components/Story/StoryEditor/StoryContent";
 import RestoreVersionCard from "@/components/Story/EditStory/RestoreVersionCard";
 import { Theme } from "@/types/Theme";
 import { Series } from "@/types/Series";
-import { Story, AgeGroup } from "@/types/Story";
+import { Story, StoryVersion, AgeGroup } from "@/types/Story";
 import { storyApi } from "@/api/stories.api";
 import { useThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
@@ -53,6 +53,7 @@ const EditStoryPage: React.FC = () => {
   const { data: availableSeries = [] } = useSeries();
 
   const [saving, setSaving] = useState<boolean>(false);
+  const savingRef = useRef(false);
   const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
   const [sortedDayOfWeekOptions, setSortedDayOfWeekOptions] = useState([
     { value: "Monday", label: t("days.monday") },
@@ -64,7 +65,7 @@ const EditStoryPage: React.FC = () => {
     { value: "Sunday", label: t("days.sunday") },
   ]);
   const [formInitialised, setFormInitialised] = useState(false);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<StoryVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
@@ -81,12 +82,25 @@ const EditStoryPage: React.FC = () => {
       version: 1,
     },
   });
+  const editedTitle = useWatch({ control: form.control, name: "title" });
 
-  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(form.formState.isDirty && !saving);
+  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(form.formState.isDirty || saving);
+
+  const beginSave = () => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(true);
+    return true;
+  };
+
+  const endSave = () => {
+    savingRef.current = false;
+    setSaving(false);
+  };
 
   const fetchVersions = useCallback(async () => {
     try {
-      const data = (await storyApi.getVersions(id!)) as any;
+      const data = await storyApi.getVersions(id!);
       setVersions(data);
     } catch (error) {
       console.error("Error fetching versions:", error);
@@ -152,9 +166,7 @@ const EditStoryPage: React.FC = () => {
 
 
   const onSubmit = async (values: FormValues) => {
-    if (!id) return;
-
-    setSaving(true);
+    if (!id || !beginSave()) return;
     try {
 
       const dayOrder = getDayOrder(values.dayOfWeek);
@@ -183,7 +195,7 @@ const EditStoryPage: React.FC = () => {
       toast.error(t("story.updateError"));
       console.error("Error updating story:", err);
     } finally {
-      setSaving(false);
+      endSave();
     }
   };
 
@@ -192,9 +204,7 @@ const EditStoryPage: React.FC = () => {
   };
 
   const handleRestoreVersion = async () => {
-    if (!selectedVersion) return;
-
-    setSaving(true);
+    if (!selectedVersion || !beginSave()) return;
     try {
       await storyApi.restoreVersion(id!, selectedVersion);
       
@@ -205,7 +215,7 @@ const EditStoryPage: React.FC = () => {
       toast.error(t("story.restoreError"));
       console.error("Error restoring version:", err);
     } finally {
-      setSaving(false);
+      endSave();
     }
   };
 
@@ -248,6 +258,7 @@ const EditStoryPage: React.FC = () => {
     <PageLayout>
         <div className="mb-6 flex items-center gap-2 text-gray-900 dark:text-gray-100">
           <Button
+            disabled={saving}
             onClick={handleBack}
             variant="outline"
             size="sm"
@@ -257,14 +268,15 @@ const EditStoryPage: React.FC = () => {
             {t("common.back")}
           </Button>
           <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">
-            {t("story.edit")} - {story.title}
+            {t("story.edit")} - {editedTitle}
             {weeklyTheme && ` (${t("story.weeklyTheme")}: ${weeklyTheme})`}
           </h1>
         </div>
 
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <fieldset disabled={saving} aria-busy={saving} className="min-w-0 border-0 p-0">
+            <div className={`grid grid-cols-1 lg:grid-cols-4 gap-6 ${saving ? "pointer-events-none opacity-70" : ""}`}>
               <div className="lg:col-span-3">
                 <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
                   <CardHeader>
@@ -292,7 +304,7 @@ const EditStoryPage: React.FC = () => {
                       </TabsList>
 
                       <TabsContent value="editor">
-                        <StoryContent />
+                        <StoryContent disabled={saving} />
                       </TabsContent>
 
                       <TabsContent value="illustrations">
@@ -303,6 +315,7 @@ const EditStoryPage: React.FC = () => {
                           deleteIllustration={deleteIllustration}
                           reorderIllustrations={reorderIllustrations}
                           illustrationPrompt={story.illustration_prompt}
+                          disabled={saving}
                         />
 
                       </TabsContent>
@@ -324,6 +337,7 @@ const EditStoryPage: React.FC = () => {
                       sortedDayOfWeekOptions={sortedDayOfWeekOptions}
                       story={story}
                       availableSeries={availableSeries as unknown as Series[]}
+                      disabled={saving}
                     />
                   </CardContent>
                   <CardFooter className="flex flex-col gap-2">
@@ -351,6 +365,7 @@ const EditStoryPage: React.FC = () => {
                 />
               </div>
             </div>
+            </fieldset>
           </form>
         </FormProvider>
         {unsavedChangesDialog}

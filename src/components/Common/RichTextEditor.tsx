@@ -7,19 +7,23 @@ import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useEffect, useCallback, useRef } from 'react';
+import { i18n } from '@/lib/i18n';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
   onImageAdd?: (image: string, position: number, filename?: string, fileType?: string) => void;
 }
 
-const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd }: RichTextEditorProps) => {
+const RichTextEditor = ({ content, onChange, placeholder, className, disabled = false, onImageAdd }: RichTextEditorProps) => {
+  const { t } = i18n;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
+    editable: !disabled,
     extensions: [
       StarterKit,
       Placeholder.configure({
@@ -37,6 +41,10 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
       },
     },
   });
+
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
 
   useEffect(() => {
     if (editor && content) {
@@ -76,11 +84,11 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
   }, [content, editor]);
 
   const addImage = useCallback(() => {
-    const url = window.prompt('URL');
+    const url = window.prompt(t("story.inlineImageUrlPrompt"));
     if (url && editor) {
       editor.chain().focus().setImage({ src: url }).run();
     }
-  }, [editor]);
+  }, [editor, t]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -112,6 +120,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
     <div className={cn("border rounded-md bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm border-white/20 dark:border-white/10", className)}>
       <div className="flex items-center gap-1 border-b p-2 bg-gray-50 dark:bg-gray-900 rounded-t-md flex-wrap">
         <Toggle
+          disabled={disabled}
           size="sm"
           pressed={editor.isActive('bold')}
           onPressedChange={() => editor.chain().focus().toggleBold().run()}
@@ -120,6 +129,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
           <Bold className="h-4 w-4" />
         </Toggle>
         <Toggle
+          disabled={disabled}
           size="sm"
           pressed={editor.isActive('italic')}
           onPressedChange={() => editor.chain().focus().toggleItalic().run()}
@@ -128,6 +138,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
           <Italic className="h-4 w-4" />
         </Toggle>
         <Toggle
+          disabled={disabled}
           size="sm"
           pressed={editor.isActive('heading', { level: 1 })}
           onPressedChange={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -136,6 +147,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
           <Heading1 className="h-4 w-4" />
         </Toggle>
         <Toggle
+          disabled={disabled}
           size="sm"
           pressed={editor.isActive('heading', { level: 2 })}
           onPressedChange={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -144,6 +156,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
           <Heading2 className="h-4 w-4" />
         </Toggle>
         <Toggle
+          disabled={disabled}
           size="sm"
           pressed={editor.isActive('bulletList')}
           onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
@@ -155,20 +168,24 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
         <div className="h-6 w-px bg-gray-300 mx-1" />
 
         <Button type="button"
+          disabled={disabled}
           size="sm"
           variant="ghost"
           onClick={addImage}
-          title="Add Image via URL"
+          title={t("story.insertImageUrl")}
+          aria-label={t("story.insertImageUrl")}
         >
           <ImageIcon className="h-4 w-4" />
         </Button>
 
         {onImageAdd && (
             <Button type="button"
+            disabled={disabled}
             size="sm"
             variant="ghost"
             onClick={handleUploadClick}
-            title="Upload Image"
+            title={t("story.uploadImage")}
+            aria-label={t("story.uploadImage")}
             >
             <Upload className="h-4 w-4" />
             </Button>
@@ -177,6 +194,7 @@ const RichTextEditor = ({ content, onChange, placeholder, className, onImageAdd 
       
       <input
         type="file"
+        disabled={disabled}
         ref={fileInputRef}
         className="hidden"
         accept="image/*"

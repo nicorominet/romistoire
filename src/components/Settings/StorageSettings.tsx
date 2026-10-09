@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { i18n } from "@/lib/i18n";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,26 +48,41 @@ const Stat = ({ label, value }: { label: string; value: string | number }) => (
 /** Integer input saved when it loses focus (or on Enter), within [min, max]. */
 const NumberSetting = ({ id, label, value, min, max, onSave }: {
   id: string; label: string; value: number; min: number; max: number; onSave: (value: number) => void;
-}) => (
-  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-    <Label htmlFor={id}>{label}</Label>
-    <Input
-      key={value}
-      id={id}
-      type="number"
-      min={min}
-      max={max}
-      defaultValue={value}
-      onBlur={(e) => {
-        const next = Number(e.target.value);
-        if (Number.isInteger(next) && next >= min && next <= max && next !== value) onSave(next);
-        else e.target.value = String(value);
-      }}
-      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-      className="w-full sm:w-[120px]"
-    />
-  </div>
-);
+}) => {
+  const { t } = i18n;
+  const [error, setError] = useState(false);
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <Label htmlFor={id}>{label}</Label>
+        <Input
+          key={value}
+          id={id}
+          type="number"
+          min={min}
+          max={max}
+          defaultValue={value}
+          aria-invalid={error}
+          aria-describedby={error ? `${id}-error` : undefined}
+          onChange={() => setError(false)}
+          onBlur={(e) => {
+            const next = Number(e.target.value);
+            if (!Number.isInteger(next) || next < min || next > max) {
+              e.target.value = String(value);
+              setError(true);
+            } else {
+              setError(false);
+              if (next !== value) onSave(next);
+            }
+          }}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          className="w-full sm:w-[120px]"
+        />
+      </div>
+      {error && <p id={`${id}-error`} className="text-xs text-red-600 dark:text-red-400" role="alert">{t("settings.storage.numberRange", { min: String(min), max: String(max) })}</p>}
+    </div>
+  );
+};
 
 /**
  * StorageSettings Component
@@ -76,7 +92,7 @@ const NumberSetting = ({ id, label, value, min, max, onSave }: {
  */
 export const StorageSettings = () => {
   const { t } = i18n;
-  const { data, update } = useAppSettings();
+  const { data, isLoading: settingsLoading, isError: settingsError, refetch: refetchSettings, update } = useAppSettings();
   const { backups, stats, runBackup, deleteBackup, clearDebugLog } = useBackups();
 
   const save = (storage: AppSettingsUpdate["storage"]) =>
@@ -118,6 +134,13 @@ export const StorageSettings = () => {
   return (
     <div className="space-y-6">
       {/* Dashboard */}
+      {settingsLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><Loader2 className="h-4 w-4 animate-spin" />{t("common.loading")}</div>}
+      {settingsError && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-red-300 p-3 text-sm text-red-700 dark:border-red-800 dark:text-red-300" role="alert">
+          <span>{t("settings.storage.settingsError")}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => refetchSettings()} disabled={settingsLoading}>{t("common.retry")}</Button>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
@@ -199,6 +222,7 @@ export const StorageSettings = () => {
                 max={50}
                 onSave={(keep) => save({ autoBackup: { keep } })}
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("settings.storage.keepHint")}</p>
             </>
           )}
 
@@ -211,9 +235,16 @@ export const StorageSettings = () => {
               {t("settings.storage.backupNow")}
             </Button>
           </div>
-          {(backups.data?.length ?? 0) === 0 ? (
+          {backups.isLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><Loader2 className="h-4 w-4 animate-spin" />{t("common.loading")}</div>}
+          {backups.isError && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-red-300 p-3 text-sm text-red-700 dark:border-red-800 dark:text-red-300" role="alert">
+              <span>{t("settings.storage.backupsError")}</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => backups.refetch()} disabled={backups.isFetching}>{t("common.retry")}</Button>
+            </div>
+          )}
+          {backups.data && backups.data.length === 0 && !backups.isError ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">{t("settings.storage.noBackups")}</p>
-          ) : (
+          ) : backups.data && backups.data.length > 0 ? (
             <ul className="divide-y rounded-md border">
               {backups.data!.map((backup) => (
                 <li key={backup.filename} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
@@ -246,7 +277,7 @@ export const StorageSettings = () => {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
           <p className="text-xs text-gray-500 dark:text-gray-400">{t("settings.storage.restoreHint")}</p>
         </CardContent>
       </Card>

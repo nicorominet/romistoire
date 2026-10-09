@@ -18,11 +18,12 @@ import {
 interface IllustrationListProps {
   illustrations: Illustration[];
   onDelete: (index: number) => Promise<void>;
+  disabled?: boolean;
   /** Moves the illustration at index one step (-1 = before, 1 = after). Hidden when not provided. */
   onMove?: (index: number, direction: -1 | 1) => void;
 }
 
-const IllustrationList = ({ illustrations, onDelete, onMove }: IllustrationListProps) => {
+const IllustrationList = ({ illustrations, onDelete, onMove, disabled = false }: IllustrationListProps) => {
   const { t } = i18n;
 
   return (
@@ -53,7 +54,7 @@ const IllustrationList = ({ illustrations, onDelete, onMove }: IllustrationListP
                   <div className="absolute top-2 left-2 flex gap-1">
                     <Button type="button"
                       onClick={() => onMove(index, -1)}
-                      disabled={index === 0}
+                      disabled={disabled || index === 0}
                       variant="outline"
                       size="sm"
                       title={t("story.moveIllustrationBefore")}
@@ -63,7 +64,7 @@ const IllustrationList = ({ illustrations, onDelete, onMove }: IllustrationListP
                     </Button>
                     <Button type="button"
                       onClick={() => onMove(index, 1)}
-                      disabled={index === illustrations.length - 1}
+                      disabled={disabled || index === illustrations.length - 1}
                       variant="outline"
                       size="sm"
                       title={t("story.moveIllustrationAfter")}
@@ -76,6 +77,7 @@ const IllustrationList = ({ illustrations, onDelete, onMove }: IllustrationListP
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button type="button"
+                      disabled={disabled}
                       variant="outline"
                       size="sm"
                       className="absolute top-2 right-2"
@@ -91,7 +93,7 @@ const IllustrationList = ({ illustrations, onDelete, onMove }: IllustrationListP
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDelete(index)} className="bg-red-600 hover:bg-red-700">
+                      <AlertDialogAction onClick={() => onDelete(index)} disabled={disabled} className="bg-red-600 hover:bg-red-700">
                         {t("common.delete")}
                       </AlertDialogAction>
                     </AlertDialogFooter>

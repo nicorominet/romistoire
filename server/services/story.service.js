@@ -114,6 +114,28 @@ export const normalizeStoryThemes = (themes) => {
   return cleaned.map((theme, index) => ({ ...theme, isPrimary: cleaned.length > 0 && index === primaryIndex }));
 };
 
+const sameStoryThemes = (currentThemes, requestedThemes) => {
+  const current = normalizeStoryThemes(currentThemes.map(theme => ({
+    id: theme.theme_id ?? theme.id,
+    isPrimary: theme.is_primary ?? theme.isPrimary
+  }))).sort((a, b) => a.id.localeCompare(b.id));
+  const requested = normalizeStoryThemes(requestedThemes).sort((a, b) => a.id.localeCompare(b.id));
+  return current.length === requested.length && current.every((theme, index) =>
+    theme.id === requested[index].id && theme.isPrimary === requested[index].isPrimary
+  );
+};
+
+const sameStoryIllustrations = (currentIllustrations, requestedIllustrations) => (
+  currentIllustrations.length === requestedIllustrations.length &&
+  currentIllustrations.every((current, index) => {
+    const requested = requestedIllustrations[index];
+    return current.image_path === (requested.image_path ?? requested.imagePath ?? requested.path ?? null)
+      && (current.filename ?? null) === (requested.filename ?? null)
+      && (current.file_type ?? current.fileType ?? null) === (requested.fileType ?? requested.file_type ?? null)
+      && Number(current.position ?? index) === Number(requested.position ?? index);
+  })
+);
+
 /**
  * Service for managing stories and related data.
  * Coordinates between database and specialized helpers/services.
@@ -479,13 +501,10 @@ class StoryService {
       // The audio reads the title and the text: it is kept unless one of them changed
       const textChanged = title !== oldStory.title || content !== oldStory.content;
       
-      const [oldThemes] = await connection.query('SELECT * FROM story_themes WHERE story_id = ?', [id]);
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const [oldThemes] = await connection.query('SELECT * FROM story_themes WHERE story_id = ?', [id]);
 
       await connection.beginTransaction();
-
-      // Delegation: Create SNAPSHOT for versioning
-      await storyVersionService.createSnapshot(connection, oldStory, oldThemes);
 
       // Map day order
       const dayOrder = storyData.day_order ?? (storyData.dayOfWeek ? this._mapDayToOrder(storyData.dayOfWeek) : oldStory.day_order);
@@ -499,6 +518,40 @@ class StoryService {
       let seriesId = hasSeriesField
         ? await storySeriesHelper.resolveSeriesId(connection, storyData.seriesId || storyData.series_id, seriesName)
         : oldStory.series_id;
+
+      const hasIllustrations = Array.isArray(storyData.illustrations);
+      const [oldIllustrations] = hasIllustrations
+        ? await connection.query('SELECT * FROM illustrations WHERE story_id = ? ORDER BY position ASC', [id])
+        : [[]];
+      const illustrationPrompt = ('illustrationPrompt' in storyData || 'illustration_prompt' in storyData)
+        ? (storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null)
+        : (oldStory.illustration_prompt ?? null);
+      const hasChanges = title !== oldStory.title
+        || content !== oldStory.content
+        || ageGroup !== oldStory.age_group
+        || Number(weekNumber) !== Number(oldStory.week_number)
+        || Number(dayOrder) !== Number(oldStory.day_order)
+        || locale !== oldStory.locale
+        || (seriesId || null) !== (oldStory.series_id || null)
+        || illustrationPrompt !== (oldStory.illustration_prompt ?? null)
+        || (Array.isArray(storyData.themes) && !sameStoryThemes(oldThemes, storyData.themes))
+        || (hasIllustrations && !sameStoryIllustrations(oldIllustrations, storyData.illustrations));
+
+      if (!hasChanges) {
+        const statusUpdates = [];
+        if (oldStory.review_status !== 'validated') statusUpdates.push("review_status = 'validated'");
+        if (oldStory.source !== 'manual' && !oldStory.is_manually_edited) statusUpdates.push('is_manually_edited = TRUE');
+        if (statusUpdates.length > 0) {
+          await connection.query(`UPDATE stories SET ${statusUpdates.join(', ')} WHERE id = ?`, [id]);
+        }
+        await connection.commit();
+        return {
+          id, ...storyData, title, content, age_group: ageGroup, week_number: weekNumber,
+          day_order: dayOrder, locale, version: oldStory.version, series_id: seriesId,
+          modified_at: oldStory.modified_at, review_status: 'validated',
+          audio_path: oldStory.audio_path, aliasSeries: null
+        };
+      }
 
       // Handle Collisions & Branching when the story moves to another slot
       let aliasSeries = null;
@@ -531,11 +584,8 @@ class StoryService {
       // Calculate NEXT linear version (Max + 1) to avoid collision/rewind
       const nextVersion = await storyVersionService.getNextVersionNumber(id);
 
-      // Illustration prompt is only changed when explicitly sent
-      const hasIllustrationPrompt = 'illustrationPrompt' in storyData || 'illustration_prompt' in storyData;
-      const illustrationPrompt = hasIllustrationPrompt
-        ? (storyData.illustrationPrompt ?? storyData.illustration_prompt ?? null)
-        : (oldStory.illustration_prompt ?? null);
+      // Snapshot only after confirming the submitted values differ from the stored story.
+      await storyVersionService.createSnapshot(connection, oldStory, oldThemes);
 
       // Saved from the edit page: a person read the story, so it counts as reviewed
       await connection.query(
@@ -559,7 +609,7 @@ class StoryService {
       // If illustrations is undefined, we might skip, but consistent PUT usually implies replacement.
       // However, to be safe and match `create`, we check for existence.
       // If the frontend sends existing illustrations, they should be in the list.
-      if (storyData.illustrations) {
+      if (hasIllustrations) {
           await connection.query('DELETE FROM illustrations WHERE story_id = ?', [id]);
           for (const illu of storyData.illustrations) {
               await connection.query(

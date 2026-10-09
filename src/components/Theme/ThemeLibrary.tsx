@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitMerge, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, GitMerge, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,7 +38,7 @@ const CONFIRM_NAMES_MAX = 5;
 
 /**
  * Story themes library: search, sort, quick filters ("to review", "unused"), duplicate banner,
- * list with edit / merge / delete actions, and bulk deletion of unused themes.
+ * list with edit / merge / delete actions, bulk review approval, and deletion of unused themes.
  */
 export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) => {
   const { t } = i18n;
@@ -65,13 +65,14 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
   const [deleting, setDeleting] = useState<{ theme: Theme; mode: "delete" | "merge"; replacementId: string | null } | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [confirmBulk, setConfirmBulk] = useState(false);
-  const { deleteThemes } = useThemeMutations();
+  const [confirmBulkAction, setConfirmBulkAction] = useState<"delete" | "approve" | null>(null);
+  const { deleteThemes, approveThemes } = useThemeMutations();
 
   // A new filter shows other themes: start a new selection
   useEffect(() => { setSelectedIds(new Set()); }, [filters.search, filters.filter]);
 
   const unusedShown = useMemo(() => themes.filter(theme => (theme.storyCount ?? 0) === 0), [themes]);
+  const reviewShown = useMemo(() => themes.filter(theme => theme.needsReview), [themes]);
   const selectedThemes = useMemo(() => allThemes.filter(theme => selectedIds.has(theme.id)), [allThemes, selectedIds]);
 
   const toggleSelected = (theme: Theme, selected: boolean) => {
@@ -83,6 +84,7 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
     });
   };
   const selectAllUnused = () => setSelectedIds(new Set(unusedShown.map(theme => theme.id)));
+  const selectAllReview = () => setSelectedIds(new Set(reviewShown.map(theme => theme.id)));
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleBulkDelete = async () => {
@@ -94,7 +96,20 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
     } catch (err) {
       toast.error(getApiError(err).message);
     } finally {
-      setConfirmBulk(false);
+      setConfirmBulkAction(null);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    try {
+      const result = await approveThemes.mutateAsync([...selectedIds]);
+      if (result.validated > 0) toast.success(t("themes.bulk.validated", { count: String(result.validated) }));
+      else toast.info(t("themes.bulk.noneToValidate"));
+      clearSelection();
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    } finally {
+      setConfirmBulkAction(null);
     }
   };
 
@@ -157,21 +172,33 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
         ))}
       </div>
 
-      {(selectedIds.size > 0 || (filters.filter === "unused" && unusedShown.length > 0)) && (
+      {(selectedIds.size > 0 || (filters.filter === "unused" && unusedShown.length > 0) || (filters.filter === "review" && reviewShown.length > 0)) && (
         <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-4 py-2 shadow-sm backdrop-blur"
           role="region" aria-label={t("themes.bulk.region")}>
           <span className="text-sm font-medium tabular-nums">{t("themes.bulk.selected", { count: String(selectedIds.size) })}</span>
-          {selectedIds.size < unusedShown.length && (
+          {filters.filter === "unused" && selectedIds.size < unusedShown.length && (
             <Button type="button" size="sm" variant="ghost" onClick={selectAllUnused}>
               {t("themes.bulk.selectAllUnused", { count: String(unusedShown.length) })}
+            </Button>
+          )}
+          {filters.filter === "review" && selectedIds.size < reviewShown.length && (
+            <Button type="button" size="sm" variant="ghost" onClick={selectAllReview}>
+              {t("themes.bulk.selectAllReview", { count: String(reviewShown.length) })}
             </Button>
           )}
           {selectedIds.size > 0 && (
             <>
               <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>{t("themes.bulk.clearSelection")}</Button>
-              <Button type="button" size="sm" variant="destructive" className="ml-auto" onClick={() => setConfirmBulk(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />{t("themes.bulk.delete", { count: String(selectedIds.size) })}
-              </Button>
+              {filters.filter !== "review" && (
+                <Button type="button" size="sm" variant="destructive" className="ml-auto" onClick={() => setConfirmBulkAction("delete")}>
+                  <Trash2 className="mr-2 h-4 w-4" />{t("themes.bulk.delete", { count: String(selectedIds.size) })}
+                </Button>
+              )}
+              {filters.filter === "review" && (
+                <Button type="button" size="sm" className="ml-auto" onClick={() => setConfirmBulkAction("approve")}>
+                  <Check className="mr-2 h-4 w-4" />{t("themes.bulk.approve", { count: String(selectedIds.size) })}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -198,6 +225,7 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
           {themes.map(theme => (
             <ThemeListItem key={theme.id} theme={theme}
               selected={selectedIds.has(theme.id)}
+              selectionMode={filters.filter === "review" ? "review" : "unused"}
               onSelectedChange={toggleSelected}
               onEdit={openForm}
               onMerge={(source) => setDeleting({ theme: source, mode: "merge", replacementId: null })}
@@ -213,11 +241,15 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
         defaultReplacementId={deleting?.replacementId} onClose={() => setDeleting(null)} />
       <ThemeMergeDialog open={mergeOpen} onOpenChange={setMergeOpen} />
 
-      <AlertDialog open={confirmBulk} onOpenChange={setConfirmBulk}>
+      <AlertDialog open={confirmBulkAction !== null} onOpenChange={(open) => { if (!open) setConfirmBulkAction(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("themes.bulk.confirmTitle", { count: String(selectedThemes.length) })}</AlertDialogTitle>
-            <AlertDialogDescription>{t("themes.bulk.confirmDesc")}</AlertDialogDescription>
+            <AlertDialogTitle>{confirmBulkAction === "approve"
+              ? t("themes.bulk.approveConfirmTitle", { count: String(selectedThemes.length) })
+              : t("themes.bulk.confirmTitle", { count: String(selectedThemes.length) })}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmBulkAction === "approve"
+              ? t("themes.bulk.approveConfirmDesc")
+              : t("themes.bulk.confirmDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="flex flex-wrap gap-1.5">
             {selectedThemes.slice(0, CONFIRM_NAMES_MAX).map(theme => <li key={theme.id}><ThemeBadge theme={theme} /></li>)}
@@ -227,10 +259,14 @@ export const ThemeLibrary = ({ filters, onFiltersChange }: ThemeLibraryProps) =>
           </ul>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={(event) => { event.preventDefault(); void handleBulkDelete(); }} disabled={deleteThemes.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleteThemes.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t("common.delete")}
+            <AlertDialogAction onClick={(event) => {
+              event.preventDefault();
+              if (confirmBulkAction === "approve") void handleBulkApprove();
+              else void handleBulkDelete();
+            }} disabled={deleteThemes.isPending || approveThemes.isPending}
+              className={confirmBulkAction === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}>
+              {(deleteThemes.isPending || approveThemes.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {confirmBulkAction === "approve" ? t("themes.bulk.approveAction") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

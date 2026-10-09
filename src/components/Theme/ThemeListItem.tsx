@@ -20,17 +20,20 @@ interface ThemeListItemProps {
   /** Selection for bulk deletion: only unused themes can be selected */
   selected?: boolean;
   onSelectedChange?: (theme: Theme, selected: boolean) => void;
+  selectionMode?: "unused" | "review";
 }
 
 /**
  * One theme of the library: badge, description, expandable list of its stories,
  * "to review" flag, actions menu and (unused themes) a selection checkbox.
  */
-export const ThemeListItem = ({ theme, onEdit, onMerge, onDelete, selected = false, onSelectedChange }: ThemeListItemProps) => {
+export const ThemeListItem = ({ theme, onEdit, onMerge, onDelete, selected = false, onSelectedChange, selectionMode = "unused" }: ThemeListItemProps) => {
   const { t } = i18n;
   const [expanded, setExpanded] = useState(false);
   const count = theme.storyCount ?? 0;
-  const selectable = count === 0 && Boolean(onSelectedChange);
+  const selectable = Boolean(onSelectedChange) && (
+    selectionMode === "review" ? Boolean(theme.needsReview) : count === 0
+  );
   const storiesId = `theme-stories-${theme.id}`;
 
   return (

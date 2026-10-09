@@ -244,7 +244,7 @@ const StoriesPage = (): JSX.Element => {
               {isFetchingNextPage && <div className="text-center py-4">{t('common.loading')}</div>}
             </TabsContent>
             <TabsContent value="export">
-              <PDFExport availableStories={stories} />
+              <PDFExport availableStories={stories} storyQuery={queryParams} />
             </TabsContent>
           </Tabs>
         </div>

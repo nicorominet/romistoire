@@ -17,6 +17,7 @@ interface StoryIllustrationsProps {
   deleteIllustration: (illustrationId: string) => Promise<void>;
   reorderIllustrations?: (orderedIds: string[]) => Promise<void> | void;
   illustrationPrompt?: string | null;
+  disabled?: boolean;
 }
 
 const StoryIllustrations = ({
@@ -25,12 +26,13 @@ const StoryIllustrations = ({
   deleteIllustration,
   reorderIllustrations,
   illustrationPrompt,
+  disabled = false,
 }: StoryIllustrationsProps) => {
   const { t } = i18n;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || disabled) return;
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       toast.error(t("story.invalidImageType"));
       e.target.value = "";
@@ -88,6 +90,7 @@ const StoryIllustrations = ({
              I will update imports if I move them later.
          */}
          <IllustrationCanvas
+            disabled={disabled}
             onSave={async (dataURL: string) => {
             try {
                 const res = await fetch(dataURL);
@@ -101,11 +104,12 @@ const StoryIllustrations = ({
             }
             }}
         />
-        <IllustrationUpload onImageChange={handleImageUpload} />
+        <IllustrationUpload onImageChange={handleImageUpload} disabled={disabled} />
       </div>
 
       <IllustrationList
         illustrations={illustrations}
+        disabled={disabled}
         onDelete={handleDeleteIllustration}
         onMove={reorderIllustrations ? handleMoveIllustration : undefined}
       />

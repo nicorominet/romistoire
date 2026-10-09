@@ -86,6 +86,14 @@ describe('PDF generation', () => {
     expect(doc.getNumberOfPages()).toBe(4);
   });
 
+  it.each(['kids', 'teen', 'pro'])('should render the table of contents in the %s style', async (style) => {
+    storyService.findByIds.mockResolvedValue([story('a', 30, 1), story('b', 30, 2)]);
+
+    const doc = await generatePDF({ stories: ['a', 'b'], tableOfContents: true, style });
+
+    expect(doc.getNumberOfPages()).toBe(3);
+  });
+
   it.each([['kids', 'Andika'], ['teen', 'Poppins'], ['pro', 'CrimsonText']])('should embed the font of the %s style', async (style, font) => {
     storyService.findByIds.mockResolvedValue([story('a', 30, 1)]);
 

@@ -31,7 +31,8 @@
     "save": "[[Enregistrer]]",
     "saving": "[[Enregistrement...]]",
     "search": "[[Rechercher]]",
-    "noDaysAvailable": "[[Aucun jour disponible]]"
+    "noDaysAvailable": "[[Aucun jour disponible]]",
+    "retry": "[[Réessayer]]"
   },
   "create": {
     "error": {
@@ -167,7 +168,20 @@
     "success": "[[PDF généré avec succès]]",
     "tableOfContents": "[[Inclure une table des matières]]",
     "title": "[[Exporter les histoires en PDF]]",
-    "tocTitle": "[[Table des matières]]"
+    "exportDescription": "[[Choisissez les histoires, affinez les filtres et réglez la présentation de votre livre.]]",
+    "activeFilters": "[[{{count}} filtre(s) actif(s)]]",
+    "filtersHint": "[[Les filtres affinent la liste sans retirer les histoires déjà sélectionnées.]]",
+    "clearFilters": "[[Effacer les filtres]]",
+    "weeksSelected": "[[{{selected}} / {{total}} semaines]]",
+    "selectionSummary": "[[{{selected}} sélectionnée(s) sur {{total}} · {{visible}} affichée(s) · {{hidden}} masquée(s)]]",
+    "selectAllCount": "[[Tout sélectionner ({{count}})]]",
+    "addVisible": "[[Ajouter les {{count}} résultats affichés]]",
+    "keepVisible": "[[Garder uniquement les {{count}} résultats]]",
+    "searchStories": "[[Rechercher un titre, thème ou série…]]",
+    "noMatchingStories": "[[Aucune histoire ne correspond à la recherche.]]",
+    "documentContents": "[[Contenu du document]]",
+    "tocTitle": "[[Table des matières]]",
+    "invalidDateRange": "[[La date de début doit être antérieure ou égale à la date de fin.]]"
   },
   "series": {
     "createSuccess": "[[Série créée avec succès]]",
@@ -241,15 +255,16 @@
   "settings": {
     "appearanceChanged": "[[Apparence modifiée avec succès.]]",
     "cleanup": "[[Nettoyer]]",
-    "cleanupImagesDesc": "[[Supprimer les fichiers images qui ne sont plus liés à aucune histoire.]]",
-    "cleanupImagesTitle": "[[Nettoyer les images inutilisées]]",
+    "cleanupImagesDesc": "[[Supprimer les images et fichiers audio qui ne sont liés à aucune histoire.]]",
+    "cleanupGracePeriod": "[[Le délai de protection configuré dans Stockage est respecté : {{hours}} h.]]",
+    "cleanupImagesTitle": "[[Nettoyer les médias inutilisés]]",
     "clearButton": "[[Effacer toutes les données]]",
     "clearConfirm": "[[Confirmer la suppression]]",
     "clearError": "[[Erreur lors de la suppression des données.]]",
     "clearWarning": "[[Êtes-vous sûr de vouloir tout effacer ? Cette action est irréversible.]]",
     "confirmCleanup": "[[Oui, nettoyer]]",
-    "confirmCleanupDesc": "[[Cela va scanner votre dossier d'uploads et supprimer définitivement tout fichier image non référencé dans la base de données. Cette action est irréversible.]]",
-    "confirmCleanupTitle": "[[Nettoyer les images inutilisées ?]]",
+    "confirmCleanupDesc": "[[Le dossier des médias sera parcouru. Seuls les fichiers image ou audio non référencés et plus anciens que le délai de protection configuré dans Stockage seront supprimés définitivement. Cette action est irréversible.]]",
+    "confirmCleanupTitle": "[[Nettoyer les médias inutilisés ?]]",
     "confirmClear": "[[Confirmation d'effacement]]",
     "confirmReset": "[[Confirmation de réinitialisation]]",
     "dangerDescription": "[[Supprimer définitivement toutes les données de l'application.]]",
@@ -264,7 +279,7 @@
     "developerMode": "[[Mode Développeur]]",
     "developerModeDescription": "[[Activer les fonctionnalités techniques avancées (Logs, Réseau).]]",
     "exportData": "[[Exporter les données]]",
-    "exportDescription": "[[Télécharger une sauvegarde de vos histoires et paramètres.]]",
+    "exportDescription": "[[Le JSON contient les données de la bibliothèque sans les médias. Le ZIP ajoute les fichiers du dossier des médias. Les paramètres de l'application (langue, apparence, IA et stockage) ne sont inclus dans aucun des deux.]]",
     "exportError": "[[Erreur lors de l'exportation des données.]]",
     "exportFullZip": "[[Sauvegarde complète (ZIP)]]",
     "exportJsonOnly": "[[Données seulement (JSON)]]",
@@ -274,7 +289,7 @@
     "generalDescription": "[[Gérer les paramètres généraux de l'application.]]",
     "importButton": "[[Importer]]",
     "importData": "[[Importer des données]]",
-    "importDescription": "[[Télécharger des histoires et paramètres depuis une sauvegarde.]]",
+    "importDescription": "[[Importez un JSON de données ou un ZIP avec les médias. Les paramètres de l'application ne sont pas restaurés.]]",
     "importError": "[[Erreur lors de l'importation des données]]",
     "importNoFile": "[[Veuillez sélectionner un fichier à importer]]",
     "importOverwrite": "[[Écraser les existants]]",
@@ -333,7 +348,8 @@
           "input": "[[Entrée (Prompt)]]",
           "output": "[[Sortie (Réponse)]]"
         },
-        "noEntries": "[[Aucun log IA trouvé.]]"
+        "noEntries": "[[Aucun log IA trouvé.]]",
+        "privacyNotice": "[[Les journaux IA enregistrent le contenu complet des requêtes (prompts) et des réponses. Ils sont conservés pendant la durée définie dans Stockage, puis supprimés par la maintenance du serveur. N’y incluez pas de données sensibles.]]"
       },
       "config": {
         "sql": "[[Log des requêtes SQL]]",
@@ -393,11 +409,15 @@
       "timeoutGemini": "[[Gemini : une histoire]]",
       "timeoutGeminiWeek": "[[Gemini : une semaine entière]]",
       "timeoutOllama": "[[Ollama]]",
-      "timeoutsHint": "[[Laissez vide pour garder la valeur actuelle (affichée en gris). Minimum 10 secondes.]]"
+      "timeoutsHint": "[[La valeur affichée en gris est celle actuellement utilisée. Laissez le champ vide pour revenir à la configuration par défaut.]]",
+      "timeoutRange": "[[Valeur autorisée : {{min}} à {{max}} secondes.]]",
+      "timeoutInvalid": "[[Saisissez une durée entre {{min}} et {{max}} secondes, avec une précision maximale d'une milliseconde.]]"
     },
     "storage": {
       "tab": "[[Stockage]]",
       "saved": "[[Réglages de stockage enregistrés.]]",
+      "settingsError": "[[Impossible de charger les réglages de stockage.]]",
+      "backupsError": "[[Impossible de charger la liste des sauvegardes.]]",
       "dashboardTitle": "[[Espace utilisé]]",
       "dashboardDescription": "[[Contenu de la bibliothèque et place occupée sur le disque.]]",
       "statsError": "[[Impossible de charger les statistiques.]]",
@@ -415,13 +435,15 @@
       "backupCount": "[[{{count}} sauvegarde(s)]]",
       "lastBackup": "[[dernière le {{date}}]]",
       "backupTitle": "[[Sauvegardes]]",
-      "backupDescription": "[[Archive ZIP complète (données + images), identique à l'export complet.]]",
+      "backupDescription": "[[Archive ZIP des données de la bibliothèque et des fichiers du dossier des médias. Les paramètres de l'application ne sont pas sauvegardés ; la restauration se fait depuis l'onglet Données.]]",
       "autoBackup": "[[Sauvegarde automatique]]",
       "autoBackupHint": "[[Vérifiée toutes les heures tant que le serveur tourne.]]",
       "frequency": "[[Fréquence]]",
       "daily": "[[Quotidienne]]",
       "weekly": "[[Hebdomadaire]]",
       "keep": "[[Nombre de sauvegardes conservées]]",
+      "keepHint": "[[La limite est appliquée à la création de la prochaine sauvegarde. La diminuer ne supprime pas immédiatement les archives existantes.]]",
+      "numberRange": "[[Saisissez un nombre entier entre {{min}} et {{max}}.]]",
       "backupList": "[[Sauvegardes disponibles]]",
       "backupNow": "[[Sauvegarder maintenant]]",
       "backupDone": "[[Sauvegarde créée : {{name}}]]",
@@ -560,6 +582,15 @@
     "themeAddedSuccess": "[[Thème ajouté avec succès]]",
     "themeDeletedSuccess": "[[Thème supprimé avec succès!]]",
     "themeUpdatedSuccess": "[[Thème mis à jour avec succès]]",
+    "bulk": {
+      "approve": "[[Valider ({{count}})]]",
+      "approveAction": "[[Valider]]",
+      "approveConfirmDesc": "[[Le statut « à revoir » sera retiré. Le nom et la description des étiquettes ne seront pas modifiés.]]",
+      "approveConfirmTitle": "[[Valider {{count}} étiquette(s) IA ?]]",
+      "noneToValidate": "[[Aucune étiquette sélectionnée n'était encore à valider.]]",
+      "selectAllReview": "[[Tout sélectionner ({{count}} à valider)]]",
+      "validated": "[[{{count}} étiquette(s) validée(s).]]"
+    },
     "validation": {
       "colorRequired": "[[Couleur valide requise]]",
       "nameRequired": "[[Le nom est requis]]",

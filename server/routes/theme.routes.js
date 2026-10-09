@@ -41,6 +41,12 @@ router.post('/merge', themeController.mergeThemes);
 router.post('/bulk-delete', themeController.deleteThemes);
 
 /**
+ * POST /api/themes/bulk-approve
+ * Mark AI themes in { ids } as reviewed without changing their content.
+ */
+router.post('/bulk-approve', themeController.approveThemes);
+
+/**
  * PUT /api/themes/:id
  * Partial update. 404 unknown theme, 409 { conflictWith } when the name is taken.
  */

@@ -21,6 +21,7 @@ interface StorySettingsProps {
   sortedDayOfWeekOptions: { value: string; label: string }[];
   story: Story;
   availableSeries: Series[];
+  disabled?: boolean;
 }
 
 const StorySettings: React.FC<StorySettingsProps> = ({
@@ -29,6 +30,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
   sortedDayOfWeekOptions,
   story,
   availableSeries,
+  disabled = false,
 }) => {
   const { t } = i18n;
   const { control, setValue } = useFormContext();
@@ -56,6 +58,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
               <SeriesSelector
                 series={availableSeries}
                 value={field.value}
+                disabled={disabled}
                 onChange={(value) => {
                   setValue("seriesName", value);
                   field.onChange(value);
@@ -76,6 +79,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
               <ThemeMultiSelect
                 themes={availableThemes}
                 value={(field.value || []) as SelectedTheme[]}
+                disabled={disabled}
                 onChange={(value) => setValue("themes", value, { shouldDirty: true, shouldValidate: true })}
                 onCreate={handleCreateTheme}
               />
@@ -94,6 +98,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
             <FormControl>
               <Select
                 value={field.value}
+                disabled={disabled}
                 onValueChange={(value) => {
                   setValue("ageGroup", value);
                   field.onChange(value);
@@ -125,6 +130,7 @@ const StorySettings: React.FC<StorySettingsProps> = ({
             <FormControl>
               <Select
                 value={field.value}
+                disabled={disabled}
                 onValueChange={(value) => {
                   setValue("language", value as "fr" | "en");
                   field.onChange(value);
@@ -156,9 +162,9 @@ const StorySettings: React.FC<StorySettingsProps> = ({
             <FormControl>
               <Select
                 value={field.value}
+                disabled={disabled}
                 onValueChange={(value) => {
-                  setValue("dayOfWeek", value);
-                  field.onChange(value);
+                  if (value) field.onChange(value);
                 }}
               >
                 <SelectTrigger ref={field.ref} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
@@ -191,9 +197,9 @@ const StorySettings: React.FC<StorySettingsProps> = ({
             <FormControl>
               <Select
                 value={field.value}
+                disabled={disabled}
                 onValueChange={(value) => {
-                  setValue("weekNumber", value);
-                  field.onChange(value);
+                  if (value) field.onChange(value);
                 }}
               >
                 <SelectTrigger ref={field.ref} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">

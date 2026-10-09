@@ -12,8 +12,9 @@ import { ArrowDown, ArrowUp, CheckCircle2, Info, Loader2, Plug, Plus, RotateCcw,
 import { toast } from "sonner";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { settingsApi } from "@/api/settings.api";
-import { AiProvider, AppSettingsUpdate, OllamaTestResult } from "@/types/system.types";
+import { AiProvider, AppSettingsResponse, AppSettingsUpdate, OllamaTestResult } from "@/types/system.types";
 import { QuotaUsageCard } from "./QuotaUsageCard";
+import { AI_TIMEOUT_LIMITS_SECONDS, AiTimeoutKey, isValidAiTimeoutSeconds } from "@/utils/settingsValidation";
 
 const DEFAULT_CREATIVITY = 0.9;
 const MODEL_NAME_RE = /^[\w.:\-/]+$/;
@@ -40,10 +41,12 @@ const ModelListEditor = ({ id, label, models, isCustom, saving, onSave }: ModelL
   const { t } = i18n;
   const [draft, setDraft] = useState<string[]>(models);
   const [newModel, setNewModel] = useState("");
-
-  useEffect(() => setDraft(models), [models]);
-
   const changed = draft.join(",") !== models.join(",");
+
+  useEffect(() => {
+    if (!changed) setDraft(models);
+  }, [models, changed]);
+
   const move = (index: number, delta: number) => {
     const next = [...draft];
     [next[index], next[index + delta]] = [next[index + delta], next[index]];
@@ -127,18 +130,25 @@ export const AiSettings = () => {
   // Timeouts form, in seconds
   const [timeouts, setTimeouts] = useState({ gemini: "", geminiWeek: "", ollama: "" });
   const [creativity, setCreativity] = useState(DEFAULT_CREATIVITY);
+  const [ollamaDirty, setOllamaDirty] = useState(false);
+  const [timeoutsDirty, setTimeoutsDirty] = useState(false);
+  const [creativityDirty, setCreativityDirty] = useState(false);
 
   useEffect(() => {
     if (!data) return;
-    setOllamaUrl(data.effective.ollamaBaseUrl);
-    setOllamaModel(data.effective.ollamaModel);
-    setTimeouts({
-      gemini: toSeconds(data.settings.ai.geminiTimeoutMs),
-      geminiWeek: toSeconds(data.settings.ai.geminiWeekTimeoutMs),
-      ollama: toSeconds(data.settings.ai.ollamaTimeoutMs),
-    });
-    setCreativity(data.settings.ai.creativity ?? DEFAULT_CREATIVITY);
-  }, [data]);
+    if (!ollamaDirty) {
+      setOllamaUrl(data.effective.ollamaBaseUrl);
+      setOllamaModel(data.effective.ollamaModel);
+    }
+    if (!timeoutsDirty) {
+      setTimeouts({
+        gemini: toSeconds(data.settings.ai.geminiTimeoutMs),
+        geminiWeek: toSeconds(data.settings.ai.geminiWeekTimeoutMs),
+        ollama: toSeconds(data.settings.ai.ollamaTimeoutMs),
+      });
+    }
+    if (!creativityDirty) setCreativity(data.settings.ai.creativity ?? DEFAULT_CREATIVITY);
+  }, [data, ollamaDirty, timeoutsDirty, creativityDirty]);
 
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>;
@@ -149,9 +159,16 @@ export const AiSettings = () => {
 
   const { settings, effective, codeDefaults, geminiKeyConfigured } = data;
 
-  const save = (ai: AppSettingsUpdate["ai"], successKey = "settings.ai.saved") =>
+  const save = (
+    ai: AppSettingsUpdate["ai"],
+    successKey = "settings.ai.saved",
+    onSaved?: (saved: AppSettingsResponse) => void,
+  ) =>
     update.mutate({ ai }, {
-      onSuccess: () => toast.success(t(successKey)),
+      onSuccess: (saved) => {
+        toast.success(t(successKey));
+        onSaved?.(saved);
+      },
       onError: (error) => toast.error(`${t("settings.ai.saveError")} ${error.message}`),
     });
 
@@ -162,6 +179,7 @@ export const AiSettings = () => {
       setOllamaTest(result);
       if (result.ok && result.models.length > 0 && !result.models.includes(ollamaModel)) {
         setOllamaModel(result.models[0]);
+        setOllamaDirty(ollamaUrl !== effective.ollamaBaseUrl || result.models[0] !== effective.ollamaModel);
       }
     } catch (error) {
       setOllamaTest({ ok: false, baseUrl: ollamaUrl, models: [], error: (error as Error).message });
@@ -173,7 +191,28 @@ export const AiSettings = () => {
   // Models offered for Ollama: the tested instance's, plus the current one
   const ollamaModels = [...new Set([...(ollamaTest?.models ?? []), ollamaModel].filter(Boolean))];
   const ollamaChanged = ollamaUrl !== effective.ollamaBaseUrl || ollamaModel !== effective.ollamaModel;
-  const timeoutsValid = Object.values(timeouts).every((v) => v.trim() === "" || (Number(v) >= 10 && Number.isFinite(Number(v))));
+  const timeoutIsValid = (key: AiTimeoutKey, value: string) => isValidAiTimeoutSeconds(key, value);
+  const timeoutsValid = (Object.keys(AI_TIMEOUT_LIMITS_SECONDS) as AiTimeoutKey[])
+    .every(key => timeoutIsValid(key, timeouts[key]));
+  const isTimeoutDraftChanged = (draft: typeof timeouts) => (
+    draft.gemini !== toSeconds(settings.ai.geminiTimeoutMs) ||
+    draft.geminiWeek !== toSeconds(settings.ai.geminiWeekTimeoutMs) ||
+    draft.ollama !== toSeconds(settings.ai.ollamaTimeoutMs)
+  );
+
+  const syncOllama = (saved: AppSettingsResponse) => {
+    setOllamaUrl(saved.effective.ollamaBaseUrl);
+    setOllamaModel(saved.effective.ollamaModel);
+    setOllamaDirty(false);
+  };
+  const syncTimeouts = (saved: AppSettingsResponse) => {
+    setTimeouts({
+      gemini: toSeconds(saved.settings.ai.geminiTimeoutMs),
+      geminiWeek: toSeconds(saved.settings.ai.geminiWeekTimeoutMs),
+      ollama: toSeconds(saved.settings.ai.ollamaTimeoutMs),
+    });
+    setTimeoutsDirty(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -275,7 +314,11 @@ export const AiSettings = () => {
           <div className="space-y-1">
             <Label htmlFor="ollama-url">{t("settings.ai.ollamaUrl")}</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Input id="ollama-url" value={ollamaUrl} onChange={(e) => { setOllamaUrl(e.target.value); setOllamaTest(null); }} className="font-mono text-sm" />
+              <Input id="ollama-url" value={ollamaUrl} disabled={update.isPending} onChange={(e) => {
+                setOllamaUrl(e.target.value);
+                setOllamaDirty(e.target.value !== effective.ollamaBaseUrl || ollamaModel !== effective.ollamaModel);
+                setOllamaTest(null);
+              }} className="font-mono text-sm" />
               <Button type="button" variant="outline" onClick={handleTestOllama} disabled={testing || !ollamaUrl.trim()} className="gap-2">
                 {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
                 {t("settings.ai.testConnection")}
@@ -291,7 +334,10 @@ export const AiSettings = () => {
           </div>
           <div className="space-y-1">
             <Label htmlFor="ollama-model">{t("settings.ai.ollamaModel")}</Label>
-            <Select value={ollamaModel} onValueChange={setOllamaModel}>
+            <Select value={ollamaModel} onValueChange={(value) => {
+              setOllamaModel(value);
+              setOllamaDirty(ollamaUrl !== effective.ollamaBaseUrl || value !== effective.ollamaModel);
+            }} disabled={update.isPending}>
               <SelectTrigger id="ollama-model" className="w-full sm:w-[280px] font-mono text-sm">
                 <SelectValue />
               </SelectTrigger>
@@ -304,7 +350,7 @@ export const AiSettings = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.ollamaModelHint")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" disabled={!ollamaChanged || update.isPending} onClick={() => save({ ollamaBaseUrl: ollamaUrl.trim(), ollamaModel })}>
+            <Button type="button" size="sm" disabled={!ollamaChanged || update.isPending} onClick={() => save({ ollamaBaseUrl: ollamaUrl.trim(), ollamaModel }, "settings.ai.saved", syncOllama)}>
               {t("common.save")}
             </Button>
             <Button
@@ -313,7 +359,7 @@ export const AiSettings = () => {
               variant="ghost"
               className="gap-1"
               disabled={(settings.ai.ollamaBaseUrl === null && settings.ai.ollamaModel === null) || update.isPending}
-              onClick={() => { setOllamaTest(null); save({ ollamaBaseUrl: null, ollamaModel: null }); }}
+              onClick={() => { setOllamaTest(null); save({ ollamaBaseUrl: null, ollamaModel: null }, "settings.ai.saved", syncOllama); }}
             >
               <RotateCcw className="h-3 w-3" /> {t("settings.ai.restoreEnv")}
             </Button>
@@ -335,8 +381,14 @@ export const AiSettings = () => {
               max={1.2}
               step={0.1}
               value={[creativity]}
-              onValueChange={([value]) => setCreativity(value)}
-              onValueCommit={([value]) => save({ creativity: Math.round(value * 10) / 10 })}
+              onValueChange={([value]) => {
+                setCreativity(value);
+                setCreativityDirty(value !== (settings.ai.creativity ?? DEFAULT_CREATIVITY));
+              }}
+              onValueCommit={([value]) => save({ creativity: Math.round(value * 10) / 10 }, "settings.ai.saved", (saved) => {
+                setCreativity(saved.settings.ai.creativity ?? DEFAULT_CREATIVITY);
+                setCreativityDirty(false);
+              })}
               aria-label={t("settings.ai.creativityTitle")}
               className="flex-1"
             />
@@ -344,7 +396,10 @@ export const AiSettings = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant="outline">{settings.ai.creativity === null ? t("settings.ai.creativityDefault") : creativity.toFixed(1)}</Badge>
-            <Button type="button" size="sm" variant="ghost" className="gap-1" disabled={settings.ai.creativity === null || update.isPending} onClick={() => save({ creativity: null })}>
+            <Button type="button" size="sm" variant="ghost" className="gap-1" disabled={settings.ai.creativity === null || update.isPending} onClick={() => save({ creativity: null }, "settings.ai.saved", (saved) => {
+              setCreativity(saved.settings.ai.creativity ?? DEFAULT_CREATIVITY);
+              setCreativityDirty(false);
+            })}>
               <RotateCcw className="h-3 w-3" /> {t("settings.ai.restoreDefault")}
             </Button>
           </div>
@@ -363,19 +418,35 @@ export const AiSettings = () => {
             ["geminiWeek", "settings.ai.timeoutGeminiWeek", effective.geminiWeekTimeoutMs],
             ["ollama", "settings.ai.timeoutOllama", effective.ollamaTimeoutMs],
           ] as const).map(([key, labelKey, inUse]) => (
-            <div key={key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div key={key} className="space-y-1">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <Label htmlFor={`timeout-${key}`}>{t(labelKey)}</Label>
               <Input
                 id={`timeout-${key}`}
                 type="number"
                 min={10}
-                inputMode="numeric"
+                max={AI_TIMEOUT_LIMITS_SECONDS[key]}
+                step="0.001"
+                inputMode="decimal"
                 value={timeouts[key]}
                 placeholder={toSeconds(inUse)}
-                onChange={(e) => setTimeouts({ ...timeouts, [key]: e.target.value })}
+                disabled={update.isPending}
+                aria-invalid={!timeoutIsValid(key, timeouts[key])}
+                aria-describedby={`timeout-${key}-error`}
+                onChange={(e) => {
+                  const next = { ...timeouts, [key]: e.target.value };
+                  setTimeouts(next);
+                  setTimeoutsDirty(isTimeoutDraftChanged(next));
+                }}
                 className="w-full sm:w-[140px]"
               />
             </div>
+            <p id={`timeout-${key}-error`} className={`text-xs ${timeoutIsValid(key, timeouts[key]) ? "text-muted-foreground" : "text-red-600 dark:text-red-400"}`} role={timeoutIsValid(key, timeouts[key]) ? undefined : "alert"}>
+              {timeoutIsValid(key, timeouts[key])
+                ? t("settings.ai.timeoutRange", { min: "10", max: String(AI_TIMEOUT_LIMITS_SECONDS[key]) })
+                : t("settings.ai.timeoutInvalid", { min: "10", max: String(AI_TIMEOUT_LIMITS_SECONDS[key]) })}
+            </p>
+          </div>
           ))}
           <p className="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.timeoutsHint")}</p>
           <Button
@@ -386,7 +457,7 @@ export const AiSettings = () => {
               geminiTimeoutMs: toMs(timeouts.gemini),
               geminiWeekTimeoutMs: toMs(timeouts.geminiWeek),
               ollamaTimeoutMs: toMs(timeouts.ollama),
-            })}
+            }, "settings.ai.saved", syncTimeouts)}
           >
             {t("common.save")}
           </Button>

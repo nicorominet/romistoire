@@ -1,6 +1,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { storyService, normalizeStoryThemes } from '../../services/story.service.js';
+import { storyVersionService } from '../../services/story_version.service.js';
 import * as db from '../../config/database.js';
 
 // Mock the database module
@@ -118,14 +119,14 @@ describe('StoryService Unit Tests', () => {
     });
 
     describe('update', () => {
-        const oldStory = { id: 'story-1', title: 'T', content: 'C', age_group: '4-6', week_number: 1, day_order: 1, locale: 'fr', version: 2, source: 'manual', series_id: null };
+        const oldStory = { id: 'story-1', title: 'T', content: 'C', age_group: '4-6', week_number: 1, day_order: 1, locale: 'fr', version: 2, source: 'manual', series_id: null, review_status: 'validated', modified_at: '2026-01-01 10:00:00' };
 
         // slotTaken: whether another story already occupies the target slot
-        const setupConnection = ({ existingSeries = [], slotTaken = false } = {}) => {
+        const setupConnection = ({ existingSeries = [], existingThemes = [], slotTaken = false } = {}) => {
             const connection = {
                 query: vi.fn(async (sql) => {
                     if (sql.includes('SELECT * FROM stories')) return [[oldStory]];
-                    if (sql.includes('SELECT * FROM story_themes')) return [[]];
+                    if (sql.includes('SELECT * FROM story_themes')) return [existingThemes];
                     if (sql.includes('FROM story_series WHERE name')) return [existingSeries];
                     if (sql.includes('SELECT id, series_id FROM stories')) return [slotTaken ? [{ id: 'other', series_id: null }] : []];
                     if (sql.includes('SELECT id FROM stories')) return [[]];
@@ -150,6 +151,50 @@ describe('StoryService Unit Tests', () => {
             const placeholders = assignments.filter(a => a.endsWith('?')).map(a => a.split('=')[0].trim());
             return params[placeholders.indexOf(column)];
         };
+
+        it('should not create a snapshot or update the version when the submitted story is unchanged', async () => {
+            const connection = setupConnection({ existingThemes: [{ theme_id: 'theme-1', is_primary: 1 }] });
+            const createSnapshot = vi.spyOn(storyVersionService, 'createSnapshot');
+
+            const result = await storyService.update('story-1', {
+                title: ' T ', content: 'C', age_group: '4-6', week_number: 1, day_order: 1,
+                locale: 'fr', series_name: '', themes: [{ id: 'theme-1', isPrimary: true }]
+            });
+
+            expect(createSnapshot).not.toHaveBeenCalled();
+            expect(connection.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE stories'), expect.anything());
+            expect(connection.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO story_versions'), expect.anything());
+            expect(db.query).not.toHaveBeenCalled();
+            expect(connection.commit).toHaveBeenCalled();
+            expect(result.version).toBe(2);
+            expect(result.modified_at).toBe('2026-01-01 10:00:00');
+            createSnapshot.mockRestore();
+        });
+
+        it('should mark a pending AI story reviewed without creating a new version on an unchanged save', async () => {
+            const connection = setupConnection();
+            oldStory.source = 'gemini';
+            oldStory.is_manually_edited = false;
+            oldStory.review_status = 'to_review';
+
+            const result = await storyService.update('story-1', {
+                title: 'T', content: 'C', age_group: '4-6', week_number: 1, day_order: 1,
+                locale: 'fr', series_name: '', themes: []
+            });
+
+            expect(connection.query).toHaveBeenCalledWith(
+                "UPDATE stories SET review_status = 'validated', is_manually_edited = TRUE WHERE id = ?",
+                ['story-1']
+            );
+            expect(result.review_status).toBe('validated');
+            expect(result.version).toBe(2);
+            expect(result.modified_at).toBe('2026-01-01 10:00:00');
+            expect(db.query).not.toHaveBeenCalled();
+
+            oldStory.source = 'manual';
+            oldStory.is_manually_edited = false;
+            oldStory.review_status = 'validated';
+        });
 
         it('should persist the selected series', async () => {
             const connection = setupConnection({ existingSeries: [{ id: 'series-a' }] });
@@ -542,4 +587,3 @@ describe('generateFromAI', () => {
         expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({ incomplete: { stories: 1, expected: 7 } }));
     });
 });
-

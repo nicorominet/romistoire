@@ -24,6 +24,7 @@ import {
 import { Download, Upload, Trash2, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSystemMutations } from "@/hooks/useSystem";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { systemApi } from "@/api/system.api";
 import { downloadBlob, generateDateFilename } from "@/utils/fileUtils";
 import { ExportType, ImportMode } from "@/types/system.types";
@@ -39,6 +40,7 @@ export const DataSettings = () => {
     
     // Mutations for data operations
     const { importData, resetData, cleanupImages } = useSystemMutations();
+    const { data: appSettings } = useAppSettings();
     
     // Local state
     const [importMode, setImportMode] = useState<ImportMode>('skip');
@@ -142,9 +144,7 @@ export const DataSettings = () => {
         }
     };
 
-    /**
-     * Handles cleanup of unused images.
-     */
+    /** Handles cleanup of unreferenced images and audio files. */
     const handleCleanupImages = async () => {
         try {
             const result = await cleanupImages.mutateAsync();
@@ -297,6 +297,13 @@ export const DataSettings = () => {
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                         {t("settings.cleanupImagesDesc")}
                                     </p>
+                                    {appSettings && (
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            {t("settings.cleanupGracePeriod", {
+                                                hours: String(appSettings.settings.storage.orphanPurge.maxAgeHours),
+                                            })}
+                                        </p>
+                                    )}
                                 </div>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>

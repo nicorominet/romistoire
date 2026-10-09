@@ -4,20 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Paintbrush, Eraser, Save, Trash2 } from "lucide-react";
+import { i18n } from "@/lib/i18n";
 
 interface SimpleDrawingCanvasProps {
   width?: number;
   height?: number;
   onSave?: (dataURL: string) => void;
   backgroundColor?: string;
+  disabled?: boolean;
 }
 
 const SimpleDrawingCanvas = ({
   width = 800,
   height = 600,
   onSave,
-  backgroundColor = "#ffffff"
+  backgroundColor = "#ffffff",
+  disabled = false
 }: SimpleDrawingCanvasProps) => {
+  const { t } = i18n;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
   const [drawing, setDrawing] = useState(false);
@@ -74,7 +78,7 @@ const SimpleDrawingCanvas = ({
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!context) return;
+    if (!context || disabled) return;
     
     setDrawing(true);
     
@@ -98,7 +102,7 @@ const SimpleDrawingCanvas = ({
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!context || !drawing) return;
+    if (!context || !drawing || disabled) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -110,13 +114,13 @@ const SimpleDrawingCanvas = ({
   };
 
   const stopDrawing = () => {
-    if (!context) return;
+    if (!context || disabled) return;
     setDrawing(false);
     context.closePath();
   };
 
   const clearCanvas = () => {
-    if (!context) return;
+    if (!context || disabled) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -126,7 +130,7 @@ const SimpleDrawingCanvas = ({
   };
 
   const saveCanvas = () => {
-    if (!canvasRef.current || !onSave) return;
+    if (!canvasRef.current || !onSave || disabled) return;
     
     const dataURL = canvasRef.current.toDataURL("image/png");
     onSave(dataURL);
@@ -138,33 +142,35 @@ const SimpleDrawingCanvas = ({
         <div className="flex gap-2">
           <Button
             type="button"
+            disabled={disabled}
             variant={tool === "brush" ? "default" : "outline"}
             size="sm"
             onClick={() => setTool("brush")}
             className={tool === "brush" ? "bg-story-purple" : ""}
           >
             <Paintbrush className="h-4 w-4 mr-1" />
-            Brush
+            {t("story.drawing.brush")}
           </Button>
           <Button
             type="button"
+            disabled={disabled}
             variant={tool === "eraser" ? "default" : "outline"}
             size="sm"
             onClick={() => setTool("eraser")}
             className={tool === "eraser" ? "bg-story-purple" : ""}
           >
             <Eraser className="h-4 w-4 mr-1" />
-            Eraser
+            {t("story.drawing.eraser")}
           </Button>
           
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center">
+              <Button type="button" variant="outline" size="sm" className="flex items-center" disabled={disabled}>
                 <div
                   className="w-4 h-4 rounded-full mr-1"
                   style={{ backgroundColor: color }}
                 ></div>
-                Color
+                {t("story.drawing.color")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-48">
@@ -172,6 +178,7 @@ const SimpleDrawingCanvas = ({
                 {colors.map((c) => (
                   <button type="button"
                     key={c}
+                    disabled={disabled}
                     className={`w-6 h-6 rounded-full ${
                       c === color ? "ring-2 ring-story-purple" : ""
                     }`}
@@ -184,9 +191,10 @@ const SimpleDrawingCanvas = ({
           </Popover>
           
           <div className="flex items-center gap-2">
-            <span className="text-xs">Size:</span>
+            <span className="text-xs">{t("story.drawing.size")}</span>
             <Slider
               value={[brushSize]}
+              disabled={disabled}
               min={1}
               max={20}
               step={1}
@@ -199,22 +207,24 @@ const SimpleDrawingCanvas = ({
         <div className="flex gap-2">
           <Button
             type="button"
+            disabled={disabled}
             variant="outline"
             size="sm"
             onClick={clearCanvas}
           >
             <Trash2 className="h-4 w-4 mr-1" />
-            Clear
+            {t("story.drawing.clear")}
           </Button>
           {onSave && (
             <Button
               type="button"
+              disabled={disabled}
               size="sm"
               onClick={saveCanvas}
               className="bg-story-purple"
             >
               <Save className="h-4 w-4 mr-1" />
-              Save
+              {t("story.drawing.save")}
             </Button>
           )}
         </div>
@@ -223,6 +233,7 @@ const SimpleDrawingCanvas = ({
       <div className="border rounded-md overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
+          aria-disabled={disabled}
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}

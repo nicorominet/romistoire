@@ -241,6 +241,34 @@ describe('generation worker', () => {
     expect(storyService.create.mock.calls[0][0].summary).toBe('Résumé Mercredi');
   });
 
+  it('uses only earlier days as context when filling a gap in an existing week', async () => {
+    mem.state.stories = DAYS.filter(day => day !== 'Jeudi').map((day, i) => ({
+      id: `old-${day}`,
+      week_number: 1,
+      age_group: '4-6',
+      day_order: ORDER[day],
+      title: `Histoire ${day}`,
+      content: `<p>Début ${day}.</p><p>Fin ${day}.</p>`,
+      summary: `Résumé ${day}`
+    }));
+    storyService.generateFromAI.mockImplementation(async req => ({ stories: [story(req.day)] }));
+    const job = await createJob({ weeks: [1], ages: ['4-6'] });
+
+    await worker.kick();
+
+    expect(storyService.generateFromAI).toHaveBeenCalledTimes(1);
+    expect(storyService.generateFromAI.mock.calls[0][0]).toMatchObject({
+      day: 'Jeudi',
+      previousDays: [
+        { day: 'Lundi', summary: 'Résumé Lundi' },
+        { day: 'Mardi', summary: 'Résumé Mardi' },
+        { day: 'Mercredi', summary: 'Résumé Mercredi' }
+      ],
+      previousEnding: 'Fin Mercredi.'
+    });
+    expect((await generationJobService.get(job.id)).status).toBe('done');
+  });
+
   it('paces every request through the service hook, the length retry included', async () => {
     const sleep = vi.fn(async () => {});
     const paced = new GenerationWorker({ sleep, minIntervalMs: 60000 });

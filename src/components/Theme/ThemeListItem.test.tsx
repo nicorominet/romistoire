@@ -46,6 +46,21 @@ describe("ThemeListItem", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
+  it("allows selecting pending-review themes even when stories use them", () => {
+    const onSelectedChange = vi.fn();
+    const pendingReview = theme({ storyCount: 2, needsReview: true });
+    const { unmount } = wrap(
+      <ThemeListItem theme={pendingReview} {...actions} selectionMode="review" onSelectedChange={onSelectedChange} />
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "themes.bulk.select" }));
+    expect(onSelectedChange).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }), true);
+    unmount();
+
+    wrap(<ThemeListItem theme={theme({ storyCount: 2 })} {...actions} selectionMode="review" onSelectedChange={onSelectedChange} />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
   it("expands the list of its stories", async () => {
     vi.mocked(themeApi.getStories).mockResolvedValue([
       { id: "s1", title: "La baleine bleue", age_group: "4-6", week_number: 12, day_order: 1 },

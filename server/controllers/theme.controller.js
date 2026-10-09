@@ -71,6 +71,15 @@ export const deleteThemes = async (req, res) => {
     }
 };
 
+export const approveThemes = async (req, res) => {
+    try {
+        const validated = await themeService.approveMany(req.body?.ids);
+        res.json({ success: true, validated });
+    } catch (error) {
+        handleError(res, error);
+    }
+};
+
 export const mergeThemes = async (req, res) => {
     try {
         const { sourceIds, targetId } = req.body || {};

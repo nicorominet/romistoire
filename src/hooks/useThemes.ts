@@ -81,12 +81,17 @@ export const useThemeMutations = () => {
     onSuccess,
   });
 
+  const approveThemes = useMutation({
+    mutationFn: async (ids: string[]) => await themeApi.approveMany(ids),
+    onSuccess,
+  });
+
   const mergeThemes = useMutation({
     mutationFn: async ({ sourceIds, targetId }: { sourceIds: string[]; targetId: string }) => await themeApi.merge(sourceIds, targetId),
     onSuccess,
   });
 
-  return { createTheme, updateTheme, deleteTheme, deleteThemes, mergeThemes };
+  return { createTheme, updateTheme, deleteTheme, deleteThemes, approveThemes, mergeThemes };
 };
 
 export const useWeeklyThemes = () => {

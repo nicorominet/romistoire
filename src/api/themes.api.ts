@@ -25,6 +25,9 @@ export const themeApi = {
   /** Deletes the unused themes among `ids`; themes still used are reported in `skipped`. */
   deleteMany: (ids: string[]) =>
     client.post<{ success: boolean; deleted: string[]; skipped: { id: string; storyCount: number }[] }>(`${API_ENDPOINTS.THEMES}/bulk-delete`, { ids }),
+  /** Marks AI themes as reviewed without modifying their fields. */
+  approveMany: (ids: string[]) =>
+    client.post<{ success: boolean; validated: number }>(`${API_ENDPOINTS.THEMES}/bulk-approve`, { ids }),
   getStories: (themeId: string) => client.get<ThemeStory[]>(`${API_ENDPOINTS.THEMES}/${themeId}/stories`),
 };
 

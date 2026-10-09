@@ -3,9 +3,10 @@ import { i18n } from "@/lib/i18n";
 
 interface IllustrationCanvasProps {
   onSave: (dataURL: string) => Promise<void>;
+  disabled?: boolean;
 }
 
-const IllustrationCanvas = ({ onSave }: IllustrationCanvasProps) => {
+const IllustrationCanvas = ({ onSave, disabled = false }: IllustrationCanvasProps) => {
   const { t } = i18n;
 
   return (
@@ -13,7 +14,7 @@ const IllustrationCanvas = ({ onSave }: IllustrationCanvasProps) => {
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
         {t("story.createIllustration")}
       </h3>
-      <SimpleDrawingCanvas onSave={onSave} />
+      <SimpleDrawingCanvas onSave={onSave} disabled={disabled} />
     </div>
   );
 };
