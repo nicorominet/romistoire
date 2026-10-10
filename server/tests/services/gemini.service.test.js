@@ -8,6 +8,7 @@ vi.mock('../../services/logger.service.js', () => ({
 process.env.GEMINI_API_KEY = 'test-key';
 process.env.GEMINI_MODELS = 'model-a,model-b';
 const { geminiService, GeminiFatalError, toPlayableAudio, buildStoryRequestBody, modelCooldowns, DEFAULT_MODELS, modelsForAge } = await import('../../services/gemini.service.js');
+const { resolveAudioOptions } = await import('../../services/helpers/voice.helper.js');
 // The service reads the key at construction time
 geminiService.apiKey = 'test-key';
 
@@ -61,6 +62,49 @@ describe('GeminiService', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     // The rejecting model is skipped by the next calls
     expect(modelCooldowns.reason(fetch.mock.calls[0][0].match(/models\/([^:]+):/)[1])).toBe('invalid request');
+  });
+
+  describe('reading voice', () => {
+    const audioBody = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: Buffer.from([0, 0]).toString('base64') } }] } }] };
+    const sentBody = (call) => JSON.parse(fetch.mock.calls[call][1].body);
+    const resolved = resolveAudioOptions({ voice: 'Vindemiatrix', characterVoice: 'Puck', multiSpeaker: true }, {}, '4-6');
+
+    it('should send the chosen voice', async () => {
+      fetch.mockResolvedValueOnce(jsonResponse(200, audioBody));
+
+      const { error } = await run(geminiService.generateAudio('Il était une fois', { ...resolved, multiSpeaker: false }));
+
+      expect(error).toBeUndefined();
+      expect(sentBody(0).generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Vindemiatrix');
+    });
+
+    it('should split the dialogue by its marks when the AI changes the text', async () => {
+      const story = 'Le renard arriva.\n— Bonjour !';
+      fetch
+        .mockResolvedValueOnce(jsonResponse(200, storyBody('Narrateur: Le renard est arrivé.\nPersonnages: — Bonjour !')))
+        .mockResolvedValueOnce(jsonResponse(200, audioBody));
+
+      const { error } = await run(geminiService.generateAudio(story, resolved));
+
+      expect(error).toBeUndefined();
+      const body = sentBody(1);
+      expect(body.generationConfig.speechConfig.multiSpeakerVoiceConfig.speakerVoiceConfigs).toHaveLength(2);
+      // First audio model (Gemini 3.8): one part per line, the original words kept
+      expect(body.contents[0].parts.map(part => [part.speechMetadata.speaker, part.text])).toEqual([
+        ['Narrateur', 'Le renard arriva.'],
+        ['Personnages', '— Bonjour !']
+      ]);
+    });
+
+    it('should read with one voice when the story has no dialogue', async () => {
+      fetch
+        .mockResolvedValueOnce(jsonResponse(200, storyBody('Narrateur: Une histoire calme.')))
+        .mockResolvedValueOnce(jsonResponse(200, audioBody));
+
+      await run(geminiService.generateAudio('Une histoire calme.', resolved));
+
+      expect(sentBody(1).generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Vindemiatrix');
+    });
   });
 
   it('should retry the same model on 503 then succeed', async () => {
@@ -189,13 +233,19 @@ describe('GeminiService', () => {
 });
 
 describe('modelsForAge', () => {
-  it('should put the Flash models first for teenagers, keeping the configured order otherwise', () => {
+  it('should start with the best Flash model from 7 years old and keep 2.5 Flash as a late fallback', () => {
     const ordered = modelsForAge(DEFAULT_MODELS, '16-18 ans');
-    expect(ordered.slice(0, 6)).toEqual(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash']);
-    expect(ordered.slice(6)).toEqual(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it']);
-    expect(modelsForAge(DEFAULT_MODELS, '13-15')[0]).toBe('gemini-3.8-flash');
+    expect(ordered).toEqual([
+      'gemini-3-flash-preview', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash',
+      'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it'
+    ]);
+    expect(modelsForAge(DEFAULT_MODELS, '7-9')).toEqual(ordered);
+    expect(modelsForAge(DEFAULT_MODELS, '10-12')[0]).toBe('gemini-3-flash-preview');
+  });
 
+  it('should keep the configured order for the youngest ages and for unknown models', () => {
     expect(modelsForAge(DEFAULT_MODELS, '4-6')).toEqual(DEFAULT_MODELS);
+    expect(modelsForAge(DEFAULT_MODELS, '2-3')).toEqual(DEFAULT_MODELS);
     expect(modelsForAge(['model-a', 'model-b'], '16-18')).toEqual(['model-a', 'model-b']);
   });
 });

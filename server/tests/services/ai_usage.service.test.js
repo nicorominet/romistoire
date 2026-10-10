@@ -27,7 +27,10 @@ describe('quota limits and windows', () => {
     expect(modelLimits('gemini-3.8-flash')).toEqual({ rpm: 5, rpd: 20 });
     expect(modelLimits('gemini-3-flash-preview')).toEqual({ rpm: 5, rpd: 20 });
     expect(modelLimits('gemma-4-31b-it')).toEqual({ rpm: 30, rpd: 14400 });
-    expect(modelLimits('gemini-2.5-flash-preview-tts')).toEqual({ rpm: null, rpd: null });
+    expect(modelLimits('gemini-2.5-flash-preview-tts')).toEqual({ rpm: 3, rpd: 10 });
+    // TTS before Flash Lite: not the 500/day of the text models
+    expect(modelLimits('gemini-3.8-flash-lite-tts')).toEqual({ rpm: 3, rpd: 10 });
+    expect(modelLimits('gemini-2.5-flash-lite')).toEqual({ rpm: 10, rpd: 20 });
     expect(modelLimits('unknown')).toEqual({ rpm: null, rpd: null });
   });
 
@@ -51,6 +54,22 @@ describe('AiUsageService', () => {
   });
   afterEach(() => {
     aiUsageService.enabled = false;
+  });
+
+  it('counts the requests left today, a daily quota answer exhausting the model', async () => {
+    db.query.mockResolvedValueOnce([
+      { model: 'gemini-3.5-flash-lite', used: 500, exhausted: 0 },
+      { model: 'gemini-3.8-flash', used: 3, exhausted: 1 },
+      { model: 'gemini-3.8-flash-tts', used: 4, exhausted: 0 },
+    ]);
+
+    // 3.5 Flash Lite used up, 3.1 Flash Lite untouched (500), 3.8 Flash answered 429, 3.8 Flash TTS 6 of 10 left
+    const remaining = await aiUsageService.remainingToday(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-flash-tts']);
+
+    expect(remaining).toBe(506);
+    expect(await aiUsageService.remainingToday(['unknown-model'])).toBeNull();
+    aiUsageService.enabled = false;
+    expect(await aiUsageService.remainingToday(['gemini-3.8-flash'])).toBeNull();
   });
 
   it('computes the use per model, and flags a limit hit', async () => {

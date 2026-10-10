@@ -25,6 +25,8 @@ export interface GenerationEstimate {
     missingTopics: number[];
     requests: number;
     estimatedSeconds: number;
+    /** Requests left today on the fast Gemini models (Gemma aside); null when unknown */
+    remainingRequests: number | null;
     quotaWarning: boolean;
 }
 

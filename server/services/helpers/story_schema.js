@@ -93,45 +93,45 @@ export const WEEK_PLAN_LENGTH = STORY_DAYS.length;
 
 /**
  * Adapts a base schema: number of stories (7 for a whole week in one answer), minimum number of
- * paragraphs and, for the first day of a week generated day by day, the plan and the character sheets,
- * written before the story.
+ * paragraphs and the context written before the stories: the plan of the week (first day of a week
+ * generated day by day) and the character sheets (that first day, and a whole week in one answer).
  * @param {Object} base - GEMINI_RESPONSE_SCHEMA or JSON_SCHEMA.
  * @param {(type: string) => string} type - Type name in the schema dialect.
  */
-const buildSchema = (base, type, { withWeekPlan = false, minParagraphs = 0, storyCount = 0 } = {}) => {
+const buildSchema = (base, type, { withWeekPlan = false, withCharacters = false, minParagraphs = 0, storyCount = 0 } = {}) => {
   const schema = structuredClone(base);
   if (storyCount > 0) {
     schema.properties.stories.minItems = storyCount;
     schema.properties.stories.maxItems = storyCount;
   }
   if (minParagraphs > 0) schema.properties.stories.items.properties.paragraphs.minItems = minParagraphs;
-  if (!withWeekPlan) return schema;
+  if (!withWeekPlan && !withCharacters) return schema;
 
   const characterProperties = { name: { type: type('string') }, description: { type: type('string') } };
-  schema.properties = {
-    week_plan: { type: type('array'), items: { type: type('string') } },
+  const context = {
+    ...(withWeekPlan ? { week_plan: { type: type('array'), items: { type: type('string') } } } : {}),
     characters: {
       type: type('array'),
       items: { type: type('object'), properties: characterProperties, required: ['name', 'description'] }
-    },
-    ...schema.properties
+    }
   };
-  schema.required = ['week_plan', 'characters', 'stories'];
+  schema.properties = { ...context, ...schema.properties };
+  schema.required = [...Object.keys(context), 'stories'];
   if (base === GEMINI_RESPONSE_SCHEMA) {
     schema.properties.characters.items.propertyOrdering = ['name', 'description'];
-    schema.propertyOrdering = ['week_plan', 'characters', 'stories'];
+    schema.propertyOrdering = [...Object.keys(context), 'stories'];
   }
   return schema;
 };
 
 /**
  * Gemini schema.
- * @param {{withWeekPlan?: boolean, minParagraphs?: number, storyCount?: number}} [options]
+ * @param {{withWeekPlan?: boolean, withCharacters?: boolean, minParagraphs?: number, storyCount?: number}} [options]
  */
 export const geminiResponseSchema = (options = {}) => buildSchema(GEMINI_RESPONSE_SCHEMA, name => name.toUpperCase(), options);
 
 /**
  * JSON Schema (Ollama).
- * @param {{withWeekPlan?: boolean, minParagraphs?: number, storyCount?: number}} [options]
+ * @param {{withWeekPlan?: boolean, withCharacters?: boolean, minParagraphs?: number, storyCount?: number}} [options]
  */
 export const jsonSchema = (options = {}) => buildSchema(JSON_SCHEMA, name => name, options);

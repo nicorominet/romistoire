@@ -152,7 +152,11 @@ describe('ThemeService', () => {
 
   describe('approveMany', () => {
     it('should validate only pending review themes and invalidate the cache', async () => {
-      db.query.mockResolvedValue([{ affectedRows: 2 }]);
+      // Fill the cache of the full list, as the themes page does
+      db.query.mockResolvedValue([row({ needs_review: 1 })]);
+      await themeService.findAll();
+      // query() returns the UPDATE result header itself
+      db.query.mockResolvedValue({ affectedRows: 2 });
 
       const result = await themeService.approveMany(['a', 'b', 'a']);
 
@@ -161,6 +165,11 @@ describe('ThemeService', () => {
         expect.stringContaining('WHERE needs_review = TRUE AND id IN (?, ?)'),
         [expect.any(String), 'a', 'b']
       );
+
+      // The full list is read again: no theme stays "to review" from the cache
+      db.query.mockResolvedValue([row({ needs_review: 0 })]);
+      const themes = await themeService.findAll();
+      expect(themes[0].needsReview).toBe(false);
     });
 
     it('should reject an empty list', async () => {

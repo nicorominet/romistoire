@@ -49,6 +49,28 @@ export interface LogConfig {
 export type AiProvider = 'gemini' | 'local';
 export type BackupFrequency = 'daily' | 'weekly';
 
+export type VoiceStyle = 'auto' | 'storyteller' | 'calm' | 'lively' | 'dramatic' | 'neutral';
+export type VoicePace = 'auto' | 'slow' | 'normal' | 'lively';
+
+/** Reading voice of the audio stories. null = code default; "auto" style or pace = from the age group. */
+export interface AudioSettings {
+    voice: string | null;
+    characterVoice: string | null;
+    style: VoiceStyle | null;
+    pace: VoicePace | null;
+    multiSpeaker: boolean | null;
+}
+
+/** Choices of the reading voice, sent by the server. */
+export interface AudioOptions {
+    /** Gemini prebuilt voices; trait = translation key settings.ai.voice.traits.<trait> */
+    voices: { name: string; trait: string }[];
+    styles: VoiceStyle[];
+    paces: VoicePace[];
+    defaults: { voice: string; characterVoice: string; style: VoiceStyle; pace: VoicePace; multiSpeaker: boolean };
+    agePresets: Record<string, { style: Exclude<VoiceStyle, 'auto'>; pace: Exclude<VoicePace, 'auto'> }>;
+}
+
 /** Settings saved on the server. null = not set: the .env value (or the code default) applies. */
 export interface AppSettings {
     ai: {
@@ -61,6 +83,7 @@ export interface AppSettings {
         geminiTimeoutMs: number | null;
         geminiWeekTimeoutMs: number | null;
         ollamaTimeoutMs: number | null;
+        audio: AudioSettings;
     };
     storage: {
         autoBackup: { enabled: boolean; frequency: BackupFrequency; keep: number };
@@ -71,7 +94,7 @@ export interface AppSettings {
 
 /** Partial update sent to PUT /api/settings. */
 export type AppSettingsUpdate = {
-    ai?: Partial<AppSettings['ai']>;
+    ai?: Partial<Omit<AppSettings['ai'], 'audio'>> & { audio?: Partial<AudioSettings> };
     storage?: {
         autoBackup?: Partial<AppSettings['storage']['autoBackup']>;
         orphanPurge?: Partial<AppSettings['storage']['orphanPurge']>;
@@ -100,6 +123,7 @@ export interface AppSettingsResponse {
         ollama: { baseUrl: string; model: string; timeoutMs: number };
     };
     geminiKeyConfigured: boolean;
+    audioOptions: AudioOptions;
 }
 
 export interface PausedModel {
@@ -126,6 +150,8 @@ export interface QuotaUsage {
     dayStart: string;
     days: number;
     models: ModelQuotaUsage[];
+    /** Audio generations left today on the configured TTS models; null when unknown */
+    audioRemaining: number | null;
 }
 
 export interface OllamaTestResult {

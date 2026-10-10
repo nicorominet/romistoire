@@ -35,6 +35,14 @@ router.get('/quota-usage', settingsController.getQuotaUsage);
 router.post('/test-ollama', settingsController.testOllama);
 
 /**
+ * POST /api/settings/audio-preview
+ * Short reading of a sample sentence, not stored.
+ * @param {Object} req.body - { voice, characterVoice, style, pace, multiSpeaker, ageGroup } (missing fields: saved settings).
+ * @returns {Buffer} The audio file (Content-Type audio/wav or the model's format).
+ */
+router.post('/audio-preview', settingsController.previewVoice);
+
+/**
  * GET /api/settings/storage-stats
  * Library counts, disk usage and backups summary.
  */

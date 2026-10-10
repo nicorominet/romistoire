@@ -104,6 +104,8 @@ export interface PaginationParams {
   editStatus?: string;
   reviewStatus?: string;
   generationJobId?: string;
+  /** List order: program (week, day, age), recent, modified, title */
+  sort?: string;
 }
 
 /**

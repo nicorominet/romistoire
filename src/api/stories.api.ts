@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '@/constants';
 import { Story, PaginationParams, StoryWithIllustrations, StoryVersion } from '../types/Story';
 import { PaginatedResponse, ApiResponse } from '../types/Api';
 import { Illustration } from '../types/Story';
+import { AudioSettings } from '../types/system.types';
 
 export const storyApi = {
   /**
@@ -76,10 +77,11 @@ export const storyApi = {
   /**
    * Generate audio for a story.
    * @param {string} id - The ID of the story.
+   * @param {Partial<AudioSettings>} [voice] - Reading voice for this story only (missing fields: saved settings).
    * @returns {Promise<any>} The generated audio data or confirmation.
    */
-  generateAudio: async (id: string) => {
-      const response = await client.post(`${API_ENDPOINTS.STORIES}/${id}/audio`);
+  generateAudio: async (id: string, voice: Partial<AudioSettings> = {}) => {
+      const response = await client.post(`${API_ENDPOINTS.STORIES}/${id}/audio`, voice);
       return response.data;
   },
 

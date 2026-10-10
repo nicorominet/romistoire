@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileJson, ImagePlus, Loader2, RefreshCw, Sparkles, Square, Wand2 } from "lucide-react";
+import { Download, FileJson, Image, ImagePlus, Loader2, MoreHorizontal, RefreshCw, Sparkles, Square, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import PageLayout from "@/components/Layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,12 @@ import { shrinkImage } from "@/utils/illustrationImport";
 import { IllustrationTodoRow } from "@/components/Illustrations/IllustrationTodoRow";
 import { IllustrationImportDialog } from "@/components/Illustrations/IllustrationImportDialog";
 import { CanvasToolDialog } from "@/components/Illustrations/CanvasToolDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /** Flash Lite allows 15 requests per minute: one prompt every 5 s stays below. */
 const BATCH_PACE_MS = 5000;
@@ -50,6 +56,8 @@ const IllustrationsPage = () => {
   const [canvasOpen, setCanvasOpen] = useState(false);
 
   const missingPrompts = items.filter(item => !item.illustration_prompt);
+  const illustratedCount = items.filter(item => item.illustrationCount > 0).length;
+  const hasActiveFilters = weekNumber !== undefined || ageGroup !== "all" || hasImage !== "no";
 
   const updateItem = (id: string, changes: Partial<IllustrationTodo>) =>
     queryClient.setQueryData<IllustrationTodo[]>(queryKey, current => current?.map(item => (item.id === id ? { ...item, ...changes } : item)));
@@ -136,14 +144,94 @@ const IllustrationsPage = () => {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-5xl space-y-6">
-        <header>
-          <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">{t("illustrations.title")}</h1>
-          <p className="text-muted-foreground">{t("illustrations.subtitle")}</p>
+      <div className="space-y-7">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">{t("illustrations.title")}</h1>
+            <p className="mt-1 max-w-3xl text-muted-foreground">{t("illustrations.subtitle")}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {batch ? (
+              <Button type="button" variant="destructive" onClick={() => { stopBatch.current = true; }}>
+                <Square className="mr-2 h-4 w-4" />
+                {t("illustrations.stopBatch", { done: batch.done, total: batch.total })}
+              </Button>
+            ) : (
+              <Button type="button" onClick={generateMissing} disabled={missingPrompts.length === 0 || generatingIds.size > 0}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                {t("illustrations.createMissing", { count: missingPrompts.length })}
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={() => setImportOpen(true)} disabled={items.length === 0}>
+              <ImagePlus className="mr-2 h-4 w-4" />
+              {t("illustrations.importImages")}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setCanvasOpen(true)}>
+              <Wand2 className="mr-2 h-4 w-4" />
+              {t("illustrations.canvas.button")}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" aria-label={t("illustrations.moreActions")} title={t("illustrations.moreActions")}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => exportPrompts("txt")} disabled={items.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t("illustrations.exportTxt")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportPrompts("json")} disabled={items.length === 0}>
+                  <FileJson className="mr-2 h-4 w-4" />
+                  {t("illustrations.exportJson")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={refresh} disabled={isFetching}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                  {t("illustrations.refresh")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
-        <section className="space-y-4 rounded-lg border bg-card p-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-3" aria-label={t("illustrations.overview")}>
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-sm text-muted-foreground">{t("illustrations.storiesShown")}</p>
+            <p className="mt-1 text-2xl font-semibold">{isLoading ? "—" : items.length}</p>
+          </div>
+          <div className="rounded-xl border border-story-purple-200 bg-story-purple-50/70 p-4 dark:border-story-purple-800 dark:bg-story-purple-950/30">
+            <p className="text-sm text-muted-foreground">{t("illustrations.promptsToCreate")}</p>
+            <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-story-purple-800 dark:text-story-purple-200">
+              <Sparkles className="h-5 w-5" />{isLoading ? "—" : missingPrompts.length}
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-sm text-muted-foreground">{t("illustrations.storiesWithImages")}</p>
+            <p className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+              <Image className="h-5 w-5 text-green-600" />{isLoading ? "—" : illustratedCount}
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-semibold">{t("illustrations.filtersTitle")}</h2>
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setWeekNumber(undefined);
+                  setAgeGroup("all");
+                  setHasImage("no");
+                }}
+              >
+                {t("illustrations.resetFilters")}
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">
               <Label htmlFor="illustrations-week">{t("illustrations.filters.week")}</Label>
               <Input
@@ -180,42 +268,17 @@ const IllustrationsPage = () => {
               </Select>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => exportPrompts("txt")} disabled={items.length === 0}>
-              <Download className="mr-2 h-4 w-4" />
-              {t("illustrations.exportTxt")}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => exportPrompts("json")} disabled={items.length === 0}>
-              <FileJson className="mr-2 h-4 w-4" />
-              {t("illustrations.exportJson")}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setCanvasOpen(true)}>
-              <Wand2 className="mr-2 h-4 w-4" />
-              {t("illustrations.canvas.button")}
-            </Button>
-            <Button type="button" onClick={() => setImportOpen(true)} disabled={items.length === 0}>
-              <ImagePlus className="mr-2 h-4 w-4" />
-              {t("illustrations.importImages")}
-            </Button>
-            {batch ? (
-              <Button type="button" variant="destructive" onClick={() => { stopBatch.current = true; }}>
-                <Square className="mr-2 h-4 w-4" />
-                {t("illustrations.stopBatch", { done: batch.done, total: batch.total })}
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" onClick={generateMissing} disabled={missingPrompts.length === 0 || generatingIds.size > 0}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {t("illustrations.createMissing", { count: missingPrompts.length })}
-              </Button>
-            )}
-            <Button type="button" variant="ghost" onClick={refresh} disabled={isFetching} title={t("illustrations.refresh")}>
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-          {batch && <Progress value={(batch.done / Math.max(batch.total, 1)) * 100} />}
-          <p className="text-xs text-muted-foreground">{t("illustrations.howTo")}</p>
         </section>
+
+        {batch && (
+          <div className="space-y-2 rounded-lg border bg-card p-4" role="status">
+            <div className="flex justify-between text-sm">
+              <span>{t("illustrations.createMissing", { count: batch.total })}</span>
+              <span>{batch.done}/{batch.total}</span>
+            </div>
+            <Progress value={(batch.done / Math.max(batch.total, 1)) * 100} />
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
@@ -225,9 +288,7 @@ const IllustrationsPage = () => {
           </p>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">
-              {t("illustrations.count", { count: items.length, done: attached.size })}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("illustrations.count", { count: items.length, done: attached.size })}</p>
             <ul className="space-y-3">
               {items.map(item => (
                 <IllustrationTodoRow

@@ -10,7 +10,7 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> & { className?: string }
 >(
-  ({ className, sideOffset = 4, ...props }, ref): JSX.Element => (
+  ({ className, sideOffset = 4, ...props }, ref): React.JSX.Element => (
   <TooltipPrimitive.Content
     ref={ref}
     sideOffset={sideOffset}

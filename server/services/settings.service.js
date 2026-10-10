@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { ENV_CONFIG } from '../config/env.config.js';
 import { ValidationError } from '../middleware/error.middleware.js';
+import { PACES, STYLES, VOICE_NAMES } from './helpers/voice.helper.js';
 
 // Settings > AI generation / Storage. Gitignored: it may hold local URLs.
 const SETTINGS_FILE = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'config', 'app-settings.json');
@@ -21,7 +22,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
     creativity: null,          // temperature, 0.2 - 1.2
     geminiTimeoutMs: null,     // one story
     geminiWeekTimeoutMs: null, // a whole week in one answer
-    ollamaTimeoutMs: null
+    ollamaTimeoutMs: null,
+    // Reading voice of the audio stories (null = code default, see voice.helper DEFAULT_AUDIO)
+    audio: { voice: null, characterVoice: null, style: null, pace: null, multiSpeaker: null }
   },
   storage: {
     autoBackup: { enabled: false, frequency: 'daily', keep: 5 },
@@ -90,7 +93,14 @@ const SCHEMA = {
     creativity: nullable(number(0.2, 1.2)),
     geminiTimeoutMs: nullable(integer(10000, 900000)),
     geminiWeekTimeoutMs: nullable(integer(10000, 1800000)),
-    ollamaTimeoutMs: nullable(integer(10000, 3600000))
+    ollamaTimeoutMs: nullable(integer(10000, 3600000)),
+    audio: {
+      voice: nullable(oneOf(VOICE_NAMES)),
+      characterVoice: nullable(oneOf(VOICE_NAMES)),
+      style: nullable(oneOf(STYLES)),
+      pace: nullable(oneOf(PACES)),
+      multiSpeaker: nullable(bool)
+    }
   },
   storage: {
     autoBackup: { enabled: bool, frequency: oneOf(BACKUP_FREQUENCIES), keep: integer(1, 50) },

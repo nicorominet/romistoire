@@ -1,8 +1,9 @@
-import '@testing-library/jest-dom';
+// The /vitest entry types the matchers on Vitest's expect (the main entry types Jest's)
+import '@testing-library/jest-dom/vitest';
 
 // Polyfill ResizeObserver globally if needed, though it's already in the test file.
 // Moving it here is cleaner for future tests.
-global.ResizeObserver = class ResizeObserver {
+globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}

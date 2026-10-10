@@ -132,11 +132,53 @@
     "rights": "Tous droits réservés"
   },
   "home": {
-    "badge": "Libérez votre imagination",
-    "browse": "Parcourir la bibliothèque",
-    "cta": "Créez votre première histoire",
-    "subtitle": "Une plateforme éducative pour créer des histoires illustrées",
-    "welcome": "Bienvenue sur Romistoire"
+    "cellAvailable": "{{day}} · {{age}} · {{title}}",
+    "cellMissing": "{{day}} · {{age}} · histoire manquante : générer",
+    "cellReview": "{{day}} · {{age}} · à relire : {{title}}",
+    "generate": "Générer",
+    "legendAvailable": "Disponible",
+    "legendMissing": "Manquante",
+    "legendReview": "À relire",
+    "libraryTitle": "Bibliothèque",
+    "noTopic": "Aucun thème cette semaine · en choisir un",
+    "plannerAge": "Tranche d'âge",
+    "plannerCaption": "Histoires de la semaine {{week}} par âge et par jour",
+    "plannerCovered": "{{covered}}/{{total}} créneaux",
+    "plannerDaysCovered": "Jours couverts",
+    "plannerGenerate": "Générer les {{count}} manquantes",
+    "plannerNext": "Semaine suivante",
+    "plannerPrevious": "Semaine précédente",
+    "plannerTitle": "Planning",
+    "plannerToday": "Cette semaine",
+    "retry": "Réessayer",
+    "statsIllustrated": "illustrées",
+    "statsSeries": "séries",
+    "statsStories": "histoires",
+    "statsThemes": "étiquettes",
+    "taskGenerateDetail": "Générer seulement les créneaux vides",
+    "taskJob": "Génération en cours · {{percent}} %",
+    "taskNextTopic": "Semaine {{week}} : aucun thème",
+    "taskNextTopicDetail": "À définir avant de générer la semaine prochaine",
+    "taskNextWeek": "Semaine {{week}} : {{count}} histoires à préparer",
+    "taskNoImage": "{{count}} histoires sans illustration",
+    "taskNoImageOne": "1 histoire sans illustration",
+    "taskNoImageDetail": "Ouvrir l'atelier d'illustrations",
+    "taskReview": "{{count}} histoires à relire",
+    "taskReviewOne": "1 histoire à relire",
+    "taskReviewDetail": "Écrites par l'IA, en attente d'une lecture",
+    "taskThisWeek": "{{count}} histoires manquantes cette semaine",
+    "tasksDone": "Tout est à jour. Rien à faire pour l'instant.",
+    "tasksError": "Certaines tâches n'ont pas pu être chargées.",
+    "tasksTitle": "À faire",
+    "toReview": "à relire",
+    "todayAll": "Toute la semaine",
+    "todayMissing": "Pas encore d'histoire",
+    "todayOthers": "+ {{count}} autre(s) version(s)",
+    "todayTitle": "Les histoires du jour",
+    "topic": "Thème : {{topic}}",
+    "weekError": "Impossible de charger les histoires de la semaine.",
+    "weekLabel": "Semaine {{week}}",
+    "write": "Écrire une histoire"
   },
   "languages": {
     "en": "Anglais",
@@ -464,7 +506,63 @@
       "timeoutOllama": "Ollama",
       "timeoutsHint": "La valeur affichée en gris est celle actuellement utilisée. Laissez le champ vide pour revenir à la configuration par défaut.",
       "timeoutRange": "Valeur autorisée : {{min}} à {{max}} secondes.",
-      "timeoutInvalid": "Saisissez une durée entre {{min}} et {{max}} secondes, avec une précision maximale d'une milliseconde."
+      "timeoutInvalid": "Saisissez une durée entre {{min}} et {{max}} secondes, avec une précision maximale d'une milliseconde.",
+      "voice": {
+        "title": "Voix de lecture",
+        "description": "Voix, style et débit des histoires audio. Vous pourrez les changer pour une histoire au moment de générer son audio.",
+        "voice": "Voix",
+        "narratorVoice": "Voix du narrateur",
+        "characterVoice": "Voix des personnages",
+        "style": "Style",
+        "pace": "Débit",
+        "autoHint": "Automatique : calme et lent jusqu'à 6 ans, conteur pour 7-12 ans, naturel pour les adolescents.",
+        "autoHintAge": "Automatique pour {{age}} : {{style}}, débit {{pace}}.",
+        "multiSpeaker": "Lecture à deux voix",
+        "multiSpeakerHint": "Une voix pour la narration, une autre pour les dialogues. Les répliques sont repérées par l'IA (un appel en plus).",
+        "preview": "Écouter un extrait",
+        "previewStop": "Arrêter",
+        "previewError": "Impossible de lire l'extrait. Vérifiez la clé API ou réessayez.",
+        "styles": {
+          "auto": "Automatique (selon l'âge)",
+          "storyteller": "Conteur chaleureux",
+          "calm": "Calme et doux",
+          "lively": "Vivant et joyeux",
+          "dramatic": "Plein de suspense",
+          "neutral": "Naturel"
+        },
+        "paces": {
+          "auto": "Selon l'âge",
+          "slow": "lent",
+          "normal": "normal",
+          "lively": "rapide"
+        },
+        "traits": {
+          "warm": "chaleureuse",
+          "gentle": "douce",
+          "soft": "feutrée",
+          "friendly": "amicale",
+          "upbeat": "enjouée",
+          "lively": "vive",
+          "youthful": "jeune",
+          "breezy": "légère",
+          "bright": "lumineuse",
+          "excitable": "énergique",
+          "easyGoing": "détendue",
+          "casual": "décontractée",
+          "smooth": "veloutée",
+          "breathy": "soufflée",
+          "clear": "claire",
+          "even": "posée",
+          "mature": "mûre",
+          "knowledgeable": "savante",
+          "informative": "informative",
+          "firm": "ferme",
+          "forward": "directe",
+          "gravelly": "rocailleuse"
+        },
+        "audioRemaining": "Audio : {{count}} génération(s) restante(s) aujourd'hui (chaque extrait nouveau en compte une).",
+        "audioExhausted": "Quota audio épuisé jusqu'à {{time}} (minuit, heure du Pacifique)."
+      }
     },
     "storage": {
       "tab": "Stockage",
@@ -552,13 +650,32 @@
     "withImage": "Avec illustration",
     "withoutImage": "Sans illustration",
     "withAudio": "Avec audio",
-    "withoutAudio": "Sans audio"
+    "withoutAudio": "Sans audio",
+    "count": "{{count}} histoires",
+    "countOne": "1 histoire",
+    "sort": {
+      "label": "Trier",
+      "program": "Ordre du programme",
+      "recent": "Plus récentes",
+      "modified": "Modifiées récemment",
+      "title": "Titre (A → Z)"
+    },
+    "view": {
+      "label": "Affichage",
+      "grid": "Cartes",
+      "list": "Liste"
+    },
+    "filtersActive": "{{count}} filtre(s) actif(s)",
+    "removeFilter": "Retirer le filtre {{filter}}",
+    "clearAll": "Tout effacer",
+    "language": "Langue",
+    "allLanguages": "Toutes les langues",
+    "modifiedOn": "Modifiée le {{date}}"
   },
   "story": {
     "ageGroup": "Tranche d'âge",
     "allSeries": "Toutes les séries",
     "series": "Séries",
-    "characterCount": "{{count}} caractères",
     "content": "Contenu de l'histoire",
     "created": "Créée le",
     "createIllustration": "Créer une illustration",
@@ -624,7 +741,8 @@
       "error": "Impossible de générer l'audio",
       "errorDesc": "Vérifiez la clé API ou réessayez.",
       "unsupported": "Votre navigateur ne supporte pas la lecture audio.",
-      "willBeDeleted": "Cette histoire a un audio : il sera supprimé à l'enregistrement et devra être régénéré."
+      "willBeDeleted": "Cette histoire a un audio : il sera supprimé à l'enregistrement et devra être régénéré.",
+      "voiceHint": "Ces choix valent pour cette histoire seulement."
     },
     "aliasCreated": "Créneau déjà occupé : l'histoire a été rangée dans la série « {{series}} ».",
     "illustrationsSavedImmediately": "Les illustrations sont enregistrées dès l'envoi ou la suppression, sans attendre le bouton Enregistrer.",
@@ -633,9 +751,6 @@
     "restoreUnsavedWarning": "Les modifications non enregistrées seront perdues.",
     "versionDetails": "Âge : {{age}} · Étiquettes : {{themes}}",
     "noThemes": "Aucune",
-    "inlineImageHint": "Les images insérées par URL font partie du texte. Pour ajouter une illustration à la galerie, utilisez l’onglet Illustrations.",
-    "inlineImageUrlPrompt": "URL de l'image à insérer dans le texte :",
-    "insertImageUrl": "Insérer une image par URL dans le texte",
     "drawing": {
       "brush": "Pinceau",
       "eraser": "Gomme",
@@ -645,7 +760,25 @@
       "save": "Enregistrer"
     },
     "loadError": "Impossible de charger l'histoire.",
-    "contentPlaceholder": "Écrivez votre histoire…"
+    "contentPlaceholder": "Écrivez votre histoire…",
+    "hasAudio": "Audio disponible",
+    "detail": {
+      "back": "Mes histoires",
+      "moreActions": "Plus d'actions",
+      "textSmaller": "Texte plus petit",
+      "textLarger": "Texte plus grand",
+      "readingMode": "Lecture",
+      "exitReading": "Quitter la lecture",
+      "toReview": "Écrite par l'IA, en attente de relecture.",
+      "audio": "Audio",
+      "noAudio": "Pas encore d'audio.",
+      "program": "Programme",
+      "series": "Série",
+      "details": "Détails",
+      "modified": "Modifiée le",
+      "weekShort": "S{{week}}",
+      "navigation": "Histoires précédente et suivante"
+    }
   },
   "filters": {
     "title": "Filtres",
@@ -833,6 +966,15 @@
   "illustrations": {
     "title": "Illustrations",
     "subtitle": "Les histoires sans image, avec leur prompt prêt à copier. Créez l'image dans Gemini, ChatGPT ou Copilot, puis collez-la ici.",
+    "overview": "Résumé des illustrations",
+    "storiesShown": "Histoires affichées",
+    "promptsToCreate": "Prompts à préparer",
+    "storiesWithImages": "Histoires avec image",
+    "filtersTitle": "Filtrer les histoires",
+    "resetFilters": "Réinitialiser",
+    "moreActions": "Autres actions",
+    "promptReady": "Prompt prêt",
+    "promptMissing": "Prompt à préparer",
     "howTo": "Copiez le prompt, générez l'image dans votre outil, copiez l'image (clic droit › Copier l'image), cliquez sur la zone de la ligne puis Ctrl+V. Pour un lot : importez les fichiers téléchargés (ou le ZIP de l'outil Gemini Canvas).",
     "week": "Semaine {{week}}",
     "count": "{{count}} histoire(s) · {{done}} image(s) ajoutée(s) ici",
@@ -919,7 +1061,7 @@
       "estimate": "{{units}} semaine(s) × âge à générer : environ {{requests}} requêtes, {{duration}}.",
       "skippedCells": "{{count}} case(s) ignorée(s) (déjà écrites ou sans sujet).",
       "missingTopics": "Semaines sans sujet au programme, ignorées : {{weeks}}.",
-      "quotaWarning": "Au-delà d'environ 20 requêtes par jour, l'offre gratuite épuise chaque modèle Flash : les modèles de repli prennent le relais, puis la génération peut s'arrêter jusqu'au lendemain (les échecs se relancent ensuite).",
+      "quotaWarning": "Il reste environ {{remaining}} requêtes aujourd'hui sur les modèles rapides : au-delà, Gemma (lent) prend le relais, puis la génération s'arrête jusqu'au lendemain (les échecs se relancent ensuite).",
       "launch": "Lancer la génération"
     },
     "status": {
@@ -993,5 +1135,63 @@
     "validated": "Validées",
     "validate": "Valider",
     "validatedToast": "Histoire marquée comme relue."
+  },
+  "editor": {
+    "editTitle": "Modifier « {{title}} »",
+    "unsaved": "Modifications non enregistrées",
+    "discard": "Annuler les modifications",
+    "discardTitle": "Annuler les modifications ?",
+    "discardConfirm": "Le texte et les réglages reviennent à la dernière version enregistrée. Les illustrations, déjà enregistrées, ne changent pas.",
+    "readingStats": "{{words}} mots · ≈ {{minutes}} min de lecture à voix haute",
+    "slotTaken": "Ce créneau (semaine, jour, âge, langue) est déjà pris dans cette série par",
+    "slotAlias": "En enregistrant, l'histoire sera placée dans une série alias.",
+    "generateHint": "Pour écrire avec l'IA, utilisez la génération.",
+    "sections": {
+      "program": "Programme",
+      "classification": "Classement"
+    },
+    "notes": {
+      "review": "Enregistrer validera aussi la relecture de cette histoire."
+    },
+    "history": {
+      "title": "Versions précédentes",
+      "empty": "Pas encore d'autre version.",
+      "view": "Voir",
+      "restore": "Restaurer cette version"
+    },
+    "diff": {
+      "tab": "Différences",
+      "fullText": "Texte complet",
+      "title": "Titre : « {{from}} » → « {{to}} »",
+      "age": "Âge : {{from}} → {{to}}",
+      "themesAdded": "Étiquettes qui reviendraient : {{themes}}",
+      "themesRemoved": "Étiquettes retirées : {{themes}}",
+      "sameText": "Même texte que la version actuelle.",
+      "legendAdded": "reviendrait",
+      "legendRemoved": "disparaîtrait",
+      "words": "{{count}} mot(s)"
+    },
+    "toolbar": {
+      "label": "Mise en forme",
+      "text": "Texte de l'histoire",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "bold": "Gras",
+      "italic": "Italique",
+      "section": "Titre de partie",
+      "subsection": "Sous-titre",
+      "bulletList": "Liste à puces",
+      "orderedList": "Liste numérotée",
+      "quote": "Citation",
+      "image": "Insérer une image dans le texte"
+    },
+    "image": {
+      "insert": "Insérer l'illustration {{name}}",
+      "noIllustrations": "Aucune illustration pour l'instant : ajoutez-en dans la section Illustrations, ou collez une adresse.",
+      "url": "Adresse de l'image",
+      "urlPlaceholder": "https://…",
+      "add": "Insérer",
+      "hint": "L'image s'affiche à cet endroit sur la page de l'histoire. Le PDF et l'audio ne gardent que le texte."
+    }
   }
 }

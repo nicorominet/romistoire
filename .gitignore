@@ -34,6 +34,7 @@ public/uploads/*
 # Server Logs & Debug
 server/debug/
 server/logs/
+server/cache/
 coverage/
 
 # Root Uploads

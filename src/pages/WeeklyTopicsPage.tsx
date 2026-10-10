@@ -25,7 +25,7 @@ const WeeklyTopicsPage = () => {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="space-y-6">
         <header>
           <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">{t("weeklyTopics.title")}</h1>
           <p className="text-muted-foreground">{t("weeklyTopics.subtitle")}</p>

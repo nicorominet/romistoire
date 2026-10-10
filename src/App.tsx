@@ -81,7 +81,9 @@ const GlobalLogger = () => {
             const now = Date.now();
             
             // Basic Interaction Log
-            const elementInfo = target.tagName + (target.id ? `#${target.id}` : '') + (target.className ? `.${target.className.split(' ').join('.')}` : '');
+            // getAttribute: on an SVG icon, className is not a string
+            const classes = target.getAttribute?.('class') ?? '';
+            const elementInfo = target.tagName + (target.id ? `#${target.id}` : '') + (classes ? `.${classes.split(' ').join('.')}` : '');
             logger.info('UI_INTERACTION', `Click on ${elementInfo}`, {
                 x: e.clientX,
                 y: e.clientY,
@@ -154,16 +156,14 @@ const router = createBrowserRouter([
       { path: "*", element: <NotFound /> },
     ],
   },
-], {
-  future: { v7_relativeSplatPath: true },
-});
+]);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner />
-      <RouterProvider router={router} future={{ v7_startTransition: true }} />
-      {process.env.NODE_ENV === 'development' && <Suspense fallback={null}><DebugConsole /></Suspense>}
+      <RouterProvider router={router} />
+      {import.meta.env.DEV && <Suspense fallback={null}><DebugConsole /></Suspense>}
     </TooltipProvider>
   </QueryClientProvider>
 );

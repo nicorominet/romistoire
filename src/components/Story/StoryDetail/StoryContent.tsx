@@ -4,9 +4,15 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 
 interface StoryContentProps {
   story: any;
+  /** Reader's text size (A- / A+) */
+  textSizeClass?: string;
 }
 
-const StoryContent = ({ story }: StoryContentProps) => {
+/**
+ * Story text with its illustrations above it (several: a carousel). The illustration descriptions
+ * written in the text are hidden once a picture exists.
+ */
+const StoryContent = ({ story, textSizeClass = "text-lg" }: StoryContentProps) => {
 
   const illustrations = story.illustrations || [];
   const hasIllustrations = illustrations.length > 0;
@@ -17,7 +23,8 @@ const StoryContent = ({ story }: StoryContentProps) => {
   };
 
   const content = story.content || '';
-  const isHtml = /^\s*<p>|^\s*<div>|^\s*<ul>|^\s*<ol>|^\s*<h1>|^\s*<h2>|^\s*<h3>/i.test(content);
+  // Every block the editor writes (a story can start with a quote, a list or a picture), with or without attributes
+  const isHtml = /^\s*<(p|div|ul|ol|h[1-6]|blockquote|img)\b/i.test(content);
 
   // Helper to render content
   const renderContent = () => {
@@ -36,11 +43,11 @@ const StoryContent = ({ story }: StoryContentProps) => {
             );
         }
 
-        return <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />;
+        return <div className={`prose dark:prose-invert max-w-none ${textSizeClass} leading-relaxed text-left`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />;
     } else {
         // Plain Text Logic (Legacy)
         return (
-            <div className="prose dark:prose-invert max-w-none mx-auto text-lg leading-relaxed text-left">
+            <div className={`prose dark:prose-invert max-w-none ${textSizeClass} leading-relaxed text-left`}>
                 {content.split('\n')
                     .map((paragraph: string, index: number) => {
                         const trimmed = paragraph.trim();
@@ -81,12 +88,12 @@ const StoryContent = ({ story }: StoryContentProps) => {
   return (
     <div className="space-y-8">
       {hasIllustrations && (
-        <div className="mb-6 md:float-left md:w-1/2 lg:w-5/12 md:mr-8 rounded-xl overflow-hidden shadow-lg border border-border clear-left group relative">
+        <div className="group relative overflow-hidden rounded-xl border border-border shadow-lg">
           {illustrations.length === 1 ? (
              <img 
                src={`/${getSafePath(illustrations[0])}`} 
                alt={story.title}
-               className="w-full h-auto object-cover"
+               className="max-h-[28rem] w-full object-cover"
                onError={(e) => {
                    const target = e.target as HTMLImageElement;
                    if (!target.src.includes('placeholder')) {

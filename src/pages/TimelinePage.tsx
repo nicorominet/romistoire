@@ -278,7 +278,7 @@ const TimelinePage: React.FC = () => {
   const StoryCard = ({ storyForDay }: { storyForDay: Story }) => (
       <div className="relative group w-full h-full"> 
           <Link to={APP_ROUTES.STORY_DETAIL(storyForDay.id)} className="story-card-link w-full h-full block">
-            <Card className="story-card hover-scale h-full flex flex-col transition-all duration-300 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-white/50 dark:border-white/10 hover:bg-white/90 dark:hover:bg-slate-800/80 hover:shadow-lg shadow-sm">
+            <Card className="hover-scale h-full flex flex-col transition-all duration-300 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-white/50 dark:border-white/10 hover:bg-white/90 dark:hover:bg-slate-800/80 hover:shadow-lg shadow-sm">
               <CardHeader className="p-2 space-y-1">
                 <div className="flex justify-between items-start gap-1">
                   <div className="flex items-center text-story-purple-600 dark:text-story-purple-400">

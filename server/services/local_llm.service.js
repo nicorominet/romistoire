@@ -64,7 +64,7 @@ class LocalLLMService {
                 system,
                 prompt: prompt,
                 // Constrained JSON output (Ollama >= 0.5); the first day of a week also returns the week plan
-                format: jsonSchema({ withWeekPlan: PromptHelper.wantsWeekPlan(params), storyCount: day === ALL_WEEK ? STORY_DAYS.length : 0 }),
+                format: jsonSchema({ withWeekPlan: PromptHelper.wantsWeekPlan(params), withCharacters: PromptHelper.wantsCharacters(params), storyCount: day === ALL_WEEK ? STORY_DAYS.length : 0 }),
                 stream: false, // We want full response
                 options: {
                     temperature: settingsService.ai.creativity ?? STORY_TEMPERATURE,

@@ -107,6 +107,8 @@ router.put('/:id/illustrations/order', storyController.reorderIllustrations);
  * POST /api/stories/:id/audio
  * Generate audio for a story.
  * @param {string} req.params.id - Story ID.
+ * @param {Object} [req.body] - Reading voice for this story only: { voice, characterVoice, style, pace, multiSpeaker }
+ *   (missing fields: Settings > AI > reading voice). 400 with `fields` when a value is unknown.
  * @returns {Object} Audio path.
  */
 router.post('/:id/audio', storyController.generateAIStoryAudio || storyController.generateAudio); // Using the exported name generateAudio

@@ -5,6 +5,8 @@ import { localLLMService, OLLAMA_DEFAULTS } from '../services/local_llm.service.
 import { systemService } from '../services/system.service.js';
 import { backupService } from '../services/backup.service.js';
 import { aiUsageService } from '../services/ai_usage.service.js';
+import { voiceSampleService } from '../services/voice_sample.service.js';
+import { AGE_PRESETS, DEFAULT_AUDIO, PACES, STYLES, VOICES, resolveAudioOptions, validateAudioOptions } from '../services/helpers/voice.helper.js';
 
 /**
  * Settings as saved, plus the values really in use (after the .env fallback). The Gemini key is never sent.
@@ -33,7 +35,9 @@ const publicSettings = () => {
       geminiAudioModels: DEFAULT_AUDIO_MODELS,
       ollama: OLLAMA_DEFAULTS
     },
-    geminiKeyConfigured: Boolean(geminiService.apiKey)
+    geminiKeyConfigured: Boolean(geminiService.apiKey),
+    // Choices of the reading voice, so the client never keeps its own copy
+    audioOptions: { voices: VOICES, styles: STYLES, paces: PACES, defaults: DEFAULT_AUDIO, agePresets: AGE_PRESETS }
   };
 };
 
@@ -54,6 +58,21 @@ export const updateSettings = (req, res) => {
   }
 };
 
+/** Settings > AI > reading voice > Listen: a sample sentence read with the given options (cached on disk). */
+export const previewVoice = async (req, res) => {
+  try {
+    const { ageGroup, ...input } = req.body || {};
+    const { options, errors } = validateAudioOptions(input);
+    if (errors.length > 0) throw new ValidationError('Invalid voice options', { fields: errors });
+    const resolved = resolveAudioOptions(options, settingsService.ai.audio, ageGroup);
+    // A sample already heard is served from the disk cache: no TTS request spent
+    const { audioBuffer, mimeType, cached } = await voiceSampleService.get(resolved, () => geminiService.generateVoiceSample(resolved));
+    res.set('Content-Type', mimeType).set('Cache-Control', 'no-store').set('X-Voice-Sample', cached ? 'cached' : 'generated').send(audioBuffer);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 /** Gemini models paused after an error (quota, overload, timeout) and when they come back. */
 export const getAiStatus = (req, res) => {
   try {
@@ -67,7 +86,9 @@ export const getAiStatus = (req, res) => {
 export const getQuotaUsage = async (req, res) => {
   try {
     const days = Math.min(30, Math.max(1, Number.parseInt(req.query.days, 10) || 7));
-    res.json(await aiUsageService.usage({ days }));
+    const usage = await aiUsageService.usage({ days });
+    // Audio generations left today on the configured TTS models (the rarest quota: 10 a day each)
+    res.json({ ...usage, audioRemaining: await aiUsageService.remainingToday(geminiConfig().audioModels) });
   } catch (error) {
     handleError(res, error);
   }

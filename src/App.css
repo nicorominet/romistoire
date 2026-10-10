@@ -1,8 +1,9 @@
 #root {
-  max-width: 95%;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-align: left;
 }
 
 .logo {
@@ -47,7 +48,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 98%;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -55,7 +56,6 @@
   display: flex;
   justify-content: space-between;
   width: 100%;
-  max-width: 800px;
   margin-bottom: 1rem;
 }
 

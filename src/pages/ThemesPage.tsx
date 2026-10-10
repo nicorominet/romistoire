@@ -44,7 +44,7 @@ const ThemesPage = () => {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="space-y-6">
         <header>
           <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">{t("themes.pageTitle")}</h1>
           <p className="text-muted-foreground">{t("themes.pageSubtitle")}</p>

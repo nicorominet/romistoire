@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-
-expect.extend(matchers);
+// jest-dom matchers come from src/setupTests.ts
 
 // Simple component for smoke test
 const TestComponent = () => <div>Hello Test World</div>;

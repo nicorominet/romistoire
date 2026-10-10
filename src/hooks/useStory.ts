@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storyApi, storyReviewApi } from '../api/stories.api';
+import { AudioSettings } from '../types/system.types';
 
 export const useStory = (id: string) => {
   return useQuery({
@@ -60,9 +61,11 @@ export const useStoryMutations = () => {
     });
 
     const generateAudio = useMutation({
-        mutationFn: async (id: string) => (await storyApi.generateAudio(id)) as any,
-        onSuccess: (data, id) => {
+        mutationFn: async ({ id, voice }: { id: string; voice?: Partial<AudioSettings> }) => (await storyApi.generateAudio(id, voice)) as any,
+        onSuccess: (data, { id }) => {
              queryClient.invalidateQueries({ queryKey: ['story', id] });
+             // One TTS request spent (10 a day per model)
+             queryClient.invalidateQueries({ queryKey: ['quota-usage'] });
         }
     });
 

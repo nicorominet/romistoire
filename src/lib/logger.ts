@@ -58,7 +58,7 @@ class LoggerService {
         }
 
         // Also log to console for local debugging
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
             const style = level === 'ERROR' ? 'color: red' : level === 'WARN' ? 'color: orange' : 'color: blue';
             console.log(`%c[${category}] ${message}`, style, data || '');
         }

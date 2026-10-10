@@ -258,7 +258,8 @@ class ThemeService {
        WHERE needs_review = TRUE AND id IN (${unique.map(() => '?').join(', ')})`,
       [now(), ...unique]
     );
-    const validated = Number(result[0]?.affectedRows || 0);
+    // query() returns the result header itself (not mysql2's [result, fields] pair)
+    const validated = Number(result?.affectedRows || 0);
     if (validated > 0) this.invalidateCache();
     return validated;
   }

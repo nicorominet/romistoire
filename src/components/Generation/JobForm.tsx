@@ -230,7 +230,7 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
               )}
               {estimate.quotaWarning && (
                 <p className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t("generation.form.quotaWarning")}
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t("generation.form.quotaWarning", { remaining: String(estimate.remainingRequests ?? 0) })}
                 </p>
               )}
             </div>

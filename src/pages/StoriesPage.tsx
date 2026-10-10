@@ -1,20 +1,22 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type JSX } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { i18n } from '@/lib/i18n';
-import { Story, AgeGroup } from '@/types/Story';
+import { AgeGroup } from '@/types/Story';
 import { Theme, WeeklyTheme } from '@/types/Theme';
 import { Series } from '@/types/Series';
 import PageLayout from '@/components/Layout/PageLayout';
 import PDFExport from '@/components/Common/PDFExport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Book, FileText } from 'lucide-react';
+import { Book, FileText, LayoutGrid, List } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { storiesLocale } from '@/components/Home/useWeekStories';
 import 'flag-icons/css/flag-icons.min.css';
 import { APP_ROUTES } from '@/constants';
 
 // New Components
 import StoriesHeader from '@/components/Story/StoriesList/StoriesHeader';
 import StoriesSearch from '@/components/Story/StoriesList/StoriesSearch';
-import StoriesListGrid from '@/components/Story/StoriesList/StoriesGrid';
+import StoriesListGrid, { StoriesView } from '@/components/Story/StoriesList/StoriesGrid';
 
 // Hooks
 import { useInfiniteStories } from '@/hooks/useStories';
@@ -22,6 +24,18 @@ import { useThemes, useWeeklyThemes } from '@/hooks/useThemes';
 import { useSeries } from '@/hooks/useSeries';
 
 const { t } = i18n;
+
+const SORTS = ['program', 'recent', 'modified', 'title'] as const;
+const VIEW_STORAGE_KEY = 'stories.view';
+
+/** Last view chosen (per browser convenience; the URL wins). */
+const storedView = (): StoriesView => {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+};
 
 const StoriesPage = (): JSX.Element => {
   const navigate = useNavigate();
@@ -53,12 +67,19 @@ const StoriesPage = (): JSX.Element => {
   // Stories of one mass generation job (link from the Generation page)
   const generationJobId = searchParams.get('generationJobId') || '';
   const debouncedSearchTerm = searchParams.get('search') || '';
+  // Language of the UI by default; 'all' lists every language
+  const defaultLocale = storiesLocale();
+  const selectedLocale = searchParams.get('locale') || defaultLocale;
+  const requestedSort = searchParams.get('sort');
+  const selectedSort = SORTS.find((sort) => sort === requestedSort) ?? 'program';
+  const view: StoriesView = searchParams.get('view') === 'list' ? 'list' : searchParams.get('view') === 'grid' ? 'grid' : storedView();
   const [searchTerm, setSearchTerm] = useState<string>(debouncedSearchTerm);
 
   // Computed Params for Query
   const queryParams = useMemo(() => ({
       limit: 12, // Page size
-      // locale: undefined, // Fetch all locales
+      locale: selectedLocale,
+      sort: selectedSort,
       theme: selectedTheme !== 'all' ? selectedTheme : '',
       ageGroup: selectedAgeGroup,
       weekNumber: selectedWeekNumber?.toString() || '',
@@ -71,7 +92,7 @@ const StoriesPage = (): JSX.Element => {
       reviewStatus: selectedReviewStatus !== 'all' ? selectedReviewStatus : '',
       generationJobId,
       search: debouncedSearchTerm
-  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, selectedSource, selectedEditStatus, selectedReviewStatus, generationJobId, debouncedSearchTerm]);
+  }), [selectedTheme, selectedAgeGroup, selectedWeekNumber, selectedDayOfWeek, hasImage, hasAudio, selectedSeries, selectedSource, selectedEditStatus, selectedReviewStatus, generationJobId, debouncedSearchTerm, selectedLocale, selectedSort]);
 
   // React Query Hooks
   const { 
@@ -156,30 +177,56 @@ const StoriesPage = (): JSX.Element => {
   const handleReviewStatusChange = (value: string) => setFilter('reviewStatus', value);
   const handleSearch = () => setFilter('search', searchTerm.trim() || null);
   
+  const handleLocaleChange = (locale: string) => setFilter('locale', locale === defaultLocale ? null : locale);
+  const handleSortChange = (sort: string) => setFilter('sort', sort === 'program' ? null : sort);
+  const handleViewChange = (next: StoriesView) => {
+    try { localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* storage unavailable */ }
+    setFilter('view', next);
+  };
+
+  // Filters only: the sort and the view are kept
   const handleResetFilters = () => {
     setSearchTerm('');
-    setSearchParams(new URLSearchParams(), { replace: true });
+    const kept = new URLSearchParams();
+    ['sort', 'view'].forEach((key) => { const value = searchParams.get(key); if (value) kept.set(key, value); });
+    setSearchParams(kept, { replace: true });
   };
 
   const handleCreateStory = () => navigate(APP_ROUTES.CREATE_STORY);
 
-  const groupedStories = useMemo(() => {
-    return stories.filter(Boolean).reduce((acc, story) => {
-      if (!story) return acc; // Safety check
-      if (!acc[story.locale]) {
-        acc[story.locale] = [];
-      }
-      acc[story.locale].push(story);
-      return acc;
-    }, {} as { [key: string]: Story[] });
-  }, [stories]);
+  const viewButtonClass = (active: boolean) =>
+    `flex h-10 w-10 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-story-purple-400 ${
+      active ? 'bg-story-purple-600 text-white' : 'bg-white/50 text-gray-600 hover:bg-story-purple-50 dark:bg-slate-800/50 dark:text-gray-300'
+    }`;
 
-  
+  // Sort and view, next to the search
+  const toolbar = (
+    <>
+      <Select value={selectedSort} onValueChange={handleSortChange}>
+        <SelectTrigger className="h-10 w-auto min-w-[11rem] bg-white/50 dark:bg-slate-800/50" aria-label={t('stories.sort.label')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SORTS.map((sort) => <SelectItem key={sort} value={sort}>{t(`stories.sort.${sort}`)}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <div className="flex overflow-hidden rounded-md border border-gray-200 dark:border-gray-700" role="group" aria-label={t('stories.view.label')}>
+        <button type="button" className={viewButtonClass(view === 'grid')} aria-pressed={view === 'grid'} title={t('stories.view.grid')} aria-label={t('stories.view.grid')} onClick={() => handleViewChange('grid')}>
+          <LayoutGrid className="h-4 w-4" />
+        </button>
+        <button type="button" className={viewButtonClass(view === 'list')} aria-pressed={view === 'list'} title={t('stories.view.list')} aria-label={t('stories.view.list')} onClick={() => handleViewChange('list')}>
+          <List className="h-4 w-4" />
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <PageLayout>
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           <StoriesHeader
             totalStories={totalStories}
+            loaded={!isStoriesLoading}
             handleCreateStory={handleCreateStory}
           />
           <StoriesSearch
@@ -210,6 +257,8 @@ const StoriesPage = (): JSX.Element => {
             selectedReviewStatus={selectedReviewStatus}
             handleReviewStatusChange={handleReviewStatusChange}
             handleResetFilters={handleResetFilters}
+            localeFilter={{ value: selectedLocale, defaultValue: defaultLocale, onChange: handleLocaleChange }}
+            toolbar={toolbar}
           />
           {generationJobId && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
@@ -236,7 +285,7 @@ const StoriesPage = (): JSX.Element => {
                 loading={isStoriesLoading} 
                 error={storiesError ? (storiesError as Error).message : null}
                 stories={stories}
-                groupedStories={groupedStories}
+                view={view}
                 observerRef={observerTarget}
                 hasMore={!!hasNextPage}
                 handleCreateStory={handleCreateStory}

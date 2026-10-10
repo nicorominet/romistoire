@@ -32,7 +32,7 @@ export const StoryCardSkeleton = () => (
 );
 
 export const StoryDetailSkeleton = () => (
-    <div className="max-w-7xl mx-auto space-y-8 animate-pulse px-4 md:px-6">
+    <div className="space-y-8 animate-pulse">
         {/* Navigation Header */}
         <div className="flex items-center justify-between">
            <Skeleton className="h-10 w-24" />

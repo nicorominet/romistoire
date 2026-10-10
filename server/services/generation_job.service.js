@@ -6,6 +6,8 @@ import { storyService } from './story.service.js';
 import { defaultProvider, PROVIDERS } from './settings.service.js';
 import { ALL_WEEK } from './helpers/prompt.helper.js';
 import { GENERATION_DAYS_FR, GENERATION_MIN_INTERVAL_MS, WEEK_STORY_COUNT, requestsPerUnit } from './helpers/generation_plan.helper.js';
+import { geminiConfig } from './gemini.service.js';
+import { aiUsageService } from './ai_usage.service.js';
 
 export const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
 const MAX_WEEK = 53;
@@ -14,8 +16,6 @@ const MAX_UNITS = MAX_WEEK * AGE_GROUPS.length;
 
 /** Rough length of one request, for the estimate shown before launching (seconds). */
 const ESTIMATED_SECONDS = { gemini: 25, local: 90 };
-/** Daily requests of one Gemini Flash model on the free tier: beyond it, the fallback models take over. */
-export const FLASH_DAILY_QUOTA = 20;
 
 const ACTIVE = ['queued', 'running'];
 const FINISHED = ['done', 'failed', 'cancelled'];
@@ -121,6 +121,9 @@ class GenerationJobService {
   async estimate(input) {
     const params = normalizeJobParams(input);
     const { units, requests, skipped, missingTopics } = await planJob(params);
+    // Free tier: requests left today on the fast models; Gemma (slow, last resort) is left out
+    const fastModels = (params.model ? [params.model] : geminiConfig().models).filter(model => !model.startsWith('gemma-'));
+    const remainingRequests = params.provider === 'gemini' ? await aiUsageService.remainingToday(fastModels) : null;
     return {
       units: units.length,
       toGenerate: units.length - skipped,
@@ -128,8 +131,8 @@ class GenerationJobService {
       missingTopics,
       requests,
       estimatedSeconds: estimateSeconds(requests, params.provider),
-      // Free tier: past ~20 requests a day, each Flash model is exhausted and the next ones are used
-      quotaWarning: params.provider === 'gemini' && requests > FLASH_DAILY_QUOTA
+      remainingRequests,
+      quotaWarning: remainingRequests !== null && requests > remainingRequests
     };
   }
 

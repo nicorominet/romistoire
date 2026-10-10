@@ -30,6 +30,29 @@ class AiUsageService {
   }
 
   /**
+   * Requests left on the current quota day (Pacific time) for the given models, from the indicative
+   * free tier limits. A model that got a daily quota answer today counts as exhausted.
+   * @param {string[]} models
+   * @param {{now?: Date}} [options]
+   * @returns {Promise<number|null>} null when the use is not recorded or a limit is unknown.
+   */
+  async remainingToday(models, { now = new Date() } = {}) {
+    if (!this.enabled || models.length === 0) return null;
+    const limits = models.map(model => ({ model, rpd: modelLimits(model).rpd }));
+    if (limits.some(limit => limit.rpd === null)) return null;
+
+    const rows = await query(
+      "SELECT model, COUNT(*) AS used, SUM(outcome = 'daily_quota') AS exhausted FROM ai_requests WHERE at >= ? GROUP BY model",
+      [toSql(quotaDayStart(now))]
+    );
+    const today = new Map(rows.map(row => [row.model, { used: Number(row.used), exhausted: Number(row.exhausted) > 0 }]));
+    return limits.reduce((total, { model, rpd }) => {
+      const use = today.get(model);
+      return total + (use?.exhausted ? 0 : Math.max(0, rpd - (use?.used ?? 0)));
+    }, 0);
+  }
+
+  /**
    * Use per model over the last days, and over the current quota day (Pacific time).
    * @param {{days?: number, now?: Date}} [options]
    * @returns {Promise<{dayStart: string, days: number, models: Object[]}>}

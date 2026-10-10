@@ -136,7 +136,7 @@ export const reorderIllustrations = async (req, res) => {
 
 export const generateAudio = async (req, res) => {
     try {
-        const audioPath = await storyService.generateAudioForStory(req.params.id);
+        const audioPath = await storyService.generateAudioForStory(req.params.id, req.body || {});
         res.json({ success: true, audioPath });
     } catch (error) {
         if (error.message === 'Story not found') return res.status(404).json({ error: error.message });

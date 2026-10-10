@@ -19,6 +19,14 @@ describe('SettingsService', () => {
     expect(settingsService.get()).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('should save the reading voice and reject an unknown one', () => {
+    const result = settingsService.update({ ai: { audio: { voice: 'Kore', style: 'calm', multiSpeaker: true } } });
+    expect(result.ai.audio).toEqual({ voice: 'Kore', characterVoice: null, style: 'calm', pace: null, multiSpeaker: true });
+
+    expect(() => settingsService.update({ ai: { audio: { voice: 'Robot' } } })).toThrow(ValidationError);
+    expect(settingsService.ai.audio.voice).toBe('Kore');
+  });
+
   it('should merge a partial update and ignore unknown keys', () => {
     const result = settingsService.update({ ai: { defaultProvider: 'local', apiKey: 'nope' }, other: 1 });
 

@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '../constants';
 import {
     AppSettingsResponse,
     AppSettingsUpdate,
+    AudioSettings,
     BackupFile,
     OllamaTestResult,
     PausedModel,
@@ -28,6 +29,10 @@ export const settingsApi = {
 
     /** Lists the models of an Ollama instance (default: the configured one). */
     testOllama: (baseUrl?: string) => client.post<OllamaTestResult>(API_ENDPOINTS.SETTINGS_TEST_OLLAMA, { baseUrl }),
+
+    /** Sample sentence read with these voice options (missing ones: saved settings); not stored. */
+    previewVoice: (options: Partial<AudioSettings> & { ageGroup?: string }, signal?: AbortSignal) =>
+        client.post<Blob>(API_ENDPOINTS.SETTINGS_AUDIO_PREVIEW, options, { responseType: 'blob', signal }),
 
     /** Library counts, disk usage, backups summary. */
     getStorageStats: () => client.get<StorageStats>(API_ENDPOINTS.SETTINGS_STORAGE_STATS),

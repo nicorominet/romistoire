@@ -161,7 +161,7 @@ describe('PromptHelper', () => {
             expect(continuity).toContain('rappelle en une phrase où en était l\'aventure la veille, en nommant le personnage principal');
             expect(continuity).toContain('Les 7 débuts sont tous différents');
             expect(continuity).toContain('Le vendredi résout tous les mystères');
-            expect(week).toContain('au moins 7 paragraphes (7 à 9 paragraphes de 3 à 4 phrases), soit au moins 300 mots (environ 300-450 mots) pour chacune des 7 histoires');
+            expect(week).toContain('au moins 7 paragraphes (7 à 9 paragraphes de 3 à 4 phrases), soit au moins 300 mots (environ 300-450 mots), et jamais plus de 450 mots pour chacune des 7 histoires');
             // Length comes from developed scenes, never from filler paragraphs
             expect(week).toContain('jamais en ajoutant des paragraphes de remplissage');
         });
@@ -233,7 +233,10 @@ describe('PromptHelper', () => {
             expect(PromptHelper.getWeekPeriod(10, 2026)).toBe('début mars, au printemps');
             expect(PromptHelper.getWeekPeriod(99)).toBeNull();
 
-            expect(PromptHelper.buildStoryPrompt({ ...baseParams, weekNumber: 30 })).toMatch(/- Période : semaine 30, .*en été/);
+            const prompt = PromptHelper.buildStoryPrompt({ ...baseParams, weekNumber: 30 });
+            expect(prompt).toMatch(/- Période : .*juillet, en été/);
+            // The week number is not given as such: models wrote "la semaine quarante-deux" in the story
+            expect(prompt).not.toMatch(/semaine 30/);
             expect(PromptHelper.buildStoryPrompt(baseParams)).not.toContain('- Période');
         });
 
@@ -294,6 +297,103 @@ describe('PromptHelper', () => {
             expect(prompt).toContain('FORMAT DE SORTIE');
             ['"stories"', '"day"', '"title"', '"summary"', '"themes"', '"paragraphs"', '"illustration_prompt"']
                 .forEach(field => expect(prompt).toContain(field));
+        });
+    });
+
+    // Fixes from the content audit of October 2026
+    describe('audit rules', () => {
+        const baseParams = { theme: 'Halloween', age: '10-12', day: 'Lundi' };
+
+        it('should not suggest example names and should keep the instructions out of the story', () => {
+            const system = PromptHelper.buildSystemInstruction();
+            // "(Zoé, Léo)" made every week of the 7-18 years have the same two heroes
+            expect(system).not.toMatch(/Zoé|Léo\b/);
+            expect(system).toContain('Prénoms : français et variés');
+            expect(system).toContain('guillemets français, ouverts et fermés');
+            expect(system).toContain('ne parle jamais de la consigne');
+            expect(system).toContain('Un seul temps de récit');
+            expect(PromptHelper.buildStoryPrompt({ ...baseParams, day: 'Toute la semaine', age: '4-6' })).not.toContain('Léa');
+        });
+
+        it('should reserve the names of the other series heroes', () => {
+            const outside = PromptHelper.buildStoryPrompt({ ...baseParams, reservedNames: ['Antonin', 'Léonie'] });
+            expect(outside).toContain('Prénoms réservés aux héros d\'autres séries, à ne pas utiliser : « Antonin », « Léonie ».');
+
+            const inSeries = PromptHelper.buildStoryPrompt({ ...baseParams, seriesName: 'Léonie', reservedNames: ['Antonin', 'Léonie'] });
+            expect(inSeries).toContain('à ne pas utiliser : « Antonin ».');
+            expect(PromptHelper.buildStoryPrompt(baseParams)).not.toContain('Prénoms réservés');
+        });
+
+        it('should give the fixed character sheet of the series', () => {
+            const context = PromptHelper.getSeriesContext('Antonin', 'Antonin : garçon de 3 ans, cheveux bruns, vit avec sa maman.');
+            expect(context).toContain('Série : « Antonin »');
+            expect(context).toContain('Fiche de la série, à respecter à l\'identique (prénoms, âge, apparence, famille, liens entre personnages) : Antonin : garçon de 3 ans');
+            expect(PromptHelper.getSeriesContext('Antonin')).not.toContain('Fiche');
+            expect(PromptHelper.getSeriesContext('')).toBe('');
+        });
+
+        it('should ask a whole week in one answer for its character sheets, with the ties between characters', () => {
+            const params = { ...baseParams, age: '4-6', day: 'Toute la semaine' };
+            expect(PromptHelper.wantsCharacters(params)).toBe(true);
+            expect(PromptHelper.wantsWeekPlan(params)).toBe(false);
+            expect(PromptHelper.wantsCharacters({ ...baseParams, day: 'Mardi', weekSeries: true, previousDays: [{ day: 'Lundi', title: 'A', summary: 'S' }] })).toBe(false);
+
+            const prompt = PromptHelper.buildStoryPrompt(params);
+            expect(prompt).toContain('Un objet JSON avec deux clés : "characters"');
+            expect(prompt).toContain('lien avec les autres personnages');
+            expect(prompt).toContain('Établissez d\'abord la fiche des personnages');
+            expect(prompt).toContain('Les 7 histoires sont toutes différentes');
+        });
+
+        it('should give a maximum length as firm as the minimum', () => {
+            expect(PromptHelper.getLengthRule('2-3')).toContain('au moins 150 mots (environ 150-250 mots), et jamais plus de 250 mots');
+        });
+
+        it('should place the program weeks in the coming months', () => {
+            const october10 = new Date(Date.UTC(2026, 9, 10)); // ISO week 41
+            expect(PromptHelper.yearOfWeek(1, october10)).toBe(2027);
+            expect(PromptHelper.yearOfWeek(40, october10)).toBe(2026);
+            expect(PromptHelper.yearOfWeek(53, october10)).toBe(2026);
+        });
+
+        it('should give the autumn holidays without Halloween before its date', () => {
+            const week43 = PromptHelper.getCalendarRule(43, 2026);
+            expect(week43).toContain('la semaine va du lundi 19 octobre au dimanche 25 octobre 2026');
+            expect(week43).toContain('vacances scolaires de la Toussaint toute la semaine (l\'école reprend le lundi 2 novembre)');
+            expect(week43).not.toContain('Halloween le');
+            expect(week43).toContain('Une fête ne se célèbre que le jour où elle tombe');
+
+            const week44 = PromptHelper.getCalendarRule(44, 2026);
+            expect(week44).toContain('Halloween le samedi 31 octobre');
+            expect(week44).toContain('la Toussaint le dimanche 1er novembre');
+        });
+
+        it('should place Christmas, the holidays and the New Year on their real days', () => {
+            const week51 = PromptHelper.getCalendarRule(51, 2026);
+            expect(week51).not.toContain('Noël le');
+            expect(week51).toContain('vacances scolaires de Noël du samedi 19 décembre au dimanche 3 janvier (l\'école reprend le lundi 4 janvier)');
+
+            const week52 = PromptHelper.getCalendarRule(52, 2026);
+            expect(week52).toContain('le réveillon de Noël le jeudi 24 décembre ; Noël le vendredi 25 décembre');
+            expect(week52).toContain('vacances scolaires de Noël toute la semaine');
+
+            const week53 = PromptHelper.getCalendarRule(53, 2026);
+            expect(week53).toContain('du lundi 28 décembre au dimanche 3 janvier 2027');
+            expect(week53).toContain('la Saint-Sylvestre le jeudi 31 décembre ; le Nouvel An le vendredi 1er janvier');
+        });
+
+        it('should compute Easter and leave a plain school week without events', () => {
+            // Easter 2027: Sunday March 28 (week 12), Easter Monday in the next week
+            expect(PromptHelper.getCalendarRule(12, 2027)).toContain('Cette semaine : Pâques le dimanche 28 mars.');
+            expect(PromptHelper.getCalendarRule(13, 2027)).toContain('le lundi de Pâques le lundi 29 mars');
+            const plain = PromptHelper.getCalendarRule(47, 2026);
+            expect(plain).toContain('la semaine va du lundi 16 novembre au dimanche 22 novembre 2026');
+            expect(plain).not.toContain('Cette semaine');
+            expect(PromptHelper.getCalendarRule(0, 2026)).toBe('');
+        });
+
+        it('should put the calendar in the story prompt', () => {
+            expect(PromptHelper.buildStoryPrompt({ ...baseParams, weekNumber: 43 })).toContain('- Calendrier : la semaine va du lundi');
         });
     });
 });

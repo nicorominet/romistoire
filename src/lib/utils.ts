@@ -70,4 +70,14 @@ function storyPreview(content: string | null | undefined, maxLength: number): st
   return truncateText(storyPlainText(content), maxLength);
 }
 
-export { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, storyPlainText, storyPreview };
+/** Reading aloud to a child: slower than silent reading. */
+const READ_ALOUD_WORDS_PER_MINUTE = 110;
+
+/** Words of a story and the time to read it aloud (whole minutes, at least 1 when there is text). */
+function readingStats(content: string | null | undefined): { words: number; minutes: number } {
+  const text = storyPlainText(content);
+  const words = text ? text.split(" ").filter(Boolean).length : 0;
+  return { words, minutes: words === 0 ? 0 : Math.max(1, Math.ceil(words / READ_ALOUD_WORDS_PER_MINUTE)) };
+}
+
+export { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, storyPlainText, storyPreview, readingStats };

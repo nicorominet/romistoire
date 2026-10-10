@@ -8,8 +8,9 @@ class StoryQueryHelper {
      * @returns {Object} { whereClause, params }
      */
     buildWhere({ locale = 'fr', theme, ageGroup, weekNumber, dayOfWeek, search, searchTerm, hasImage, hasAudio, seriesId, excludeSeriesId, source, editStatus, reviewStatus, generationJobId }) {
-        let whereClauses = ['s.locale = ?'];
-        let params = [locale];
+        // 'all': every language (library page); the other callers keep French by default
+        let whereClauses = locale === 'all' ? ['1 = 1'] : ['s.locale = ?'];
+        let params = locale === 'all' ? [] : [locale];
 
         const actualSearch = search || searchTerm;
 

@@ -1,14 +1,15 @@
-import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
+import useDarkMode from "@/hooks/useDarkMode"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  // Follows the app's light / dark switch (the "dark" class on <html>)
+  const darkMode = useDarkMode()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={darkMode ? "dark" : "light"}
       className="toaster group"
       toastOptions={{
         classNames: {

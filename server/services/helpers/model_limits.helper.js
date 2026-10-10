@@ -1,11 +1,14 @@
 /**
  * Free tier limits of the Gemini models, by model family (indicative: Google changes them, the API
- * gives no way to read them). Checked against the API on 2026-10-07, see the comments of gemini.service.js.
+ * gives no way to read them). Read on the AI Studio "Rate limits" page on 2026-10-09.
+ * First match wins: TTS before Flash Lite (gemini-3.8-flash-lite-tts), 2.5 Flash Lite before the other Flash Lite.
  * null = unknown (not shown as a limit).
  */
 const LIMITS = [
+  // Every TTS model: 3 per minute, 10 per day (10K tokens per minute)
+  { test: /^gemini-.*-tts/, rpm: 3, rpd: 10 },
+  { test: /^gemini-2\.5-flash-lite/, rpm: 10, rpd: 20 },
   { test: /^gemini-.*-flash-lite/, rpm: 15, rpd: 500 },
-  { test: /^gemini-.*-tts/, rpm: null, rpd: null },
   { test: /^gemini-.*-flash(?:-preview)?$/, rpm: 5, rpd: 20 },
   { test: /^gemma-/, rpm: 30, rpd: 14400 },
 ];

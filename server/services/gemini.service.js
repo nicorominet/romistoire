@@ -4,6 +4,10 @@ import { PromptHelper, ALL_WEEK } from './helpers/prompt.helper.js';
 import { geminiResponseSchema } from './helpers/story_schema.js';
 import { COOLDOWN_MS, ModelCooldowns, msUntilPacificMidnight, parseRateLimit } from './helpers/model_cooldown.helper.js';
 import { settingsService } from './settings.service.js';
+import {
+  buildTtsRequestBody, checkSplit, hasDialogue, parseSpeakerLines, resolveAudioOptions, splitDialogueHeuristic,
+  CHARACTERS, NARRATOR, SAMPLE_TEXT, SPLIT_INSTRUCTION
+} from './helpers/voice.helper.js';
 import { aiUsageService } from './ai_usage.service.js';
 dotenv.config();
 
@@ -27,12 +31,14 @@ export const DEFAULT_MODELS = [
   'gemma-4-26b-a4b-it'
 ];
 
-// Models that support Audio Generation (override with GEMINI_AUDIO_MODELS)
+// Models that support Audio Generation (override with GEMINI_AUDIO_MODELS). Free tier: 3 per minute and
+// 10 per day each, the same for all of them, so ordered by quality: 3.8 first (most expressive, takes the
+// reading style apart from the text), 2.5 last (style given as an instruction before the text).
 export const DEFAULT_AUDIO_MODELS = [
-  'gemini-2.5-flash-preview-tts', // Specialized TTS model (raw 24 kHz PCM)
   'gemini-3.8-flash-tts',
-  'gemini-3.1-flash-tts-preview',
   'gemini-3.8-flash-lite-tts',
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts', // raw 24 kHz PCM
 ];
 
 const parseModelList = (value, fallback) => {
@@ -99,21 +105,36 @@ const MODEL_CAPABILITIES = [
 export const getModelCapabilities = (model) =>
   MODEL_CAPABILITIES.find(c => model.startsWith(c.prefix)) || { systemInstruction: false, jsonSchema: false, thinkingConfig: null };
 
-/** Age groups whose stories are long (900+ words): Flash Lite stops around 700 words. */
-const LONG_STORY_AGES = ['13-15', '16-18'];
+/**
+ * Age groups written by the Flash models first. Flash Lite stops around 700 words, and the content audit
+ * of October 2026 found its 7-12 stories far weaker (generation slips, lost plot threads) than Flash's.
+ */
+const FLASH_FIRST_AGES = ['7-9', '10-12', '13-15', '16-18'];
+/** Best Flash model of the audit, tried first. */
+const PREFERRED_FLASH = 'gemini-3-flash-preview';
+/** Weakest science of the audit: kept as a late fallback, just before Gemma. */
+const LATE_FLASH = 'gemini-2.5-flash';
 
 const isFlashModel = (model) => /^gemini-.*-flash(?:-preview)?$/.test(model);
 
 /**
- * Model order for an age group: for teenagers (long stories), the Flash models come first,
- * then every other model in the configured order. Other ages keep the configured order.
+ * Model order for an age group. From 7 years old: the preferred Flash model, the other Flash models,
+ * every other Gemini model in the configured order, the late Flash model, then Gemma.
+ * Younger ages keep the configured order (Flash Lite first: short stories, larger quota).
  * @param {string[]} models - Configured order.
  * @param {string} age - Age group ("13-15" or "13-15 ans").
  * @returns {string[]}
  */
 export const modelsForAge = (models, age) => {
-  if (!LONG_STORY_AGES.includes(PromptHelper.normalizeAge(age))) return models;
-  return [...models.filter(isFlashModel), ...models.filter(model => !isFlashModel(model))];
+  if (!FLASH_FIRST_AGES.includes(PromptHelper.normalizeAge(age))) return models;
+  const rank = (model) => {
+    if (model === PREFERRED_FLASH) return 0;
+    if (model === LATE_FLASH) return 3;
+    if (isFlashModel(model)) return 1;
+    return model.startsWith('gemma-') ? 4 : 2;
+  };
+  // Stable sort: the configured order is kept inside each rank
+  return models.map((model, index) => ({ model, index })).sort((a, b) => rank(a.model) - rank(b.model) || a.index - b.index).map(({ model }) => model);
 };
 
 /** Models skipped after a failure (shared by story and audio calls). */
@@ -131,7 +152,7 @@ export const modelCooldowns = new ModelCooldowns();
  *   makes small models pad the story with filler or the illustration description.
  * @returns {Object} Request body.
  */
-export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutputTokens, { thinking = true, withWeekPlan = false, minParagraphs = 0, storyCount = 0 } = {}) => {
+export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutputTokens, { thinking = true, withWeekPlan = false, withCharacters = false, minParagraphs = 0, storyCount = 0 } = {}) => {
   const capabilities = getModelCapabilities(model);
   const body = {
     contents: [{
@@ -148,7 +169,7 @@ export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutpu
   }
   if (capabilities.jsonSchema) {
     body.generationConfig.responseMimeType = 'application/json';
-    body.generationConfig.responseSchema = geminiResponseSchema({ withWeekPlan, minParagraphs, storyCount });
+    body.generationConfig.responseSchema = geminiResponseSchema({ withWeekPlan, withCharacters, minParagraphs, storyCount });
   }
   return body;
 };
@@ -398,13 +419,14 @@ class GeminiService {
     const isWeek = day === ALL_WEEK;
     const maxOutputTokens = isWeek ? MAX_OUTPUT_TOKENS_WEEK : MAX_OUTPUT_TOKENS_SINGLE;
     const withWeekPlan = PromptHelper.wantsWeekPlan(params);
+    const withCharacters = PromptHelper.wantsCharacters(params);
     const config = geminiConfig();
 
     const startTime = Date.now();
     try {
         const { result, model, skipped } = await this._generateWithFallback(
             modelsForAge(config.models, age),
-            (model, options) => buildStoryRequestBody(model, systemInstruction, prompt, maxOutputTokens, { ...options, withWeekPlan, storyCount: isWeek ? WEEK_STORY_COUNT : 0 }),
+            (model, options) => buildStoryRequestBody(model, systemInstruction, prompt, maxOutputTokens, { ...options, withWeekPlan, withCharacters, storyCount: isWeek ? WEEK_STORY_COUNT : 0 }),
             'Story',
             { timeoutMs: isWeek ? config.weekTimeoutMs : config.timeoutMs }
         );
@@ -470,31 +492,79 @@ class GeminiService {
   }
 
   /**
+   * Splits a story between the narrator and the characters for a two-voice reading: by the AI, checked word
+   * for word against the story, else by the dialogue dashes and guillemets.
+   * @param {string} text
+   * @returns {Promise<{segments: {speaker: string, text: string}[], method: 'ai'|'heuristic'}>}
+   */
+  async splitDialogue(text) {
+    try {
+      const { text: answer } = await this.generateText(SPLIT_INSTRUCTION, text, 'Audio-Split', { maxOutputTokens: 8192 });
+      const segments = parseSpeakerLines(answer);
+      if (checkSplit(text, segments)) return { segments, method: 'ai' };
+      console.warn('[Gemini] Two-voice split changed the text, using the dialogue marks instead');
+    } catch (error) {
+      console.warn('[Gemini] Two-voice split failed, using the dialogue marks instead:', error.message);
+    }
+    return { segments: splitDialogueHeuristic(text), method: 'heuristic' };
+  }
+
+  /**
    * Generates audio for a given text using Gemini.
    * @param {string} text - The text to convert to audio.
+   * @param {Object} [resolved] - Voice, style and two-voice choice (see voice.helper resolveAudioOptions).
    * @returns {Promise<{audioBuffer: Buffer, mimeType: string, extension: string}>} The playable audio file, its mime type and extension.
    */
-  async generateAudio(text) {
+  async generateAudio(text, resolved = resolveAudioOptions()) {
     if (!this.apiKey) {
       throw new Error("Gemini API Key not configured.");
     }
 
+    let input = text;
+    let split = 'single';
+    if (resolved.multiSpeaker) {
+      const { segments, method } = await this.splitDialogue(text);
+      // Without any dialogue the second voice would never speak: one voice then
+      if (hasDialogue(segments)) {
+        input = segments;
+        split = method;
+      } else {
+        split = 'no-dialogue';
+      }
+    }
+    return this._speak(input, resolved, { textLength: text.length, split });
+  }
+
+  /**
+   * Short reading of a fixed sentence with the given voice options (Settings > reading voice), not stored.
+   * @param {Object} resolved - See voice.helper resolveAudioOptions.
+   */
+  async generateVoiceSample(resolved) {
+    if (!this.apiKey) {
+      throw new Error("Gemini API Key not configured.");
+    }
+    const input = resolved.multiSpeaker
+      ? [{ speaker: NARRATOR, text: SAMPLE_TEXT.narrator }, { speaker: CHARACTERS, text: SAMPLE_TEXT.character }]
+      : `${SAMPLE_TEXT.narrator} ${SAMPLE_TEXT.character}`;
+    return this._speak(input, resolved, { sample: true });
+  }
+
+  /** TTS call through the audio models, returning a playable file. */
+  async _speak(input, resolved, logInput) {
     const startTime = Date.now();
+    const voices = { voice: resolved.voice, characterVoice: Array.isArray(input) ? resolved.characterVoice : undefined, style: resolved.style, pace: resolved.pace };
     try {
-        const { result, model } = await this._generateWithFallback(geminiConfig().audioModels, {
-            contents: [{
-                role: "user",
-                parts: [{ text: `Please read the following story aloud with a narrator's voice suitable for children:\n\n${text}` }]
-            }],
-            generationConfig: {
-                responseModalities: ["AUDIO"]
-            }
-        }, 'Audio', { nextModelOn400: true });
+        const { result, model } = await this._generateWithFallback(
+            geminiConfig().audioModels,
+            (model) => buildTtsRequestBody(model, input, resolved),
+            'Audio',
+            { nextModelOn400: true }
+        );
 
         const audioPart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
 
         if (!audioPart?.inlineData?.data) {
-            logger.ai('Gemini', 'Audio-Error', { textLength: text.length }, { error: 'No audio content in response' }, { duration: Date.now() - startTime, success: false });
+            logger.ai('Gemini', 'Audio-Error', { ...logInput, ...voices }, { error: 'No audio content in response' }, { duration: Date.now() - startTime, success: false });
             console.error("No audio content in response:", JSON.stringify(result, null, 2));
             throw new Error("No audio generated by Gemini.");
         }
@@ -503,12 +573,12 @@ class GeminiService {
         const audio = toPlayableAudio(rawAudioBuffer, audioPart.inlineData.mimeType);
 
         const duration = Date.now() - startTime;
-        logger.ai('Gemini', 'Audio', { textLength: text.length }, { audioSize: audio.audioBuffer.length, model, sourceMimeType: audioPart.inlineData.mimeType }, { duration });
+        logger.ai('Gemini', 'Audio', { ...logInput, ...voices }, { audioSize: audio.audioBuffer.length, model, sourceMimeType: audioPart.inlineData.mimeType }, { duration });
 
         return audio;
     } catch (error) {
          const duration = Date.now() - startTime;
-         logger.ai('Gemini', 'Audio-Error', { textLength: text.length }, { error: error.message }, { duration, success: false });
+         logger.ai('Gemini', 'Audio-Error', { ...logInput, ...voices }, { error: error.message }, { duration, success: false });
          throw error;
     }
   }

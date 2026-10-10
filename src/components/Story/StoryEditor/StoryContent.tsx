@@ -1,15 +1,22 @@
 import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import RichTextEditor from "@/components/Common/RichTextEditor";
+import RichTextEditor, { EditorImage } from "@/components/Common/RichTextEditor";
 import { i18n } from "@/lib/i18n";
-import { stripHtmlTags } from "@/lib/utils";
+import { readingStats } from "@/lib/utils";
 
-const StoryContent = ({ disabled = false }: { disabled?: boolean }) => {
+interface StoryContentProps {
+  disabled?: boolean;
+  /** Illustrations of the story, offered for insertion in the text */
+  images?: EditorImage[];
+}
+
+/** Title and text of a story (edit and create pages), with the words and reading-aloud time. */
+const StoryContent = ({ disabled = false, images }: StoryContentProps) => {
   const { t } = i18n;
   const { control, watch } = useFormContext();
   const content = watch("content");
-  const plainTextContent = stripHtmlTags(content || "");
+  const { words, minutes } = readingStats(content);
 
   return (
     <div className="space-y-4">
@@ -23,7 +30,7 @@ const StoryContent = ({ disabled = false }: { disabled?: boolean }) => {
               <Input
                 placeholder={t("story.titlePlaceholder")}
                 {...field}
-                className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-white/20 dark:border-white/10 text-gray-900 dark:text-gray-100"
+                className="h-12 bg-white/50 text-xl font-semibold text-gray-900 backdrop-blur-sm border-white/20 dark:border-white/10 dark:bg-gray-800/50 dark:text-gray-100"
               />
             </FormControl>
             <FormMessage />
@@ -43,16 +50,16 @@ const StoryContent = ({ disabled = false }: { disabled?: boolean }) => {
                 onChange={field.onChange}
                 placeholder={t("story.contentPlaceholder")}
                 disabled={disabled}
+                images={images}
               />
             </FormControl>
             <FormMessage />
-            <p className="text-xs text-muted-foreground">{t("story.inlineImageHint")}</p>
           </FormItem>
         )}
       />
 
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        {t("story.characterCount", { count: plainTextContent.length })}
+      <div className="text-sm text-gray-500 dark:text-gray-400" aria-live="polite">
+        {t("editor.readingStats", { words: String(words), minutes: String(minutes) })}
       </div>
     </div>
   );

@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
     SETTINGS_AI_STATUS: '/api/settings/ai-status',
     SETTINGS_QUOTA_USAGE: '/api/settings/quota-usage',
     SETTINGS_TEST_OLLAMA: '/api/settings/test-ollama',
+    SETTINGS_AUDIO_PREVIEW: '/api/settings/audio-preview',
     SETTINGS_STORAGE_STATS: '/api/settings/storage-stats',
     BACKUPS: '/api/backups',
     GENERATION_JOBS: '/api/generation-jobs',

@@ -91,7 +91,15 @@ export const IllustrationTodoRow = ({ item, attachedImage, generating, onGenerat
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="font-mono text-xs">{item.code}</Badge>
             <Link to={APP_ROUTES.STORY_DETAIL(item.id)} className="font-semibold hover:underline">{item.title}</Link>
-            {hasImage && <Check className="h-4 w-4 text-green-600" aria-label={t("illustrations.hasImage")} />}
+            <Badge variant={item.illustration_prompt ? "secondary" : "outline"}>
+              {item.illustration_prompt ? t("illustrations.promptReady") : t("illustrations.promptMissing")}
+            </Badge>
+            {hasImage && (
+              <Badge variant="outline" className="border-green-600/40 text-green-700 dark:text-green-400">
+                <Check className="mr-1 h-3 w-3" />
+                {t("illustrations.hasImage")}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             {[

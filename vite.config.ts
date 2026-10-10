@@ -3,7 +3,6 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
   server: {
@@ -17,15 +16,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    tailwindcss(),
-    nodePolyfills({
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true
-      },
-      protocolImports: true
-    })
+    tailwindcss()
   ],
   define: {
     'process.env': {},

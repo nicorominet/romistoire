@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText } from './utils';
+import { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, readingStats } from './utils';
 
 describe('utils', () => {
   describe('cn', () => {
@@ -80,6 +80,22 @@ describe('utils', () => {
 
     it('should not truncate text equal to max length', () => {
       expect(truncateText('Hello', 5)).toBe('Hello');
+    });
+  });
+
+  describe('readingStats', () => {
+    it('counts the words of the text, not of the markup', () => {
+      expect(readingStats('<p>Il était</p><p>une <strong>fois</strong></p>')).toEqual({ words: 4, minutes: 1 });
+    });
+
+    it('rounds the reading-aloud time up', () => {
+      expect(readingStats(Array(111).fill('mot').join(' ')).minutes).toBe(2);
+      expect(readingStats(Array(110).fill('mot').join(' ')).minutes).toBe(1);
+    });
+
+    it('gives nothing for an empty story', () => {
+      expect(readingStats('<p></p>')).toEqual({ words: 0, minutes: 0 });
+      expect(readingStats(null)).toEqual({ words: 0, minutes: 0 });
     });
   });
 });

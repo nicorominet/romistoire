@@ -8,9 +8,11 @@ import {
 import { monthOfWeek, parseTopicSuggestions, buildTopicSuggestionPrompt } from '../../services/helpers/topic_suggestion.helper.js';
 
 describe('generation plan', () => {
-  it('generates a week in one request for young ages, day by day from 10-12 or with Ollama', () => {
+  it('generates a week in one request for the youngest ages, day by day from 7-9 or with Ollama', () => {
+    expect(isIterativeGeneration(ALL_WEEK, '2-3', 'gemini')).toBe(false);
     expect(isIterativeGeneration(ALL_WEEK, '4-6', 'gemini')).toBe(false);
-    expect(isIterativeGeneration(ALL_WEEK, '7-9 ans', 'gemini')).toBe(false);
+    expect(isIterativeGeneration(ALL_WEEK, '7-9 ans', 'gemini')).toBe(true);
+    expect(requestsPerUnit(ALL_WEEK, '7-9', 'gemini')).toBe(7);
     expect(isIterativeGeneration(ALL_WEEK, '10-12', 'gemini')).toBe(true);
     expect(isIterativeGeneration(ALL_WEEK, '4-6', 'local')).toBe(true);
     expect(isIterativeGeneration('Lundi', '16-18', 'gemini')).toBe(false);

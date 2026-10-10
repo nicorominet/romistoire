@@ -6,7 +6,7 @@ import StoryCard from './StoryCard';
 import { Story } from '@/types/Story';
 
 // Polyfill ResizeObserver
-global.ResizeObserver = class ResizeObserver {
+globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -141,6 +141,24 @@ describe('StoryCard', () => {
         );
         const link = screen.getByRole('link');
         expect(link).toHaveAttribute('href', '/stories/123');
+    });
+
+    it('shows when a story has an audio or waits for a review', () => {
+        const { rerender } = render(
+            <MemoryRouter>
+                <StoryCard story={mockStory} />
+            </MemoryRouter>
+        );
+        expect(screen.queryByLabelText('story.hasAudio')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('review.toReview')).not.toBeInTheDocument();
+
+        rerender(
+            <MemoryRouter>
+                <StoryCard story={{ ...mockStory, audio_path: '/uploads/audio/123.wav', review_status: 'to_review' }} />
+            </MemoryRouter>
+        );
+        expect(screen.getByLabelText('story.hasAudio')).toBeInTheDocument();
+        expect(screen.getByLabelText('review.toReview')).toBeInTheDocument();
     });
 
     it('colors each badge with its theme color and shows the primary theme first', () => {

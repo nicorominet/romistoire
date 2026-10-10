@@ -1,11 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { i18n } from "@/lib/i18n";
 import { truncateText } from "@/lib/utils";
 import PageLayout from "@/components/Layout/PageLayout";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PenLine, Save, Book, Paintbrush, Wand2 } from "lucide-react";
+import { PenLine, Book, Paintbrush, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import StorySettings from "@/components/Story/StorySettings";
 import { useForm, FormProvider } from "react-hook-form";
@@ -16,6 +15,8 @@ import { format } from 'date-fns';
 import { getDayOrder } from "@/utils/dayUtils";
 import useDarkMode from "@/hooks/useDarkMode";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { useSaveShortcut } from "@/hooks/useSaveShortcut";
+import EditorSaveBar from "@/components/Story/StoryEditor/EditorSaveBar";
 import { SelectedTheme } from "@/components/Theme/ThemeSelect";
 
 // Shared Components
@@ -65,7 +66,7 @@ const CreateStoryPage = () => {
     },
   });
 
-  const { handleSubmit, watch, formState: { isDirty } } = methods;
+  const { handleSubmit, watch, formState: { isDirty, isSubmitting } } = methods;
 
   // Leaving loses the text, the uploaded illustrations, or interrupts a running generation
   const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(isDirty || illustrations.length > 0);
@@ -152,18 +153,6 @@ const CreateStoryPage = () => {
           .filter((img): img is Illustration => Boolean(img)));
   };
 
-  
-  const memoizedAvailableThemes = useMemo(() => availableThemes, [availableThemes]);
-  const sortedDayOfWeekOptions = useMemo(() => [
-      { value: "Monday", label: t("days.monday") },
-      { value: "Tuesday", label: t("days.tuesday") },
-      { value: "Wednesday", label: t("days.wednesday") },
-      { value: "Thursday", label: t("days.thursday") },
-      { value: "Friday", label: t("days.friday") },
-      { value: "Saturday", label: t("days.saturday") },
-      { value: "Sunday", label: t("days.sunday") },
-    ], [t]);
-
   // Helper for Preview
   const getImageSrc = (img: any): string | undefined => {
     const pathValue = img.image_path || img.imagePath || img.path;
@@ -177,87 +166,52 @@ const CreateStoryPage = () => {
     return undefined;
   };
 
-  const defaultStoryForSetting = useMemo(() => ({
-    id: "",
-    title: watch("title"),
-    content: watch("content"),
-    theme_name: "",
-    theme_description: "",
-    theme_id: "",
-    age_group: watch("ageGroup") as AgeGroup,
-    week_number: parseInt(watch("weekNumber") || "1"),
-    day_order: 1,
-    created_at: new Date().toISOString(),
-    modified_at: new Date().toISOString(),
-    version: 1,
-    locale: watch("language"),
-    source: 'manual' as const,
-    is_manually_edited: false,
-    illustrations: illustrations,
-    themes: []
-  }), [watch, illustrations]);
+  const save = handleSubmit(onSubmit);
+  useSaveShortcut(() => void save(), !isSubmitting);
+
+  const panelClass = "rounded-xl border border-white/20 bg-white/40 p-4 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-slate-900/40 md:p-6";
+  const tabClass = "flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700";
 
   return (
     <PageLayout>
-        <h1 className="text-3xl font-bold text-story-purple-800 mb-6">
-          {t("create.title")}
-        </h1>
-
         <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/10 shadow-lg p-6">
-                <Tabs
-                  defaultValue="write"
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="w-full"
-                >
-                  <TabsList className="mb-6 bg-white/50 dark:bg-slate-800/50 w-full justify-start">
-                  <TabsTrigger value="generate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
-                      <Wand2 className="h-4 w-4 mr-1" />
-                      {t("create.tabs.generate")}
-                    </TabsTrigger>
-                    <TabsTrigger value="write" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
-                      <PenLine className="h-4 w-4 mr-1" />
-                      {t("create.tabs.write")}
-                    </TabsTrigger>
-                    <TabsTrigger value="illustrate" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
-                      <Paintbrush className="h-4 w-4 mr-1"  />
-                      {t("create.tabs.illustrate")}
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="flex items-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
-                      <Book className="h-4 w-4 mr-1"  />
-                      {t("create.tabs.preview")}
-                    </TabsTrigger>
-                  </TabsList>
+          <form onSubmit={save}>
+            <EditorSaveBar
+              title={t("create.title")}
+              dirty={isDirty || illustrations.length > 0}
+              saving={isSubmitting}
+              onBack={() => navigate(-1)}
+              saveLabel={t("create.save")}
+            />
 
-                  {/* AI generation runs on the server as jobs: it has its own page */}
-                  <TabsContent value="generate">
-                    <div className="space-y-3 rounded-lg border bg-white/50 p-6 text-center dark:bg-slate-800/50">
-                      <Wand2 className="mx-auto h-8 w-8 text-indigo-500" />
-                      <p className="text-gray-700 dark:text-gray-300">{t("generation.createTabHint")}</p>
-                      <Button type="button" asChild className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                        <Link to={APP_ROUTES.GENERATION}>{t("generation.open")}</Link>
-                      </Button>
-                    </div>
-                  </TabsContent>
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+              <div className="min-w-0 space-y-6">
+                {/* AI generation runs on the server as jobs: it has its own page */}
+                <p className="flex flex-wrap items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-2 text-sm text-indigo-900 dark:border-indigo-300/20 dark:bg-indigo-400/10 dark:text-indigo-200">
+                  <Wand2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  {t("editor.generateHint")}
+                  <Link to={APP_ROUTES.GENERATION} className="font-semibold underline">{t("generation.open")} →</Link>
+                </p>
 
-                  <TabsContent value="write">
-                     <StoryContent />
-                  </TabsContent>
+                <div className={panelClass}>
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="mb-6 bg-white/50 dark:bg-slate-800/50 w-full justify-start">
+                      <TabsTrigger value="write" className={tabClass}>
+                        <PenLine className="h-4 w-4 mr-1" />
+                        {t("create.tabs.write")}
+                      </TabsTrigger>
+                      <TabsTrigger value="preview" className={tabClass}>
+                        <Book className="h-4 w-4 mr-1" />
+                        {t("create.tabs.preview")}
+                      </TabsTrigger>
+                    </TabsList>
 
-                  <TabsContent value="illustrate">
-                     <StoryIllustrations
-                        illustrations={illustrations}
-                        addIllustrationToBackend={addIllustrationToBackend}
-                        deleteIllustration={deleteIllustration}
-                        reorderIllustrations={reorderIllustrations}
-                     />
-                  </TabsContent>
+                    <TabsContent value="write">
+                      <StoryContent images={illustrations.map((image) => ({ src: getImageSrc(image) ?? "", alt: image.filename })).filter((image) => image.src)} />
+                    </TabsContent>
 
-                  <TabsContent value="preview">
-                     <StoryPreviewTab
+                    <TabsContent value="preview">
+                      <StoryPreviewTab
                         title={watch("title")}
                         content={watch("content")}
                         watchThemes={watch("themes") as SelectedTheme[]}
@@ -266,37 +220,32 @@ const CreateStoryPage = () => {
                         illustrations={illustrations}
                         getImageSrc={getImageSrc}
                         darkMode={darkMode}
-                     />
-                  </TabsContent>
-                </Tabs>
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                <section aria-labelledby="create-illustrations" className={panelClass}>
+                  <h2 id="create-illustrations" className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <Paintbrush aria-hidden="true" className="h-5 w-5 text-story-purple-600 dark:text-story-purple-300" />
+                    {t("create.tabs.illustrate")}
+                  </h2>
+                  <StoryIllustrations
+                    illustrations={illustrations}
+                    addIllustrationToBackend={addIllustrationToBackend}
+                    deleteIllustration={deleteIllustration}
+                    reorderIllustrations={reorderIllustrations}
+                  />
+                </section>
               </div>
 
-              <div
-                className={`rounded-xl shadow-lg p-6 h-fit transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900/40 border border-white/10 backdrop-blur-md text-gray-100"
-                    : "bg-white/40 border border-white/20 backdrop-blur-md text-gray-900"
-                }`}
-              >
-                <h2 className="text-xl font-bold text-story-purple-800 mb-4">
-                  {t("create.storyDetails")}
-                </h2>
+              <aside>
                 <StorySettings
-                  availableThemes={memoizedAvailableThemes}
+                  availableThemes={availableThemes}
                   weeklyThemes={weeklyThemes}
-                  sortedDayOfWeekOptions={sortedDayOfWeekOptions}
-                  story={defaultStoryForSetting}
                   availableSeries={availableSeries}
                 />
-
-                <Button
-                  type="submit"
-                  className="w-full bg-story-purple hover:bg-story-purple-600 mt-6"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {t("create.save")}
-                </Button>
-              </div>
+              </aside>
             </div>
           </form>
         </FormProvider>

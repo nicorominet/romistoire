@@ -68,6 +68,30 @@ describe('StoryService Unit Tests', () => {
            await storyService.findAll({ search: 'Dragon' });
            expect(db.query).toHaveBeenCalledWith(expect.stringContaining('LIKE ?'), expect.arrayContaining(['%Dragon%']));
        });
+
+        it('should sort by the program by default, or by the chosen order', async () => {
+            db.query.mockImplementation(async (sql) => (sql.includes('COUNT(*)') ? [{ total: 0 }] : []));
+            const listSql = () => db.query.mock.calls.map(([sql]) => sql).find(sql => sql.includes('LIMIT ? OFFSET ?'));
+
+            await storyService.findAll({});
+            expect(listSql()).toContain('ORDER BY s.week_number ASC, s.day_order ASC, FIELD(s.age_group');
+
+            for (const [sort, order] of [['recent', 's.created_at DESC'], ['modified', 's.modified_at DESC'], ['title', 's.title ASC'], ['DROP TABLE', 's.week_number ASC']]) {
+                db.query.mockClear();
+                await storyService.findAll({ sort });
+                expect(listSql()).toContain(`ORDER BY ${order}`);
+            }
+        });
+
+        it('should list every language with locale=all', async () => {
+            db.query.mockImplementation(async (sql) => (sql.includes('COUNT(*)') ? [{ total: 0 }] : []));
+
+            await storyService.findAll({ locale: 'all', ageGroup: '4-6' });
+            const [sql, params] = db.query.mock.calls.find(([q]) => q.includes('LIMIT ? OFFSET ?'));
+
+            expect(sql).not.toContain('s.locale = ?');
+            expect(params).not.toContain('all');
+        });
     });
 
     describe('getAvailableWeeks', () => {
@@ -324,6 +348,8 @@ describe('StoryService Unit Tests', () => {
             expect(result).toEqual({ next: { id: 'next', title: 'Lundi semaine 4' }, prev: { id: 'prev', title: 'Samedi' } });
             const nextCall = db.query.mock.calls.find(([sql]) => sql.includes('week_number > ?'));
             expect(nextCall[0]).toContain('locale = ?');
+            // Week and day are shown in the page's previous / next links
+            expect(nextCall[0]).toContain('SELECT id, title, week_number, day_order');
             expect(nextCall[0]).toContain('series_id IS NULL');
             expect(nextCall[0]).toContain('ORDER BY week_number ASC, day_order ASC');
             expect(nextCall[1]).toEqual(['4-6', 'fr', 'sunday', 3, 3, 7]);

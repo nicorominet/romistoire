@@ -34,7 +34,7 @@ vi.mock("@/hooks/useSeries", () => ({
 }));
 
 vi.mock("@/api/stories.api", () => ({
-  storyApi: { getVersions: mockGetVersions },
+  storyApi: { getVersions: mockGetVersions, getAll: vi.fn().mockResolvedValue({ data: [], total: 0 }) },
 }));
 
 vi.mock("@/components/Story/StoryEditor/StoryContent", () => ({
@@ -51,7 +51,7 @@ describe("EditStoryPage", () => {
       id: "ai-story",
       title: "AI story",
       content: "<p>Story body</p>",
-      themes: [{ id: "theme-1", name: "Adventure" }],
+      themes: [{ id: "theme-1", name: "Adventure", description: "", color: "#000000", created_at: "" }],
       age_group: "4-6",
       week_number: 40,
       day_order: 1,
@@ -66,7 +66,7 @@ describe("EditStoryPage", () => {
     mockGetVersions.mockResolvedValue([]);
   });
 
-  it("preselects the saved day and week for an AI-generated story", async () => {
+  const renderPage = () => {
     const queryClient = new QueryClient();
     const router = createMemoryRouter(
       [{ path: "/stories/:id/edit", element: <EditStoryPage /> }],
@@ -78,6 +78,10 @@ describe("EditStoryPage", () => {
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
+  };
+
+  it("preselects the saved day and week for an AI-generated story", async () => {
+    renderPage();
 
     const selectTriggers = await screen.findAllByRole("combobox");
 
@@ -89,5 +93,17 @@ describe("EditStoryPage", () => {
         selectTriggers.some((trigger) => /^40\s+-/.test(trigger.textContent || "")),
       ).toBe(true);
     });
+  });
+
+  it("keeps the saved age group and language, and the form stays clean", async () => {
+    mockStory.current = { ...mockStory.current!, age_group: "2-3", locale: "en" };
+    renderPage();
+
+    await waitFor(() => {
+      const triggers = screen.getAllByRole("combobox").map((trigger) => trigger.textContent);
+      expect(triggers).toContain(i18n.t("ages.2-3"));
+      expect(triggers).toContain(i18n.t("languages.en"));
+    });
+    expect(screen.queryByText(i18n.t("editor.unsaved"))).not.toBeInTheDocument();
   });
 });

@@ -1,38 +1,55 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "@/constants";
-import { useForm, FormProvider, useWatch } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import PageLayout from "@/components/Layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { i18n } from "@/lib/i18n";
-import { Save, ArrowLeft, PenLine, Image } from "lucide-react";
+import { ArrowLeft, Image, Info } from "lucide-react";
 import { toast } from "sonner";
 import StoryIllustrations from "@/components/Story/StoryEditor/StoryIllustrations";
 import StorySettings from "@/components/Story/StorySettings";
 import { formSchema, FormValues } from "@/components/Story/StoryEditor/formSchema";
 import useStoryData from "@/hooks/useStoryData";
 import StoryContent from "@/components/Story/StoryEditor/StoryContent";
-import RestoreVersionCard from "@/components/Story/EditStory/RestoreVersionCard";
+import EditorSaveBar from "@/components/Story/StoryEditor/EditorSaveBar";
+import VersionHistory from "@/components/Story/EditStory/VersionHistory";
 import { Theme } from "@/types/Theme";
 import { Series } from "@/types/Series";
 import { Story, StoryVersion, AgeGroup } from "@/types/Story";
 import { storyApi } from "@/api/stories.api";
 import { useThemes } from "@/hooks/useThemes";
 import { useSeries } from "@/hooks/useSeries";
-import { getDayOrder } from "@/utils/dayUtils";
+import { DAY_NAMES_EN, getDayOrder } from "@/utils/dayUtils";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { useSaveShortcut } from "@/hooks/useSaveShortcut";
 import { withOnePrimary } from "@/components/Theme/ThemeSelect";
 import { StoryTheme } from "@/types/Theme";
 
+const panelClass = "rounded-xl border border-white/20 bg-white/40 p-4 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-slate-900/40 md:p-6";
+
+/** Form values of a loaded story. */
+const formValuesOf = (story: Story): FormValues => ({
+  title: story.title,
+  content: story.content,
+  themes: withOnePrimary(story.themes.map((theme) => ({ id: theme.id, isPrimary: Boolean((theme as StoryTheme).isPrimary) }))),
+  ageGroup: story.age_group as AgeGroup,
+  // Legacy free-text locales ("fr-FR", typos) fall back to French; the select only offers fr / en
+  language: story.locale === "en" ? "en" : "fr",
+  dayOfWeek: DAY_NAMES_EN[story.day_order - 1] || "",
+  weekNumber: story.week_number.toString(),
+  seriesName: story.series_name || "",
+  version: story.version,
+});
+
+/**
+ * EditStoryPage Component
+ *
+ * Writing first (title, text, then illustrations), the settings beside; the save bar stays in sight
+ * (Ctrl+S too) and says when changes are unsaved. Earlier versions can be read and restored.
+ */
 const EditStoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -54,19 +71,8 @@ const EditStoryPage: React.FC = () => {
 
   const [saving, setSaving] = useState<boolean>(false);
   const savingRef = useRef(false);
-  const [weeklyTheme, setWeeklyTheme] = useState<string | null>(null);
-  const [sortedDayOfWeekOptions, setSortedDayOfWeekOptions] = useState([
-    { value: "Monday", label: t("days.monday") },
-    { value: "Tuesday", label: t("days.tuesday") },
-    { value: "Wednesday", label: t("days.wednesday") },
-    { value: "Thursday", label: t("days.thursday") },
-    { value: "Friday", label: t("days.friday") },
-    { value: "Saturday", label: t("days.saturday") },
-    { value: "Sunday", label: t("days.sunday") },
-  ]);
   const [formInitialised, setFormInitialised] = useState(false);
   const [versions, setVersions] = useState<StoryVersion[]>([]);
-  const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -82,9 +88,9 @@ const EditStoryPage: React.FC = () => {
       version: 1,
     },
   });
-  const editedTitle = useWatch({ control: form.control, name: "title" });
+  const { isDirty, dirtyFields } = form.formState;
 
-  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(form.formState.isDirty || saving);
+  const { dialog: unsavedChangesDialog, allowNavigation } = useUnsavedChangesGuard(isDirty || saving);
 
   const beginSave = () => {
     if (savingRef.current) return false;
@@ -116,59 +122,14 @@ const EditStoryPage: React.FC = () => {
 
   useEffect(() => {
     if (story && !formInitialised) {
-      const dayOfWeekOptions = [
-        { value: "Monday", label: t("days.monday") },
-        { value: "Tuesday", label: t("days.tuesday") },
-        { value: "Wednesday", label: t("days.wednesday") },
-        { value: "Thursday", label: t("days.thursday") },
-        { value: "Friday", label: t("days.friday") },
-        { value: "Saturday", label: t("days.saturday") },
-        { value: "Sunday", label: t("days.sunday") },
-      ];
-      const dayOfWeekValue = dayOfWeekOptions[story.day_order - 1]?.value || "";
-
-      form.reset({
-        title: story.title,
-        content: story.content,
-        themes: withOnePrimary(story.themes.map((theme) => ({ id: theme.id, isPrimary: Boolean((theme as StoryTheme).isPrimary) }))),
-        ageGroup: story.age_group as AgeGroup,
-        // Legacy free-text locales ("fr-FR", typos) fall back to French; the select only offers fr / en
-        language: story.locale === "en" ? "en" : "fr",
-        dayOfWeek: dayOfWeekValue,
-        weekNumber: story.week_number.toString(),
-        seriesName: story.series_name || "",
-        version: story.version,
-      });
-
-      setSortedDayOfWeekOptions((prevOptions) => {
-        const currentIndex = prevOptions.findIndex(
-          (option) => option.value === dayOfWeekValue
-        );
-        if (currentIndex === -1) {
-          return prevOptions;
-        }
-        const currentDayOption = prevOptions[currentIndex];
-        const remainingDays = [
-          ...prevOptions.slice(0, currentIndex),
-          ...prevOptions.slice(currentIndex + 1),
-        ];
-        return [currentDayOption, ...remainingDays];
-      });
+      form.reset(formValuesOf(story));
       setFormInitialised(true);
-
-      const theme = weeklyThemes.find(
-        (theme) => theme.week_number === story.week_number
-      );
-      setWeeklyTheme(theme ? theme.theme_name : null);
     }
-  }, [story, formInitialised, weeklyThemes, t, form]);
-
-
+  }, [story, formInitialised, form]);
 
   const onSubmit = async (values: FormValues) => {
     if (!id || !beginSave()) return;
     try {
-
       const dayOrder = getDayOrder(values.dayOfWeek);
       if (dayOrder < 1 || dayOrder > 7) {
         throw new Error("Invalid day_order value");
@@ -199,15 +160,22 @@ const EditStoryPage: React.FC = () => {
     }
   };
 
+  const save = form.handleSubmit(onSubmit);
+  useSaveShortcut(() => void save(), !saving && formInitialised);
+
   const handleBack = () => {
     navigate(APP_ROUTES.STORY_DETAIL(id!));
   };
 
-  const handleRestoreVersion = async () => {
-    if (!selectedVersion || !beginSave()) return;
+  const handleDiscard = () => {
+    if (story) form.reset(formValuesOf(story));
+  };
+
+  const handleRestoreVersion = async (versionId: string) => {
+    if (!beginSave()) return;
     try {
-      await storyApi.restoreVersion(id!, selectedVersion);
-      
+      await storyApi.restoreVersion(id!, versionId);
+
       toast.success(t("story.restoreSuccess"));
       allowNavigation();
       navigate(APP_ROUTES.STORY_DETAIL(id!));
@@ -254,116 +222,80 @@ const EditStoryPage: React.FC = () => {
     );
   }
 
+  // What saving will also do, said before it happens (the server removes the audio when the text changes)
+  const notes = [
+    story.review_status === "to_review" && t("editor.notes.review"),
+    story.audio_path && (dirtyFields.title || dirtyFields.content) && t("story.audio.willBeDeleted"),
+  ].filter(Boolean) as string[];
+
   return (
     <PageLayout>
-        <div className="mb-6 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-          <Button
-            disabled={saving}
-            onClick={handleBack}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t("common.back")}
-          </Button>
-          <h1 className="text-3xl font-bold text-story-purple-800 dark:text-story-purple-200">
-            {t("story.edit")} - {editedTitle}
-            {weeklyTheme && ` (${t("story.weeklyTheme")}: ${weeklyTheme})`}
-          </h1>
-        </div>
-
         <FormProvider {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
+          <form onSubmit={save}>
+            <EditorSaveBar
+              title={t("editor.editTitle", { title: form.watch("title") || story.title })}
+              dirty={isDirty}
+              saving={saving}
+              onBack={handleBack}
+              onDiscard={handleDiscard}
+            />
+
             <fieldset disabled={saving} aria-busy={saving} className="min-w-0 border-0 p-0">
-            <div className={`grid grid-cols-1 lg:grid-cols-4 gap-6 ${saving ? "pointer-events-none opacity-70" : ""}`}>
-              <div className="lg:col-span-3">
-                <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-gray-900 dark:text-gray-100">
-                      {t("story.content")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="editor">
-                      <TabsList className="mb-4">
-                        <TabsTrigger
-                          value="editor"
-                          className="flex items-center gap-1"
-                        >
-                          <PenLine className="h-4 w-4" />
-                          {t("story.editor")}
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="illustrations"
-                          className="flex items-center gap-1"
-                        >
-                          <Image className="h-4 w-4" />
-                          {t("story.illustrations")}
-                        </TabsTrigger>
-                      </TabsList>
+            <div className={`grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)] ${saving ? "pointer-events-none opacity-70" : ""}`}>
+              <div className="min-w-0 space-y-6">
+                <div className={panelClass}>
+                  <StoryContent
+                    disabled={saving}
+                    images={illustrations.filter((image) => image.image_path).map((image) => ({ src: `/${image.image_path!.replace(/\\/g, "/")}`, alt: image.filename }))}
+                  />
+                </div>
 
-                      <TabsContent value="editor">
-                        <StoryContent disabled={saving} />
-                      </TabsContent>
-
-                      <TabsContent value="illustrations">
-                        <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">{t("story.illustrationsSavedImmediately")}</p>
-                        <StoryIllustrations
-                          illustrations={illustrations}
-                          addIllustrationToBackend={addIllustrationToBackend}
-                          deleteIllustration={deleteIllustration}
-                          reorderIllustrations={reorderIllustrations}
-                          illustrationPrompt={story.illustration_prompt}
-                          disabled={saving}
-                        />
-
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
+                <section aria-labelledby="edit-illustrations" className={panelClass}>
+                  <h2 id="edit-illustrations" className="mb-1 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <Image aria-hidden="true" className="h-5 w-5 text-story-purple-600 dark:text-story-purple-300" />
+                    {t("story.illustrations")}
+                  </h2>
+                  <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("story.illustrationsSavedImmediately")}</p>
+                  <StoryIllustrations
+                    illustrations={illustrations}
+                    addIllustrationToBackend={addIllustrationToBackend}
+                    deleteIllustration={deleteIllustration}
+                    reorderIllustrations={reorderIllustrations}
+                    illustrationPrompt={story.illustration_prompt}
+                    disabled={saving}
+                  />
+                </section>
               </div>
-              <div>
-                <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-gray-900 dark:text-gray-100">
-                      {t("story.settings")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <StorySettings
-                      availableThemes={availableThemes}
-                      weeklyThemes={weeklyThemes}
-                      sortedDayOfWeekOptions={sortedDayOfWeekOptions}
-                      story={story}
-                      availableSeries={availableSeries as unknown as Series[]}
-                      disabled={saving}
-                    />
-                  </CardContent>
-                  <CardFooter className="flex flex-col gap-2">
-                    {story.audio_path && (
-                      <p className="text-xs text-amber-700 dark:text-amber-400">{t("story.audio.willBeDeleted")}</p>
-                    )}
-                    <Button
-                      type="submit"
-                      disabled={saving}
-                      className="w-full bg-story-purple hover:bg-story-purple-600 flex items-center gap-1 text-gray-900 dark:text-gray-100"
-                    >
-                      <Save className="h-4 w-4" />
-                      {saving ? t("common.saving") : t("common.save")}
-                    </Button>
-                  </CardFooter>
-                </Card>
 
-                <RestoreVersionCard
-                    versions={versions}
-                    selectedVersion={selectedVersion}
-                    setSelectedVersion={setSelectedVersion}
-                    handleRestoreVersion={handleRestoreVersion}
-                    saving={saving}
-                    hasUnsavedChanges={form.formState.isDirty}
+              {/* Not sticky: taller than the screen with the history; the save bar is what stays in sight */}
+              <aside className="space-y-4">
+                <StorySettings
+                  availableThemes={availableThemes}
+                  weeklyThemes={weeklyThemes}
+                  availableSeries={availableSeries as unknown as Series[]}
+                  storyId={story.id}
+                  disabled={saving}
                 />
-              </div>
+
+                {notes.length > 0 && (
+                  <ul className="space-y-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-200">
+                    {notes.map((note) => (
+                      <li key={note} className="flex gap-2">
+                        <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                        {note}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <VersionHistory
+                  versions={versions}
+                  current={{ title: story.title, content: story.content, ageGroup: String(story.age_group), themes: story.themes.map((theme) => theme.name) }}
+                  onRestore={handleRestoreVersion}
+                  saving={saving}
+                  hasUnsavedChanges={isDirty}
+                />
+              </aside>
             </div>
             </fieldset>
           </form>

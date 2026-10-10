@@ -82,6 +82,62 @@ const OPENING_MAX = 200;
 /** Index of Friday: the days before end on suspense, Friday solves the plot. */
 const SUSPENSE_LAST_DAY = 4;
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+/** Feasts on a fixed date: [month, day, name]. */
+const FIXED_FEASTS = [
+  [1, 1, "le Nouvel An"], [1, 6, "l'Épiphanie (galette des rois)"], [2, 2, "la Chandeleur"], [5, 1, "la fête du Travail"],
+  [6, 21, "la fête de la musique"], [7, 14, "la fête nationale"], [10, 31, "Halloween"], [11, 1, "la Toussaint"],
+  [11, 11, "l'Armistice"], [12, 6, "la Saint-Nicolas"], [12, 24, "le réveillon de Noël"], [12, 25, "Noël"], [12, 31, "la Saint-Sylvestre"]
+];
+/** A week more than this far behind the current one belongs to next year (see yearOfWeek). */
+const BEHIND_WEEKS = 8;
+
+const addDays = (date, days) => {
+  const next = new Date(date);
+  next.setUTCDate(date.getUTCDate() + days);
+  return next;
+};
+const sameDay = (a, b) => a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
+/** "samedi 31 octobre", "dimanche 1er novembre". */
+const frenchDate = (date) => `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate() === 1 ? "1er" : date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
+/** ISO week number of a date. */
+const isoWeekOf = (date) => {
+  // The ISO week of a date is the week of its Thursday; week 1 holds January 4th
+  const thursday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  thursday.setUTCDate(thursday.getUTCDate() + 3 - ((thursday.getUTCDay() + 6) % 7));
+  const jan4 = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
+  const week1Monday = addDays(jan4, -((jan4.getUTCDay() + 6) % 7));
+  return 1 + Math.floor((thursday - week1Monday) / (7 * 86400000));
+};
+/** Easter Sunday (anonymous Gregorian algorithm). */
+const easterSunday = (year) => {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+};
+/**
+ * School holidays common to every zone, as the national calendar sets them: autumn holidays from the third
+ * Saturday of October, Christmas holidays from the Saturday on or before December 21, two weeks each
+ * (school starts again on the Monday 16 days later); summer from the first Saturday of July to September 1st.
+ * Winter and spring holidays depend on the zone: not listed.
+ * @returns {{name: string, start: Date, end: Date}[]} end: the day school starts again.
+ */
+const schoolHolidays = (year) => {
+  const october1 = new Date(Date.UTC(year, 9, 1));
+  const autumn = addDays(october1, ((6 - october1.getUTCDay() + 7) % 7) + 14);
+  const december21 = new Date(Date.UTC(year, 11, 21));
+  const christmas = addDays(december21, -((december21.getUTCDay() + 1) % 7));
+  const july1 = new Date(Date.UTC(year, 6, 1));
+  const summer = addDays(july1, (6 - july1.getUTCDay() + 7) % 7);
+  return [
+    { name: "de la Toussaint", start: autumn, end: addDays(autumn, 16) },
+    { name: "de Noël", start: christmas, end: addDays(christmas, 16) },
+    { name: "d'été", start: summer, end: new Date(Date.UTC(year, 8, 1)) }
+  ];
+};
+
 /** Existing themes listed in the prompt (most used first): enough to reuse, short enough for small models. */
 export const MAX_EXISTING_THEMES = 80;
 /** Titles of the series listed in the prompt (most recent first). */
@@ -121,8 +177,11 @@ export class PromptHelper {
       "- Une notion scientifique principale par histoire.",
       "- Pas de morale lourde ni de leçon finale récitée.",
       "- Écris en français, avec une orthographe et une typographie soignées (guillemets « », espaces avant ; : ! ?).",
-      "- Uniquement des mots français : aucun anglicisme (pas de « puddle », « splash », « cool »…) ; prénoms écrits à la française (Zoé, Léo).",
-      "- Les dialogues sont toujours entre guillemets français « … », avec un tiret à chaque changement d'interlocuteur.",
+      "- Uniquement des mots français : aucun anglicisme (pas de « puddle », « splash », « cool »…), aucun mot d'une autre langue, aucun caractère d'un autre alphabet.",
+      "- Prénoms : français et variés, choisis pour cette histoire (ne reprenez pas d'office les prénoms des exemples).",
+      "- Les dialogues sont toujours entre guillemets français, ouverts et fermés : « Regarde ! » s'écrie la fillette. Une réplique par paragraphe, avec un tiret à chaque changement d'interlocuteur.",
+      "- Un seul temps de récit pour toute l'histoire, et pour toute la semaine quand il y en a plusieurs.",
+      "- Le texte est le récit lui-même : il ne parle jamais de la consigne (numéro de semaine, suspense, cliffhanger, lecteurs, série d'histoires) et ne se corrige pas en cours de route (« non… », « ou plutôt… »).",
       "",
       "Format : réponds UNIQUEMENT avec un objet JSON valide qui respecte le format demandé. Aucun texte avant ni après, pas de bloc de code markdown, pas de markdown dans les valeurs."
     ].join("\n");
@@ -154,25 +213,29 @@ export class PromptHelper {
    */
   static buildStoryPrompt(params) {
     const { theme, age, day, numCharacters, charNames, seriesName, previousSummary, previousChapter, existingThemes, themeDescription,
-      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint, avoidTitles } = params;
+      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint, avoidTitles, reservedNames, seriesSheet } = params;
     const isWeek = day === ALL_WEEK;
     const ageKey = this.normalizeAge(age);
     const profile = this.getAgeProfile(ageKey);
     const targetDay = isWeek ? null : this.normalizeDay(day);
     const withWeekPlan = this.wantsWeekPlan(params);
+    const withCharacters = this.wantsCharacters(params);
 
     const mission = isWeek
       ? `Générez une SÉRIE COMPLÈTE de 7 histoires, une par jour, du Lundi à Dimanche, qui forment une seule aventure suivie. Le tableau "stories" contient exactement 7 éléments, dans l'ordre des jours.`
       : `Générez UNE SEULE histoire, pour le ${targetDay || "jour demandé"}. Le tableau "stories" contient exactement 1 élément.`;
 
-    const period = this.getWeekPeriod(weekNumber);
+    const year = this.yearOfWeek(weekNumber);
+    const period = this.getWeekPeriod(weekNumber, year);
     const parameters = [
       `- Sujet de la semaine : « ${theme} ». Reliez-le à la saison ou à un événement du calendrier si c'est pertinent.`,
-      period ? `- Période : semaine ${Number(weekNumber)}, ${period}. L'histoire se déroule à cette saison (météo, nature, vacances scolaires le cas échéant).` : "",
+      period ? `- Période : ${period}. L'histoire se déroule à cette saison (météo, nature).` : "",
+      this.getCalendarRule(weekNumber, year),
       themeDescription && String(themeDescription).trim() ? `- Précisions sur le sujet : ${String(themeDescription).trim()}` : "",
       `- Tranche d'âge : ${ageKey} ans.`,
       this.getCharacterPrompt(numCharacters, charNames),
-      this.getSeriesContext(seriesName)
+      this.getSeriesContext(seriesName, seriesSheet),
+      this.getReservedNamesRule(reservedNames, [seriesName, charNames])
     ].filter(Boolean).join("\n");
 
     const audience = [
@@ -222,7 +285,7 @@ export class PromptHelper {
       this.getThemesPrompt(existingThemes, { isWeek }),
       "",
       "## FORMAT DE SORTIE",
-      this.getOutputFormat(isWeek ? "Lundi" : (targetDay || "Lundi"), { withWeekPlan })
+      this.getOutputFormat(isWeek ? "Lundi" : (targetDay || "Lundi"), { withWeekPlan, withCharacters })
     ].join("\n");
   }
 
@@ -269,7 +332,8 @@ export class PromptHelper {
    */
   static getLengthRule(age) {
     const profile = this.getAgeProfile(age);
-    return `au moins ${profile.minParagraphs} paragraphes (${profile.paragraphs}), soit au moins ${this.getTargetWords(age).min} mots (${profile.wordCount})`;
+    const { min, max } = this.getTargetWords(age);
+    return `au moins ${profile.minParagraphs} paragraphes (${profile.paragraphs}), soit au moins ${min} mots (${profile.wordCount}), et jamais plus de ${max} mots`;
   }
 
   /**
@@ -293,11 +357,35 @@ export class PromptHelper {
     return lines.join("\n");
   }
 
-  static getSeriesContext(seriesName) {
-    if (seriesName && String(seriesName).trim()) {
-      return `- Série : « ${String(seriesName).trim()} ». Restez fidèle à l'univers et aux personnages de cette série.`;
+  /**
+   * Series of the story, with its fixed character sheet (written by its first generated week, or by the user),
+   * so the hero keeps the same age, look and family from one week to the next.
+   * @param {string} [seriesName]
+   * @param {string} [seriesSheet] - Character sheet of the series.
+   */
+  static getSeriesContext(seriesName, seriesSheet) {
+    if (!seriesName || !String(seriesName).trim()) return "";
+    const lines = [`- Série : « ${String(seriesName).trim()} ». Restez fidèle à l'univers et aux personnages de cette série.`];
+    const sheet = String(seriesSheet || "").trim();
+    if (sheet) {
+      lines.push(`- Fiche de la série, à respecter à l'identique (prénoms, âge, apparence, famille, liens entre personnages) : ${sheet}`);
     }
-    return "";
+    return lines.join("\n");
+  }
+
+  /**
+   * Names of the heroes of the other series: a story outside a series must not borrow them
+   * (the library had a bat called Léonie and a toad called Antonin next to the series of the same names).
+   * @param {string[]} [reservedNames] - Names of the series heroes.
+   * @param {string[]} [allowed] - Series name and requested character names of this story.
+   */
+  static getReservedNamesRule(reservedNames, allowed = []) {
+    const allowedText = allowed.filter(Boolean).join(" ").toLowerCase();
+    const names = [...new Set((Array.isArray(reservedNames) ? reservedNames : []).map(name => String(name || "").trim()).filter(Boolean))]
+      .filter(name => !allowedText.includes(name.toLowerCase()));
+    return names.length > 0
+      ? `- Prénoms réservés aux héros d'autres séries, à ne pas utiliser : ${names.map(name => `« ${name} »`).join(", ")}.`
+      : "";
   }
 
   /**
@@ -342,6 +430,16 @@ export class PromptHelper {
   }
 
   /**
+   * The answer carries the character sheets: the first day of a week generated day by day, and a whole week
+   * in one answer (its 7 stories then share one cast, with fixed names and family ties).
+   * @param {Object} params - Same parameters as buildStoryPrompt.
+   * @returns {boolean}
+   */
+  static wantsCharacters(params = {}) {
+    return params.day === ALL_WEEK || this.wantsWeekPlan(params);
+  }
+
+  /**
    * What the end of the day may (not) open, so the week tells one story that closes:
    * Monday to Thursday, the suspense prepares tomorrow's step; Friday closes every open question;
    * the weekend opens nothing.
@@ -380,6 +478,91 @@ export class PromptHelper {
     const season = [11, 0, 1].includes(month) ? "hiver" : month <= 4 ? "printemps" : month <= 7 ? "été" : "automne";
     const label = part === "mi-" ? `mi-${MONTHS[month]}` : `${part} ${MONTHS[month]}`;
     return `${label}, ${season === "été" || season === "hiver" || season === "automne" ? "en" : "au"} ${season}`;
+  }
+
+  /**
+   * Year a week of the program belongs to: the program looks ahead, so a week far behind the current one
+   * is next year's (week 1 generated in October is next January).
+   * @param {number} weekNumber
+   * @param {Date} [now]
+   * @returns {number}
+   */
+  static yearOfWeek(weekNumber, now = new Date()) {
+    const year = now.getUTCFullYear();
+    const week = Number(weekNumber);
+    if (!Number.isInteger(week)) return year;
+    return week < isoWeekOf(now) - BEHIND_WEEKS ? year + 1 : year;
+  }
+
+  /**
+   * Monday to Sunday of an ISO week.
+   * @returns {Date[]} 7 UTC dates.
+   */
+  static getWeekDates(weekNumber, year) {
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + (Number(weekNumber) - 1) * 7);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setUTCDate(monday.getUTCDate() + index);
+      return date;
+    });
+  }
+
+  /**
+   * Feasts and school holidays of a week (metropolitan France, holidays common to every zone).
+   * @returns {{dates: Date[], feasts: {date: Date, name: string}[], holidays: {name: string, start: Date, end: Date}[]}}
+   *   holidays: end is the day school starts again.
+   */
+  static getCalendarEvents(weekNumber, year) {
+    const dates = this.getWeekDates(weekNumber, year);
+    const inWeek = (date) => dates.some(day => sameDay(day, date));
+    const feasts = [];
+    for (const y of new Set(dates.map(date => date.getUTCFullYear()))) {
+      const easter = easterSunday(y);
+      const candidates = [
+        ...FIXED_FEASTS.map(([month, day, name]) => ({ date: new Date(Date.UTC(y, month - 1, day)), name })),
+        { date: addDays(easter, -47), name: "Mardi gras" },
+        { date: easter, name: "Pâques" },
+        { date: addDays(easter, 1), name: "le lundi de Pâques" }
+      ];
+      feasts.push(...candidates.filter(feast => inWeek(feast.date)));
+    }
+    feasts.sort((a, b) => a.date - b.date);
+
+    const holidays = [];
+    for (const y of new Set(dates.map(date => date.getUTCFullYear()))) {
+      for (const holiday of schoolHolidays(y)) {
+        // Overlaps the week: from its first day (Saturday) to the eve of the return to school
+        if (holiday.start <= dates[6] && addDays(holiday.end, -1) >= dates[0]) holidays.push(holiday);
+      }
+    }
+    return { dates, feasts, holidays };
+  }
+
+  /**
+   * Calendar line of the prompt: the exact days of the week, its feasts and school holidays.
+   * Models placed Christmas a week early, Christmas Eve in the first days of January
+   * and the return to school in the middle of the autumn holidays.
+   * @returns {string} "" for an invalid week.
+   */
+  static getCalendarRule(weekNumber, year = this.yearOfWeek(weekNumber)) {
+    const week = Number(weekNumber);
+    if (!Number.isInteger(week) || week < 1 || week > 53) return "";
+    const { dates, feasts, holidays } = this.getCalendarEvents(week, year);
+    const facts = [
+      ...feasts.map(feast => `${feast.name} le ${frenchDate(feast.date)}`),
+      ...holidays.map(holiday => {
+        const during = holiday.start <= dates[0] && holiday.end > dates[6] ? "toute la semaine" : `du ${frenchDate(holiday.start)} au ${frenchDate(addDays(holiday.end, -1))}`;
+        return `vacances scolaires ${holiday.name} ${during} (l'école reprend le ${frenchDate(holiday.end)})`;
+      })
+    ];
+    const lines = [`- Calendrier : la semaine va du ${frenchDate(dates[0])} au ${frenchDate(dates[6])} ${dates[6].getUTCFullYear()}.`];
+    if (facts.length > 0) {
+      lines.push(`  Cette semaine : ${facts.join(" ; ")}.`);
+      lines.push("  Une fête ne se célèbre que le jour où elle tombe : avant, on la prépare ou on l'attend ; après, on s'en souvient. Pendant les vacances, il n'y a pas d'école.");
+    }
+    return lines.join("\n");
   }
 
   /** Character sheets kept from the first day: [{ name, description }] with a name. */
@@ -476,7 +659,9 @@ export class PromptHelper {
     if (isWeek) {
       // Same rules as a week generated day by day, written in one answer
       return [
-        "Les 7 histoires forment une seule aventure suivie, du lundi au dimanche, avec les mêmes personnages : mêmes noms, même apparence (âge, cheveux, vêtements) et même caractère, dans le texte comme dans les illustrations.",
+        "Les 7 histoires forment une seule aventure suivie, du lundi au dimanche, avec les mêmes personnages : mêmes noms, même apparence (âge, cheveux, vêtements), même caractère et mêmes liens entre eux (frère, cousine, ami…), dans le texte comme dans les illustrations.",
+        "- Établissez d'abord la fiche des personnages (champ \"characters\") et suivez-la à l'identique pendant les 7 jours.",
+        "- Les 7 histoires sont toutes différentes : n'en recopiez aucune, et chaque histoire parle de son propre jour.",
         "- Chaque histoire se passe un nouveau jour et doit se comprendre seule : elle s'ouvre sur une scène nouvelle, puis rappelle en une phrase où en était l'aventure la veille, en nommant le personnage principal.",
         OPENING_RULE,
         "- Les 7 débuts sont tous différents (pas la même tournure, ni la même météo, ni le même geste). Ne recopiez aucune phrase d'une histoire à l'autre, et ne répétez pas les mêmes tics descriptifs.",
@@ -489,18 +674,22 @@ export class PromptHelper {
       ? [
         "Cette histoire ouvre une aventure suivie sur 7 jours, du lundi au dimanche, avec les mêmes personnages : posez les personnages et l'enjeu de la semaine.",
         "Avant d'écrire, établissez le plan de la semaine (champ \"week_plan\") : 7 phrases, une par jour de Lundi à Dimanche, qui décrivent l'étape de l'aventure ce jour-là. Une seule intrigue qui progresse : suspense du lundi au jeudi, résolution le vendredi, activité en famille le samedi, conclusion le dimanche. Chaque jour apporte une découverte nouvelle, sans répéter les précédentes.",
-        "Établissez aussi la fiche des personnages (champ \"characters\") : 1 à 4 personnages, chacun avec \"name\" et \"description\" (âge, apparence précise : cheveux, vêtements, signe distinctif, et caractère). Reprenez les noms demandés. Cette fiche sera suivie à l'identique tous les jours, dans le texte et les illustrations.",
+        "Établissez aussi la fiche des personnages (champ \"characters\") : 1 à 4 personnages, chacun avec \"name\" et \"description\" (âge, apparence précise : cheveux, vêtements, signe distinctif, caractère, et lien avec les autres personnages). Reprenez les noms demandés. Cette fiche sera suivie à l'identique tous les jours, dans le texte et les illustrations.",
         "L'histoire de ce lundi raconte seulement la première étape du plan : ne dévoilez pas les découvertes des jours suivants.",
         "Le suspense de fin annonce la deuxième étape de votre plan. N'introduisez pas de mystère qui n'est pas dans le plan : chaque question ouverte cette semaine sera résolue vendredi."
       ].join("\n")
       : "Cette histoire est une aventure autonome : elle doit se comprendre sans avoir lu les autres jours.";
   }
 
-  static getOutputFormat(exampleDay, { withWeekPlan = false } = {}) {
+  static getOutputFormat(exampleDay, { withWeekPlan = false, withCharacters = withWeekPlan } = {}) {
+    const characterField = "\"characters\" (tableau de personnages { \"name\", \"description\" } : âge, apparence, caractère et lien avec les autres personnages, par exemple frère, cousine ou ami)";
+    const opening = withWeekPlan
+      ? `Un objet JSON avec trois clés : "week_plan" (tableau de 7 phrases, une par jour, de Lundi à Dimanche), ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
+      : withCharacters
+        ? `Un objet JSON avec deux clés : ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
+        : "Un objet JSON avec une seule clé \"stories\" : un tableau d'histoires. Chaque histoire a exactement ces champs :";
     return [
-      withWeekPlan
-        ? "Un objet JSON avec trois clés : \"week_plan\" (tableau de 7 phrases, une par jour, de Lundi à Dimanche), \"characters\" (tableau de personnages { \"name\", \"description\" }), puis \"stories\" : un tableau d'histoires. Chaque histoire a exactement ces champs :"
-        : "Un objet JSON avec une seule clé \"stories\" : un tableau d'histoires. Chaque histoire a exactement ces champs :",
+      opening,
       `- "day" : jour de la semaine, parmi ${STORY_DAYS.map(d => `"${d}"`).join(", ")}.`,
       "- \"title\" : le titre, sans guillemets ni markdown.",
       "- \"summary\" : 2 ou 3 phrases qui serviront de contexte au jour suivant : ce qui s'est passé, ce que les personnages ont découvert, et la situation exacte à la fin (le suspense laissé pour demain).",
@@ -509,15 +698,16 @@ export class PromptHelper {
       "- \"illustration_prompt\" : la description détaillée de l'illustration.",
       "",
       "Exemple de structure (contenu à remplacer) :",
+      // Placeholder names only: models reuse the names of the examples
       JSON.stringify({
-        ...(withWeekPlan ? {
-          week_plan: STORY_DAYS.map(d => `Étape du ${d.toLowerCase()}…`),
-          characters: [{ name: "Léa", description: "Fillette de 6 ans, tresses rousses, ciré jaune, curieuse et rieuse…" }]
+        ...(withWeekPlan ? { week_plan: STORY_DAYS.map(d => `Étape du ${d.toLowerCase()}…`) } : {}),
+        ...(withCharacters ? {
+          characters: [{ name: "(prénom choisi)", description: "Fillette de 6 ans, tresses rousses, ciré jaune, curieuse et rieuse ; grande sœur de… " }]
         } : {}),
         stories: [{
           day: exampleDay,
           title: "Le secret de la goutte d'eau",
-          summary: "Léa découvre d'où vient la pluie…",
+          summary: "L'héroïne découvre d'où vient la pluie…",
           themes: [
             { name: "Cycle de l'eau", description: "Comment la pluie se forme", icon: "💧", color: "#2196F3" },
             { name: "Patience", description: "Attendre et observer avant de comprendre", icon: "⏳", color: "#9C27B0" }

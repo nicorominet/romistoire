@@ -8,13 +8,14 @@ import { storyQueryHelper } from './story_query.helper.js';
 import { storySeriesHelper } from './story_series.helper.js';
 import { geminiService } from './gemini.service.js';
 import { localLLMService } from './local_llm.service.js';
-import { defaultProvider } from './settings.service.js';
+import { defaultProvider, settingsService } from './settings.service.js';
 import { fileCleanup, AUDIO_DIR } from './helpers/file_cleanup.helper.js';
 import { assignWeekDays, countRepetitiveOpenings, extractWeekContext, parseStoryOutput, removeRepeatedOpening, splitParagraphsForAge } from './helpers/story_output.helper.js';
 import { ALL_WEEK, FORBIDDEN_OPENINGS, PromptHelper } from './helpers/prompt.helper.js';
 import { STORY_DAYS } from './helpers/story_schema.js';
 import { SHORT_STORY_RATIO } from './helpers/generation_plan.helper.js';
 import { logger } from './logger.service.js';
+import { resolveAudioOptions, validateAudioOptions } from './helpers/voice.helper.js';
 import { NotFoundError, ValidationError } from '../middleware/error.middleware.js';
 
 // A single story (or a week whose median story) under SHORT_STORY_RATIO of the minimum length of its age
@@ -76,6 +77,18 @@ const typicalLength = (words) => {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
+
+// Library orders (Mes histoires > Sort). "program": the order of the weekly program, ages youngest first.
+const STORY_ORDERS = {
+  program: "s.week_number ASC, s.day_order ASC, FIELD(s.age_group, '2-3', '4-6', '7-9', '10-12', '13-15', '16-18'), s.created_at ASC",
+  recent: 's.created_at DESC',
+  modified: 's.modified_at DESC',
+  title: 's.title ASC'
+};
+export const STORY_SORTS = Object.keys(STORY_ORDERS);
+
+/** ORDER BY of a list sort; unknown values give the program order. */
+export const storyOrderBy = (sort) => STORY_ORDERS[sort] ?? STORY_ORDERS.program;
 
 /**
  * Turns stored story content (plain text, markdown or editor HTML) into text fit for speech.
@@ -278,7 +291,11 @@ class StoryService {
   /**
    * Generate audio for a story, save it, and update the record.
    */
-  async generateAudioForStory(id) {
+  async generateAudioForStory(id, voiceOptions = {}) {
+    // Checked before anything is read or paid for
+    const { options, errors } = validateAudioOptions(voiceOptions);
+    if (errors.length > 0) throw new ValidationError('Invalid voice options', { fields: errors });
+
     const story = await this.findById(id);
     if (!story) throw new Error('Story not found');
     if (!story.content) throw new Error('Story content is empty');
@@ -287,7 +304,9 @@ class StoryService {
     if (!contentToRead) throw new Error('Story content is empty');
 
     console.log(`[StoryService] Generating audio for story ${id}...`);
-    const { audioBuffer, extension } = await geminiService.generateAudio(contentToRead);
+    // Request, then Settings > reading voice, then defaults; "auto" follows the age group
+    const resolved = resolveAudioOptions(options, settingsService.ai.audio, story.age_group);
+    const { audioBuffer, extension } = await geminiService.generateAudio(contentToRead, resolved);
 
     // Stored under uploads/audio: served by Express (/uploads) in production and by Vite in dev
     if (!fs.existsSync(AUDIO_DIR)) {
@@ -322,7 +341,7 @@ class StoryService {
             FROM stories s
             LEFT JOIN story_series ss ON s.series_id = ss.id
             WHERE ${whereClause}
-            ORDER BY s.day_order ASC, s.created_at ASC LIMIT ? OFFSET ?
+            ORDER BY ${storyOrderBy(params.sort)} LIMIT ? OFFSET ?
         `;
         const stories = await query(queryStr, [...queryParams, String(limit), String(offset)]);
         return await this._hydrateStories(stories);
@@ -722,7 +741,8 @@ class StoryService {
 
      const seriesClause = series_id ? 'series_id = ?' : 'series_id IS NULL';
      const baseParams = series_id ? [age_group, locale, series_id] : [age_group, locale];
-     const base = `SELECT id, title FROM stories WHERE age_group = ? AND locale = ? AND ${seriesClause} AND id <> ?`;
+     // Week and day too: the page shows where the neighbor sits in the program
+     const base = `SELECT id, title, week_number, day_order FROM stories WHERE age_group = ? AND locale = ? AND ${seriesClause} AND id <> ?`;
 
      const nextR = await query(
          `${base} AND (week_number > ? OR (week_number = ? AND day_order > ?)) ORDER BY week_number ASC, day_order ASC LIMIT 1`,

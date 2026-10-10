@@ -12,7 +12,9 @@ import { ALL_WEEK } from './prompt.helper.js';
 export const GENERATION_MIN_INTERVAL_MS = 12000;
 
 /** Ages whose whole week fits one request (short stories: a week is about 1,000 to 5,000 words). */
-export const SINGLE_CALL_AGES = ['2-3', '4-6', '7-9'];
+// 7-9 is written day by day since the content audit of October 2026: its two weeks written in one request
+// were the weakest of the library (stories half as long as asked, generation slips, a plot without thread).
+export const SINGLE_CALL_AGES = ['2-3', '4-6'];
 
 /** Days of a week, in order, as sent to the prompt. */
 export const GENERATION_DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];

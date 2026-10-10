@@ -38,7 +38,7 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 w-full z-50 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/20 dark:border-white/5 shadow-sm">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center justify-between px-4 2xl:px-6">
         <Link to="/" className="flex items-center gap-2 group">
           <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-500/30 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
              <Book className="h-5 w-5" />

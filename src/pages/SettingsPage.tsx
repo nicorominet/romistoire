@@ -20,9 +20,9 @@ import { STORAGE_KEYS } from "@/constants";
  * Manages Developer Mode state (persisted) and renders setting tabs.
  * The active tab is kept in the URL (?tab=...): it survives a reload and the remount on language change.
  * 
- * @returns {JSX.Element} The rendered page.
+ * @returns {React.JSX.Element} The rendered page.
  */
-const SettingsPage = (): JSX.Element => {
+const SettingsPage = (): React.JSX.Element => {
   const { t } = i18n;
 
   // Developer Mode State (read synchronously: the Network tab may be the one in the URL)
@@ -53,7 +53,7 @@ const SettingsPage = (): JSX.Element => {
 
   return (
     <PageLayout>
-        <div className="max-w-4xl mx-auto">
+        <div>
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>

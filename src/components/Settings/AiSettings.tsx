@@ -14,6 +14,7 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 import { settingsApi } from "@/api/settings.api";
 import { AiProvider, AppSettingsResponse, AppSettingsUpdate, OllamaTestResult } from "@/types/system.types";
 import { QuotaUsageCard } from "./QuotaUsageCard";
+import { VoiceDraft, VoiceOptionsFields, voiceDraftFrom } from "./VoiceOptionsFields";
 import { AI_TIMEOUT_LIMITS_SECONDS, AiTimeoutKey, isValidAiTimeoutSeconds } from "@/utils/settingsValidation";
 
 const DEFAULT_CREATIVITY = 0.9;
@@ -110,7 +111,7 @@ const ModelListEditor = ({ id, label, models, isCustom, saving, onSave }: ModelL
 /**
  * AiSettings Component
  *
- * Settings > AI generation: default provider, Gemini models, Ollama instance, creativity and timeouts.
+ * Settings > AI generation: default provider, Gemini models, reading voice, Ollama instance, creativity and timeouts.
  * Saved on the server; a cleared value goes back to the .env configuration.
  */
 export const AiSettings = () => {
@@ -133,6 +134,9 @@ export const AiSettings = () => {
   const [ollamaDirty, setOllamaDirty] = useState(false);
   const [timeoutsDirty, setTimeoutsDirty] = useState(false);
   const [creativityDirty, setCreativityDirty] = useState(false);
+  // Reading voice form (saved together)
+  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
+  const [voiceDirty, setVoiceDirty] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -148,7 +152,8 @@ export const AiSettings = () => {
       });
     }
     if (!creativityDirty) setCreativity(data.settings.ai.creativity ?? DEFAULT_CREATIVITY);
-  }, [data, ollamaDirty, timeoutsDirty, creativityDirty]);
+    if (!voiceDirty) setVoiceDraft(voiceDraftFrom(data.settings.ai.audio, data.audioOptions.defaults));
+  }, [data, ollamaDirty, timeoutsDirty, creativityDirty, voiceDirty]);
 
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>;
@@ -157,7 +162,7 @@ export const AiSettings = () => {
     return <p className="p-4 text-red-600 dark:text-red-400">{t("settings.ai.loadError")}</p>;
   }
 
-  const { settings, effective, codeDefaults, geminiKeyConfigured } = data;
+  const { settings, effective, codeDefaults, geminiKeyConfigured, audioOptions } = data;
 
   const save = (
     ai: AppSettingsUpdate["ai"],
@@ -205,6 +210,12 @@ export const AiSettings = () => {
     setOllamaModel(saved.effective.ollamaModel);
     setOllamaDirty(false);
   };
+  const syncVoice = (saved: AppSettingsResponse) => {
+    setVoiceDraft(voiceDraftFrom(saved.settings.ai.audio, saved.audioOptions.defaults));
+    setVoiceDirty(false);
+  };
+  const voiceIsDefault = Object.values(settings.ai.audio).every((value) => value === null);
+
   const syncTimeouts = (saved: AppSettingsResponse) => {
     setTimeouts({
       gemini: toSeconds(saved.settings.ai.geminiTimeoutMs),
@@ -297,6 +308,40 @@ export const AiSettings = () => {
                 ))}
               </ul>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reading voice of the audio stories */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.ai.voice.title")}</CardTitle>
+          <CardDescription>{t("settings.ai.voice.description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {voiceDraft && (
+            <VoiceOptionsFields
+              id="settings-voice"
+              options={audioOptions}
+              value={voiceDraft}
+              onChange={(draft) => { setVoiceDraft(draft); setVoiceDirty(true); }}
+              disabled={!geminiKeyConfigured || update.isPending}
+            />
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" disabled={!voiceDirty || !voiceDraft || update.isPending} onClick={() => voiceDraft && save({ audio: voiceDraft }, "settings.ai.saved", syncVoice)}>
+              {t("common.save")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="gap-1"
+              disabled={voiceIsDefault || update.isPending}
+              onClick={() => save({ audio: { voice: null, characterVoice: null, style: null, pace: null, multiSpeaker: null } }, "settings.ai.saved", syncVoice)}
+            >
+              <RotateCcw className="h-3 w-3" /> {t("settings.ai.restoreDefault")}
+            </Button>
           </div>
         </CardContent>
       </Card>

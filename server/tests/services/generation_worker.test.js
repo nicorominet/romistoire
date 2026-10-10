@@ -60,6 +60,7 @@ const { storyService } = await import('../../services/story.service.js');
 const { themeService } = await import('../../services/theme.service.js');
 const { generationJobService, normalizeJobParams } = await import('../../services/generation_job.service.js');
 const { GenerationWorker } = await import('../../services/generation_worker.js');
+const { aiUsageService } = await import('../../services/ai_usage.service.js');
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 const ORDER = Object.fromEntries(DAYS.map((d, i) => [d, i + 1]));
@@ -102,6 +103,23 @@ describe('generation job parameters', () => {
 
     // week 1 / 4-6 written, week 3 has no topic (2 cells); remaining: w1 16-18 (7), w2 4-6 (1), w2 16-18 (7)
     expect(estimate).toMatchObject({ units: 6, skipped: 3, toGenerate: 3, missingTopics: [3], requests: 15, quotaWarning: false });
+  });
+
+  it('warns when the job needs more requests than the fast models have left today', async () => {
+    const remaining = vi.spyOn(aiUsageService, 'remainingToday');
+
+    remaining.mockResolvedValueOnce(1);
+    const short = await generationJobService.estimate({ weeks: [1, 2], ages: ['4-6', '16-18'], provider: 'gemini' });
+    expect(short.requests).toBeGreaterThan(1);
+    expect(short).toMatchObject({ remainingRequests: 1, quotaWarning: true });
+    // Gemma (slow, last resort) is not counted
+    expect(remaining.mock.calls[0][0].some(model => model.startsWith('gemma-'))).toBe(false);
+
+    remaining.mockResolvedValueOnce(500);
+    const enough = await generationJobService.estimate({ weeks: [1, 2], ages: ['4-6', '16-18'], provider: 'gemini' });
+    expect(enough).toMatchObject({ remainingRequests: 500, quotaWarning: false });
+
+    remaining.mockRestore();
   });
 });
 
