@@ -29,6 +29,8 @@ async function startServer() {
          .catch((error) => logger.error('Quota statistics import failed:', {}, error));
        // Mass generation jobs interrupted by a restart start again where they stopped
        generationWorker.resumeAfterRestart().catch((error) => logger.error('Generation worker failed:', {}, error));
+       // Framed jobs waiting for the quota start again on the next quota day
+       generationWorker.startScheduler();
        setInterval(runMaintenance, MAINTENANCE_INTERVAL_MS).unref();
     } else {
        logger.error('Failed to connect to database. Server not started.');

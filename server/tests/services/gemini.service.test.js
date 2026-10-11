@@ -243,6 +243,10 @@ describe('modelsForAge', () => {
     expect(modelsForAge(DEFAULT_MODELS, '10-12')[0]).toBe('gemini-3-flash-preview');
   });
 
+  it('should keep only the recommended Flash models with flashOnly', () => {
+    expect(modelsForAge(DEFAULT_MODELS, '2-3', { flashOnly: true })).toEqual(['gemini-3-flash-preview', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash']);
+  });
+
   it('should keep the configured order for the youngest ages and for unknown models', () => {
     expect(modelsForAge(DEFAULT_MODELS, '4-6')).toEqual(DEFAULT_MODELS);
     expect(modelsForAge(DEFAULT_MODELS, '2-3')).toEqual(DEFAULT_MODELS);

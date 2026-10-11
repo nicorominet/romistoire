@@ -8,8 +8,20 @@ import {
   imageCode, buildImagePrompt, cleanIllustrationPrompt, buildIllustrationRequest,
   buildPromptsText, buildPromptsJson, ILLUSTRATION_PROMPT_SYSTEM
 } from './helpers/image_prompt.helper.js';
+import { seriesCastService } from './series_cast.service.js';
+import { castForWeek } from './helpers/cast_validation.helper.js';
 
 const PROMPT_MAX = 2000;
+
+/**
+ * Bible of a story (framed series): the cast of its series for its age group, as told its week. null otherwise.
+ * @param {{series_id?: string|null, age_group?: string, week_number?: number|null}} story
+ * @param {Object[]} casts - Casts of the series concerned.
+ */
+const castOfStory = (story, casts) => {
+  const cast = story.series_id ? casts.find(c => c.seriesId === story.series_id && c.ageGroups.includes(story.age_group)) : null;
+  return cast ? castForWeek(cast, Number(story.week_number) || cast.referenceWeek) : null;
+};
 
 /**
  * Illustration workshop: stories to illustrate, their ready-to-paste prompts, and prompts written by the AI.
@@ -33,6 +45,8 @@ class IllustrationService {
        ORDER BY s.week_number ASC, CAST(SUBSTRING_INDEX(s.age_group, '-', 1) AS UNSIGNED) ASC, s.series_id ASC, s.day_order ASC, s.created_at ASC`,
       params
     );
+    // Framed series: every image prompt carries the fixed look of the characters of its bible
+    const casts = await seriesCastService.castsOfSeries(rows.map(row => row.series_id));
     return rows.map(row => ({
       id: row.id,
       title: row.title,
@@ -42,7 +56,7 @@ class IllustrationService {
       series_id: row.series_id ?? null,
       illustration_prompt: row.illustration_prompt ?? null,
       code: imageCode(row.id),
-      imagePrompt: buildImagePrompt(row),
+      imagePrompt: buildImagePrompt(row, castOfStory(row, casts)),
       illustrationCount: Number(row.illustration_count) || 0,
       cover: row.cover ? String(row.cover).replace(/\\/g, '/') : null
     }));
@@ -64,15 +78,21 @@ class IllustrationService {
   }
 
   async _findStory(storyId) {
-    const [story] = await query('SELECT id, title, content, age_group FROM stories WHERE id = ?', [storyId]);
+    const [story] = await query('SELECT id, title, content, age_group, series_id, week_number FROM stories WHERE id = ?', [storyId]);
     if (!story) throw new NotFoundError('Story not found');
     return story;
+  }
+
+  /** Bible of a story (framed series), or null. */
+  async _castOf(story) {
+    return story.series_id ? castOfStory(story, await seriesCastService.castsOfSeries([story.series_id])) : null;
   }
 
   /** Saves the description without creating a story version (the text of the story does not change). */
   async _savePrompt(story, prompt) {
     await query('UPDATE stories SET illustration_prompt = ? WHERE id = ?', [prompt, story.id]);
-    return { id: story.id, illustration_prompt: prompt, imagePrompt: buildImagePrompt({ ...story, illustration_prompt: prompt }) };
+    const imagePrompt = buildImagePrompt({ ...story, illustration_prompt: prompt }, await this._castOf(story));
+    return { id: story.id, illustration_prompt: prompt, imagePrompt };
   }
 
   /**
@@ -83,7 +103,8 @@ class IllustrationService {
    */
   async generatePrompt(storyId) {
     const story = await this._findStory(storyId);
-    const request = buildIllustrationRequest(story);
+    // Framed series: the text only evokes the looks, the bible gives them
+    const request = buildIllustrationRequest(story, await this._castOf(story));
     const ai = settingsService.ai.defaultProvider !== 'local' && geminiService.apiKey ? geminiService : localLLMService;
     const { text } = await ai.generateText(ILLUSTRATION_PROMPT_SYSTEM, request, 'IllustrationPrompt');
     const prompt = cleanIllustrationPrompt(text).slice(0, PROMPT_MAX);

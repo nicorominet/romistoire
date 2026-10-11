@@ -98,7 +98,7 @@ export const WEEK_PLAN_LENGTH = STORY_DAYS.length;
  * @param {Object} base - GEMINI_RESPONSE_SCHEMA or JSON_SCHEMA.
  * @param {(type: string) => string} type - Type name in the schema dialect.
  */
-const buildSchema = (base, type, { withWeekPlan = false, withCharacters = false, minParagraphs = 0, storyCount = 0 } = {}) => {
+const buildSchema = (base, type, { withWeekPlan = false, withCharacters = withWeekPlan, minParagraphs = 0, storyCount = 0 } = {}) => {
   const schema = structuredClone(base);
   if (storyCount > 0) {
     schema.properties.stories.minItems = storyCount;
@@ -110,15 +110,18 @@ const buildSchema = (base, type, { withWeekPlan = false, withCharacters = false,
   const characterProperties = { name: { type: type('string') }, description: { type: type('string') } };
   const context = {
     ...(withWeekPlan ? { week_plan: { type: type('array'), items: { type: type('string') } } } : {}),
-    characters: {
-      type: type('array'),
-      items: { type: type('object'), properties: characterProperties, required: ['name', 'description'] }
-    }
+    // A framed series gives its cast: its first day writes the plan only
+    ...(withCharacters ? {
+      characters: {
+        type: type('array'),
+        items: { type: type('object'), properties: characterProperties, required: ['name', 'description'] }
+      }
+    } : {})
   };
   schema.properties = { ...context, ...schema.properties };
   schema.required = [...Object.keys(context), 'stories'];
   if (base === GEMINI_RESPONSE_SCHEMA) {
-    schema.properties.characters.items.propertyOrdering = ['name', 'description'];
+    if (withCharacters) schema.properties.characters.items.propertyOrdering = ['name', 'description'];
     schema.propertyOrdering = [...Object.keys(context), 'stories'];
   }
   return schema;

@@ -315,6 +315,13 @@ describe('PromptHelper', () => {
             expect(PromptHelper.buildStoryPrompt({ ...baseParams, day: 'Toute la semaine', age: '4-6' })).not.toContain('Léa');
         });
 
+        it('should keep the mystery of the week within real science', () => {
+            // S43 16-18 (3-flash-preview): a velvet cape glowing with the pH, the skin and a "living" enzyme
+            expect(PromptHelper.buildSystemInstruction()).toContain('Le mystère s\'explique toujours par un phénomène réel et connu');
+            expect(PromptHelper.buildStoryPrompt({ ...baseParams, age: '16-18' })).toContain('leurs résultats sont ceux de la vraie science');
+            expect(PromptHelper.buildStoryPrompt({ ...baseParams, age: '13-15' })).toContain('leurs résultats sont ceux de la vraie science');
+        });
+
         it('should reserve the names of the other series heroes', () => {
             const outside = PromptHelper.buildStoryPrompt({ ...baseParams, reservedNames: ['Antonin', 'Léonie'] });
             expect(outside).toContain('Prénoms réservés aux héros d\'autres séries, à ne pas utiliser : « Antonin », « Léonie ».');
@@ -360,7 +367,9 @@ describe('PromptHelper', () => {
             const week43 = PromptHelper.getCalendarRule(43, 2026);
             expect(week43).toContain('la semaine va du lundi 19 octobre au dimanche 25 octobre 2026');
             expect(week43).toContain('vacances scolaires de la Toussaint toute la semaine (l\'école reprend le lundi 2 novembre)');
-            expect(week43).not.toContain('Halloween le');
+            expect(week43).not.toContain('Cette semaine : Halloween');
+            // S43 7-9 and S43 Antonin had the trick-or-treat on 22 and 25 October: the coming feast is said
+            expect(week43).toContain('À venir, après cette semaine : Halloween le samedi 31 octobre ; la Toussaint le dimanche 1er novembre. Cette semaine, on peut le préparer ou l\'attendre, mais pas encore le fêter.');
             expect(week43).toContain('Une fête ne se célèbre que le jour où elle tombe');
 
             const week44 = PromptHelper.getCalendarRule(44, 2026);
@@ -368,10 +377,19 @@ describe('PromptHelper', () => {
             expect(week44).toContain('la Toussaint le dimanche 1er novembre');
         });
 
+        it('should say the school days of a week where the holidays start', () => {
+            // S42 7-9 (3-flash-preview) began the holidays on Monday 12 October
+            const week42 = PromptHelper.getCalendarRule(42, 2026);
+            expect(week42).toContain('vacances scolaires de la Toussaint du samedi 17 octobre au dimanche 1er novembre');
+            expect(week42).toContain('avant le samedi 17 octobre, c\'est encore l\'école');
+            expect(PromptHelper.getCalendarRule(43, 2026)).not.toContain('c\'est encore l\'école');
+        });
+
         it('should place Christmas, the holidays and the New Year on their real days', () => {
             const week51 = PromptHelper.getCalendarRule(51, 2026);
-            expect(week51).not.toContain('Noël le');
-            expect(week51).toContain('vacances scolaires de Noël du samedi 19 décembre au dimanche 3 janvier (l\'école reprend le lundi 4 janvier)');
+            expect(week51).not.toContain('Cette semaine : Noël');
+            expect(week51).toContain('À venir, après cette semaine : le réveillon de Noël le jeudi 24 décembre ; Noël le vendredi 25 décembre');
+            expect(week51).toContain('vacances scolaires de Noël du samedi 19 décembre au dimanche 3 janvier (l\'école reprend le lundi 4 janvier ; avant le samedi 19 décembre, c\'est encore l\'école)');
 
             const week52 = PromptHelper.getCalendarRule(52, 2026);
             expect(week52).toContain('le réveillon de Noël le jeudi 24 décembre ; Noël le vendredi 25 décembre');
@@ -386,9 +404,12 @@ describe('PromptHelper', () => {
             // Easter 2027: Sunday March 28 (week 12), Easter Monday in the next week
             expect(PromptHelper.getCalendarRule(12, 2027)).toContain('Cette semaine : Pâques le dimanche 28 mars.');
             expect(PromptHelper.getCalendarRule(13, 2027)).toContain('le lundi de Pâques le lundi 29 mars');
-            const plain = PromptHelper.getCalendarRule(47, 2026);
-            expect(plain).toContain('la semaine va du lundi 16 novembre au dimanche 22 novembre 2026');
+            const plain = PromptHelper.getCalendarRule(38, 2026);
+            expect(plain).toContain('la semaine va du lundi 14 septembre au dimanche 20 septembre 2026');
             expect(plain).not.toContain('Cette semaine');
+            expect(plain).not.toContain('À venir');
+            // Saint-Nicolas (6 December) is two weeks after week 47
+            expect(PromptHelper.getCalendarRule(47, 2026)).toBe('- Calendrier : la semaine va du lundi 16 novembre au dimanche 22 novembre 2026.\n  À venir, après cette semaine : la Saint-Nicolas le dimanche 6 décembre. Cette semaine, on peut le préparer ou l\'attendre, mais pas encore le fêter.\n  Une fête ne se célèbre que le jour où elle tombe : avant, on la prépare ou on l\'attend ; après, on s\'en souvient. Pendant les vacances, il n\'y a pas d\'école.');
             expect(PromptHelper.getCalendarRule(0, 2026)).toBe('');
         });
 

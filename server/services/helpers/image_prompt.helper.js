@@ -4,6 +4,8 @@
  * then attached back to their story thanks to the code in the file name.
  */
 
+import { castLookBlock, characterLook } from './cast_look.helper.js';
+
 const CODE_LENGTH = 8;
 export const CODE_PATTERN = /IMG-([0-9a-f]{8})/i;
 
@@ -36,14 +38,16 @@ export const imageStyle = (ageGroup) => {
 export const imageCode = (storyId) => `IMG-${String(storyId).replace(/-/g, '').slice(0, CODE_LENGTH).toLowerCase()}`;
 
 /**
- * Complete prompt to paste: style of the age group, description of the story, fixed rules.
+ * Complete prompt to paste: style of the age group, description of the story, the fixed look of the characters of
+ * its series bible (framed series), fixed rules.
  * @param {{illustration_prompt?: string|null, age_group?: string}} story
+ * @param {{characters?: Object[]}|null} [cast] - Bible of its series and age group, as told its week (castForWeek).
  * @returns {string} Empty when the story has no description yet.
  */
-export const buildImagePrompt = (story) => {
+export const buildImagePrompt = (story, cast = null) => {
   const description = String(story.illustration_prompt ?? '').trim();
   if (!description) return '';
-  return [imageStyle(story.age_group), description, IMAGE_RULES].join('\n\n');
+  return [imageStyle(story.age_group), description, castLookBlock(cast, description), IMAGE_RULES].filter(Boolean).join('\n\n');
 };
 
 /**
@@ -70,11 +74,13 @@ export const ILLUSTRATION_PROMPT_SYSTEM = [
 ].join('\n');
 
 /**
- * Story given to the AI: title and plain text, trimmed to keep the call small.
+ * Story given to the AI: title and plain text, trimmed to keep the call small. A framed series gives the look of
+ * every character of its bible: the text only evokes it, the description must not invent it.
  * @param {{title: string, content: string, age_group?: string}} story
+ * @param {{characters?: Object[]}|null} [cast] - Bible of its series and age group, as told its week.
  * @returns {string}
  */
-export const buildIllustrationRequest = (story) => {
+export const buildIllustrationRequest = (story, cast = null) => {
   const text = String(story.content ?? '')
     .replace(/<\/p>|<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -84,7 +90,11 @@ export const buildIllustrationRequest = (story) => {
     .slice(0, 6000);
   const header = [`Titre : ${story.title}`];
   if (story.age_group) header.push(`Public : ${story.age_group} ans`);
-  return `${header.join('\n')}\n\n${text}`;
+  const looks = (cast?.characters || []).map(characterLook).filter(Boolean);
+  const bible = looks.length
+    ? `\n\nApparence des personnages (décrivez exactement ainsi ceux qui sont dans la scène) :\n${looks.map(line => `- ${line}`).join('\n')}`
+    : '';
+  return `${header.join('\n')}\n\n${text}${bible}`;
 };
 
 /**

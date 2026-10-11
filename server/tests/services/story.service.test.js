@@ -318,10 +318,30 @@ describe('StoryService Unit Tests', () => {
 
             await storyService.update('story-1', { title: 'Nouveau titre' });
 
-            const [sql] = updateCall(connection);
-            expect(sql).toContain("review_status = 'validated'");
+            expect(updatedValue(connection, 'review_status')).toBe('validated');
             expect(updatedValue(connection, 'content')).toBe('C');
             expect(connection.query).not.toHaveBeenCalledWith('DELETE FROM story_themes WHERE story_id = ?', ['story-1']);
+        });
+
+        it('should keep the review status, the edited flag and the audio for a typography fix', async () => {
+            const connection = setupConnection();
+
+            await storyService.update('story-1', { content: '<p>« Texte »</p>' }, { mechanical: true });
+
+            expect(updatedValue(connection, 'review_status')).toBe(oldStory.review_status);
+            expect(updatedValue(connection, 'is_manually_edited')).toBe(Boolean(oldStory.is_manually_edited));
+            expect(updatedValue(connection, 'audio_path')).toBe(oldStory.audio_path);
+        });
+
+        it('should put a regenerated story back to review, not as edited by hand, with its new summary', async () => {
+            const connection = setupConnection();
+
+            const result = await storyService.update('story-1', { title: 'Nouveau titre', summary: 'Nouveau résumé' }, { regenerated: true });
+
+            expect(updatedValue(connection, 'review_status')).toBe('to_review');
+            expect(updatedValue(connection, 'is_manually_edited')).toBe(false);
+            expect(connection.query).toHaveBeenCalledWith('UPDATE stories SET summary = ? WHERE id = ?', ['Nouveau résumé', 'story-1']);
+            expect(result.review_status).toBe('to_review');
         });
 
         it('should answer 404 for an unknown story and 400 for an invalid one', async () => {
@@ -518,10 +538,44 @@ describe('generateFromAI', () => {
         expect(generate.mock.calls[1][0].lengthHint).toContain('au moins 700 mots');
     });
 
+    const slipText = (slip) => JSON.stringify({
+        stories: [{ day: 'Mardi', title: 'T', summary: 'S', themes: [], illustration_prompt: 'I',
+            paragraphs: [`${slip} ${Array.from({ length: 720 }, (_, i) => `mot${i}`).join(' ')}`] }]
+    });
+
+    it('should ask once more for a generation slip and keep the answer without it (audit S43 10-12)', async () => {
+        const { generate, ai } = await mockGeneration(slipText('Les cartons en the carton vide.'), slipText('Les cartons vides.'));
+
+        const result = await storyService.generateFromAI({ theme: 'Halloween', age: '10-12', day: 'Mardi' }, 'gemini');
+
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(generate.mock.calls[1][0].lengthHint).toBe('Mardi : écrivez uniquement en français (vous aviez écrit « the »).');
+        expect(result.stories[0].paragraphs[0]).toMatch(/^Les cartons vides\./);
+        expect(result.defects).toEqual([]);
+        expect(ai).toHaveBeenCalledWith('Gemini', 'Story-Parsed', expect.anything(), expect.objectContaining({
+            defectsFirst: [{ index: 0, code: 'english', detail: 'the' }], defects: []
+        }));
+    });
+
+    it('should keep the first answer when the second one is worse, and not ask again for a minor defect', async () => {
+        const { generate } = await mockGeneration(slipText('Le merle傾écoute.'), slipText('Le merle傾écoute, the end.'));
+        const result = await storyService.generateFromAI({ theme: 'Oiseaux', age: '10-12', day: 'Mardi' }, 'gemini');
+        expect(generate).toHaveBeenCalledTimes(2);
+        expect(result.stories[0].paragraphs[0]).toMatch(/^Le merle傾écoute\./);
+        expect(result.defects.map(defect => defect.code)).toEqual(['cjk']);
+
+        // A title already used is reported, not asked again
+        const { generate: once } = await mockGeneration(storyText(720));
+        const kept = await storyService.generateFromAI({ theme: 'Bateaux', age: '10-12', day: 'Mardi', avoidTitles: ['T'] }, 'gemini');
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(kept.defects.map(defect => defect.code)).toEqual(['used-title']);
+    });
+
     const weekText = (wordsPerDay, paragraphsOf = () => null) => JSON.stringify({
         stories: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((day, index) => ({
             day, title: `T${index}`, summary: 'S', themes: [], illustration_prompt: 'I',
-            paragraphs: paragraphsOf(index) || [Array.from({ length: wordsPerDay }, (_, i) => `mot${i}`).join(' ')]
+            // Each day its own words: identical days are a copied story for the quality gate
+            paragraphs: paragraphsOf(index) || [Array.from({ length: wordsPerDay }, (_, i) => `jour${index}mot${i}`).join(' ')]
         }))
     });
 
@@ -572,7 +626,7 @@ describe('generateFromAI', () => {
     });
 
     it('should log the stories that open with the reminder of the previous day', async () => {
-        const opening = (index) => (index === 0 ? null : [`Hier, Léonie et Antonin avaient trouvé la bogue numéro ${index}.`, Array.from({ length: 320 }, (_, i) => `mot${i}`).join(' ')]);
+        const opening = (index) => (index === 0 ? null : [`Hier, Léonie et Antonin avaient trouvé la bogue numéro ${index}.`, Array.from({ length: 320 }, (_, i) => `jour${index}mot${i}`).join(' ')]);
         const { ai } = await mockGeneration(weekText(320, opening));
 
         await storyService.generateFromAI({ theme: 'Châtaignes', age: '4-6', day: 'Toute la semaine' }, 'gemini');

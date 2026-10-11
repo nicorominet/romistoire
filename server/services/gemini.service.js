@@ -109,23 +109,27 @@ export const getModelCapabilities = (model) =>
  * Age groups written by the Flash models first. Flash Lite stops around 700 words, and the content audit
  * of October 2026 found its 7-12 stories far weaker (generation slips, lost plot threads) than Flash's.
  */
-const FLASH_FIRST_AGES = ['7-9', '10-12', '13-15', '16-18'];
+export const FLASH_FIRST_AGES = ['7-9', '10-12', '13-15', '16-18'];
 /** Best Flash model of the audit, tried first. */
 const PREFERRED_FLASH = 'gemini-3-flash-preview';
 /** Weakest science of the audit: kept as a late fallback, just before Gemma. */
 const LATE_FLASH = 'gemini-2.5-flash';
 
-const isFlashModel = (model) => /^gemini-.*-flash(?:-preview)?$/.test(model);
+export const isFlashModel = (model) => /^gemini-.*-flash(?:-preview)?$/.test(model);
 
 /**
  * Model order for an age group. From 7 years old: the preferred Flash model, the other Flash models,
  * every other Gemini model in the configured order, the late Flash model, then Gemma.
  * Younger ages keep the configured order (Flash Lite first: short stories, larger quota).
+ * flashOnly keeps the recommended Flash models only (no Flash Lite, no 2.5 Flash, no Gemma): when they are all
+ * saturated the request fails and the unit can be retried later, instead of being written by a weaker model.
  * @param {string[]} models - Configured order.
  * @param {string} age - Age group ("13-15" or "13-15 ans").
+ * @param {{flashOnly?: boolean}} [options]
  * @returns {string[]}
  */
-export const modelsForAge = (models, age) => {
+export const modelsForAge = (models, age, { flashOnly = false } = {}) => {
+  if (flashOnly) return modelsForAge(models, '16-18').filter(model => isFlashModel(model) && model !== LATE_FLASH);
   if (!FLASH_FIRST_AGES.includes(PromptHelper.normalizeAge(age))) return models;
   const rank = (model) => {
     if (model === PREFERRED_FLASH) return 0;
@@ -135,6 +139,18 @@ export const modelsForAge = (models, age) => {
   };
   // Stable sort: the configured order is kept inside each rank
   return models.map((model, index) => ({ model, index })).sort((a, b) => rank(a.model) - rank(b.model) || a.index - b.index).map(({ model }) => model);
+};
+
+/**
+ * Models of the checks (week audit of the framed generation), taken from the configured list: its Flash Lite models,
+ * then its Gemma models; never the Flash models, whose 20 requests a day write the stories from 7 years old.
+ * The configured order when the list has neither.
+ * @param {string[]} [models] - Configured order.
+ * @returns {string[]}
+ */
+export const auditModels = (models = geminiConfig().models) => {
+  const checks = [...models.filter(model => model.includes('flash-lite')), ...models.filter(model => model.startsWith('gemma-'))];
+  return checks.length ? checks : models;
 };
 
 /** Models skipped after a failure (shared by story and audio calls). */
@@ -152,7 +168,7 @@ export const modelCooldowns = new ModelCooldowns();
  *   makes small models pad the story with filler or the illustration description.
  * @returns {Object} Request body.
  */
-export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutputTokens, { thinking = true, withWeekPlan = false, withCharacters = false, minParagraphs = 0, storyCount = 0 } = {}) => {
+export const buildStoryRequestBody = (model, systemInstruction, prompt, maxOutputTokens, { thinking = true, withWeekPlan = false, withCharacters = withWeekPlan, minParagraphs = 0, storyCount = 0 } = {}) => {
   const capabilities = getModelCapabilities(model);
   const body = {
     contents: [{
@@ -425,7 +441,8 @@ class GeminiService {
     const startTime = Date.now();
     try {
         const { result, model, skipped } = await this._generateWithFallback(
-            modelsForAge(config.models, age),
+            // A model chosen for the job is the only one tried; otherwise the order of the age group
+            params.model ? [params.model] : modelsForAge(config.models, age, { flashOnly: params.flashOnly }),
             (model, options) => buildStoryRequestBody(model, systemInstruction, prompt, maxOutputTokens, { ...options, withWeekPlan, withCharacters, storyCount: isWeek ? WEEK_STORY_COUNT : 0 }),
             'Story',
             { timeoutMs: isWeek ? config.weekTimeoutMs : config.timeoutMs }
@@ -461,14 +478,14 @@ class GeminiService {
    * @param {string} systemInstruction
    * @param {string} prompt
    * @param {string} label - Label for console and AI logs.
-   * @param {{maxOutputTokens?: number}} [options]
+   * @param {{maxOutputTokens?: number, models?: string[]}} [options] - models: another order (week audit: auditModels).
    * @returns {Promise<{text: string, model: string}>}
    */
-  async generateText(systemInstruction, prompt, label, { maxOutputTokens = 600 } = {}) {
+  async generateText(systemInstruction, prompt, label, { maxOutputTokens = 600, models = geminiConfig().models } = {}) {
     if (!this.apiKey) throw new Error("Gemini API Key not configured.");
     const startTime = Date.now();
     try {
-      const { result, model, skipped } = await this._generateWithFallback(geminiConfig().models, (model, { thinking }) => {
+      const { result, model, skipped } = await this._generateWithFallback(models, (model, { thinking }) => {
         const capabilities = getModelCapabilities(model);
         const body = {
           contents: [{ role: 'user', parts: [{ text: capabilities.systemInstruction ? prompt : `${systemInstruction}\n\n${prompt}` }] }],

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { AArrowDown, AArrowUp, ArrowLeft, BookOpenText, CheckCircle2, Edit, Eye, Loader2, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { AArrowDown, AArrowUp, ArrowLeft, BookOpenText, CheckCircle2, Edit, Eye, Loader2, MoreHorizontal, RefreshCw, Trash2, X } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import PageLayout from '@/components/Layout/PageLayout';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import StoryNavigation from '@/components/Story/StoryDetail/StoryNavigation';
 import StoryContent from '@/components/Story/StoryDetail/StoryContent';
 import StorySidePanel from '@/components/Story/StoryDetail/StorySidePanel';
+import RegenerateWeekDialog from '@/components/Story/StoryDetail/RegenerateWeekDialog';
 import { storyDayLabel } from '@/components/Story/StoryCard';
 import { APP_ROUTES } from '@/constants';
 import { WeeklyTheme } from '@/types/Theme';
@@ -50,6 +51,7 @@ const StoryDetailPage = (): JSX.Element => {
   const reading = searchParams.get('read') === '1';
   const enteredFullscreen = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const { textSizeClass, canShrink, canGrow, shrink, grow } = useReadingPrefs();
 
   // Back to where the user came from (library with its filters), or to the library on a direct visit
@@ -258,6 +260,10 @@ const StoryDetailPage = (): JSX.Element => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem className="gap-2" onSelect={() => setConfirmRegenerate(true)}>
+                  <RefreshCw className="h-4 w-4" />
+                  {t('story.regenerate.menu')}
+                </DropdownMenuItem>
                 <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-700 dark:text-red-400" onSelect={() => setConfirmDelete(true)}>
                   <Trash2 className="h-4 w-4" />
                   {t('common.delete')}
@@ -266,6 +272,9 @@ const StoryDetailPage = (): JSX.Element => {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Mounted when opened: it estimates the cost of the regeneration on opening */}
+        {confirmRegenerate && <RegenerateWeekDialog open onOpenChange={setConfirmRegenerate} story={story} />}
 
         <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <AlertDialogContent>

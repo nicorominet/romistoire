@@ -20,6 +20,7 @@ const STATUS_CLASS: Record<JobStatus | UnitStatus, string> = {
   pending: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   running: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   paused: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  scheduled: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   cancelled: "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   done: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   failed: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
@@ -29,6 +30,9 @@ const STATUS_CLASS: Record<JobStatus | UnitStatus, string> = {
 const StatusBadge = ({ status }: { status: JobStatus | UnitStatus }) => (
   <Badge variant="outline" className={`border-0 ${STATUS_CLASS[status]}`}>{i18n.t(`generation.status.${status}`)}</Badge>
 );
+
+/** Resume time of a scheduled job (stored in UTC), in local time. */
+const resumeLabel = (resumeAt: string) => new Date(`${resumeAt.replace(" ", "T")}Z`).toLocaleString();
 
 const percent = (job: GenerationJob) => (job.totalUnits > 0 ? Math.round((job.doneUnits / job.totalUnits) * 100) : 0);
 
@@ -60,12 +64,17 @@ const JobActions = ({ job }: { job: GenerationJob }) => {
           <Pause className="h-4 w-4" />
         </Button>
       )}
-      {job.status === "paused" && (
+      {job.status === "scheduled" && (
+        <Button size="icon" variant="ghost" onClick={() => run("pause")} disabled={action.isPending} aria-label={t("generation.actions.pause")} title={t("generation.actions.pause")}>
+          <Pause className="h-4 w-4" />
+        </Button>
+      )}
+      {(job.status === "paused" || job.status === "scheduled") && (
         <Button size="icon" variant="ghost" onClick={() => run("resume")} disabled={action.isPending} aria-label={t("generation.actions.resume")} title={t("generation.actions.resume")}>
           <Play className="h-4 w-4" />
         </Button>
       )}
-      {(isActiveJob(job) || job.status === "paused") && (
+      {(isActiveJob(job) || job.status === "paused" || job.status === "scheduled") && (
         <Button size="icon" variant="ghost" onClick={() => run("cancel")} disabled={action.isPending} aria-label={t("generation.actions.cancel")} title={t("generation.actions.cancel")}>
           <Square className="h-4 w-4" />
         </Button>
@@ -209,6 +218,9 @@ export const JobsPanel = ({ selectedJobId, onSelect }: JobsPanelProps) => {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={job.status} />
+                {job.params.mode === "framed" && (
+                  <Badge variant="outline" className="border-indigo-300 text-indigo-700 dark:text-indigo-300">{t("generation.jobs.framed")}</Badge>
+                )}
                 <span className="font-medium">
                   {t("generation.jobs.summary", {
                     weeks: weeksLabel(job.params.weeks),
@@ -232,6 +244,7 @@ export const JobsPanel = ({ selectedJobId, onSelect }: JobsPanelProps) => {
                 skipped: String(job.skippedCount),
               })}
               {job.currentLabel && isActiveJob(job) && <> · {t("generation.jobs.current", { label: job.currentLabel })}</>}
+              {job.status === "scheduled" && job.resumeAt && <> · {t("generation.jobs.resumeAt", { date: resumeLabel(job.resumeAt) })}</>}
               {" · "}{new Date(job.createdAt).toLocaleString()}
             </p>
           </div>

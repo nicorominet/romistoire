@@ -32,6 +32,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  BookOpenCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -238,6 +239,16 @@ const SeriesManagementPage = () => {
                         onClick={() => setViewingSeries(s)}
                       >
                         <Eye className="h-4 w-4 text-blue-500" />
+                      </Button>
+                      {/* Bible of the series: framed generation tab */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title={t("framed.sections.bible")}
+                        aria-label={t("framed.sections.bible")}
+                        onClick={() => navigate(`${APP_ROUTES.GENERATION}?tab=framed&series=${s.id}`)}
+                      >
+                        <BookOpenCheck className="h-4 w-4 text-indigo-500" />
                       </Button>
                       <Button
                         variant="ghost"

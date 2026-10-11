@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Info, Loader2, Wand2 } from "lucide-react";
+import { Info, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { i18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MultiSelect } from "@/components/Common/MultiSelect";
 import { SeriesSelector } from "@/components/Story/SeriesSelector";
+import QuotaEstimate from "@/components/Generation/QuotaEstimate";
 import { AGE_GROUPS } from "@/types/Story";
 import { Series } from "@/types/Series";
 import { WeeklyTheme } from "@/types/Theme";
@@ -56,6 +57,7 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
   const [providerTouched, setProviderTouched] = useState(false);
   const [model, setModel] = useState("");
   const [skipExisting, setSkipExisting] = useState(true);
+  const [flashOnly, setFlashOnly] = useState(false);
   const { create } = useGenerationJobMutations();
 
   // Default provider of Settings > AI generation, until the user picks one here
@@ -90,12 +92,13 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
     provider,
     model: provider === "local" ? model || null : null,
     skipExisting,
-  }), [weeks, ages, day, numCharacters, charNames, seriesName, provider, model, skipExisting]);
+    flashOnly: provider === "gemini" && flashOnly,
+  }), [weeks, ages, day, numCharacters, charNames, seriesName, provider, model, skipExisting, flashOnly]);
 
   const ready = input.weeks.length > 0 && input.ages.length > 0;
   // Only what changes the plan is part of the key
   const { data: estimate, isFetching: estimating } = useQuery({
-    queryKey: ["generation-estimate", input.weeks, input.ages, input.day, input.provider, input.skipExisting],
+    queryKey: ["generation-estimate", input.weeks, input.ages, input.day, input.provider, input.skipExisting, input.flashOnly],
     queryFn: () => generationJobsApi.estimate(input),
     enabled: ready,
     staleTime: 10000,
@@ -203,6 +206,16 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
             <p className="text-xs text-gray-500 dark:text-gray-400">{t("generation.form.skipExistingHint")}</p>
           </div>
         </div>
+
+        {provider === "gemini" && (
+          <div className="flex items-start gap-2 md:col-span-2">
+            <Checkbox id="job-flash-only" checked={flashOnly} onCheckedChange={(checked) => setFlashOnly(checked === true)} />
+            <div className="space-y-0.5">
+              <Label htmlFor="job-flash-only">{t("generation.quota.flashOnly")}</Label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("generation.quota.flashOnlyHint")}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Estimate */}
@@ -228,11 +241,7 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
                   {t("generation.form.missingTopics", { weeks: estimate.missingTopics.join(", ") })}
                 </p>
               )}
-              {estimate.quotaWarning && (
-                <p className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t("generation.form.quotaWarning", { remaining: String(estimate.remainingRequests ?? 0) })}
-                </p>
-              )}
+              <QuotaEstimate estimate={estimate} flashOnly={Boolean(input.flashOnly)} />
             </div>
           )}
         </div>

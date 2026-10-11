@@ -1,5 +1,6 @@
 import { STORY_DAYS } from './story_schema.js';
 import { normalizeThemeName } from './theme_name.helper.js';
+import { characterLook } from './cast_look.helper.js';
 
 export const ALL_WEEK = "Toute la semaine";
 
@@ -50,7 +51,7 @@ const AGE_PROFILES = {
     paragraphs: "11 à 13 paragraphes de 4 à 6 phrases",
     minParagraphs: 11,
     maxParagraphWords: 130,
-    storyStyle: "Ton « Young Adult » : narration immersive, dialogues naturels, enjeux personnels et questionnements éthiques autour de la science. Vocabulaire scientifique exact, défini quand il apparaît.",
+    storyStyle: "Ton « Young Adult » : narration immersive, dialogues naturels, enjeux personnels et questionnements éthiques autour de la science. Vocabulaire scientifique exact, défini quand il apparaît. Les expériences sont réalistes et leurs résultats sont ceux de la vraie science.",
     illustrationStyle: "Style « Young Adult » : illustration semi-réaliste, ambiance travaillée (lumière, météo, profondeur de champ), personnages adolescents crédibles."
   },
   "16-18": {
@@ -58,7 +59,7 @@ const AGE_PROFILES = {
     paragraphs: "12 à 14 paragraphes de 4 à 6 phrases",
     minParagraphs: 12,
     maxParagraphWords: 140,
-    storyStyle: "Écriture littéraire pour jeunes adultes, sans édulcorer : réflexion, nuances, démarche scientifique (hypothèse, observation, preuve). Le lecteur est traité en adulte.",
+    storyStyle: "Écriture littéraire pour jeunes adultes, sans édulcorer : réflexion, nuances, démarche scientifique (hypothèse, observation, preuve). Les expériences sont réalistes, faisables par des lycéens, et leurs résultats sont ceux de la vraie science. Le lecteur est traité en adulte.",
     illustrationStyle: "Style « Young Adult » mature : illustration réaliste ou concept art, composition soignée, ambiance réfléchie, détails scientifiques exacts."
   }
 };
@@ -71,6 +72,13 @@ const DAY_RULES = {
   Vendredi: "Vendredi : résoudre l'intrigue de la semaine, puis suggérer subtilement une activité pour le week-end, en lien direct avec le thème (ex. « Et si ce week-end, nous allions observer les papillons dans le jardin ? »).",
   Samedi: "Samedi : histoire douce qui prolonge le thème, avec une idée d'activité pratique à faire en famille. Pas de cliffhanger.",
   Dimanche: "Dimanche : conclure la semaine. Récapituler ce que les personnages ont appris, avec une fin apaisée. Pas de cliffhanger."
+};
+
+/** Tie between two characters of a bible, read "Léo : <label> Mia". */
+const RELATION_LABELS = {
+  parent: "parent de", child: "enfant de", grandparent: "grand-parent de", grandchild: "petit-enfant de",
+  sibling: "frère ou sœur de", cousin: "cousin ou cousine de", friend: "ami ou amie de", partner: "en couple avec",
+  pet: "animal de compagnie de", owner: "maître de", other: "lié à"
 };
 
 /** Number of characters kept from a raw previous chapter (text fallback when no summary exists). */
@@ -89,6 +97,8 @@ const FIXED_FEASTS = [
   [6, 21, "la fête de la musique"], [7, 14, "la fête nationale"], [10, 31, "Halloween"], [11, 1, "la Toussaint"],
   [11, 11, "l'Armistice"], [12, 6, "la Saint-Nicolas"], [12, 24, "le réveillon de Noël"], [12, 25, "Noël"], [12, 31, "la Saint-Sylvestre"]
 ];
+/** Feasts of the next days told as coming: themes of the week before a feast made the models celebrate it early. */
+const UPCOMING_DAYS = 14;
 /** A week more than this far behind the current one belongs to next year (see yearOfWeek). */
 const BEHIND_WEEKS = 8;
 
@@ -150,7 +160,13 @@ export const VAGUE_TAGS = ["Nature", "Science", "Curiosité", "Aventure", "Déco
 const VAGUE_TAG_KEYS = new Set(VAGUE_TAGS.map(normalizeThemeName));
 /** Openings models use for the reminder of the previous day: the first sentence must be an action of the day. */
 export const FORBIDDEN_OPENINGS = ["Hier", "La veille", "Après avoir", "Alors que"];
-const OPENING_RULE = `- La première phrase est une action ou un dialogue du jour. Ne commencez jamais par ${FORBIDDEN_OPENINGS.map(o => `« ${o} »`).join(", ")} : le rappel de la veille vient en deuxième ou troisième phrase.`;
+const OPENING_RULE = `- La première phrase plonge dans le jour qui commence (une action, une réplique, un bruit, un lieu…). Ne commencez jamais par ${FORBIDDEN_OPENINGS.map(o => `« ${o} »`).join(", ")} : le rappel de la veille vient en deuxième ou troisième phrase.`;
+
+/** How each day of a week written in one answer opens (Monday to Sunday), so the 7 openings differ. */
+const WEEK_OPENINGS = [
+  "par une action", "par un bruit ou une odeur", "par la réplique d'un autre personnage que le héros",
+  "par le lieu ou le temps qu'il fait", "par une question", "par un geste", "par un moment calme"
+];
 
 /**
  * Builds the prompts for story generation (Gemini, Gemma and Ollama).
@@ -171,6 +187,7 @@ export class PromptHelper {
       "- Contenu adapté aux enfants : pas de violence, pas de peur excessive, pas de marques ni de personnes réelles.",
       "- Personnages bienveillants ; les conflits se résolvent par la curiosité, l'entraide et la réflexion.",
       "- Faits scientifiques exacts. En cas de doute, reste simple plutôt que faux.",
+      "- Le mystère s'explique toujours par un phénomène réel et connu : aucune propriété inventée (matière qui réagit aux émotions ou à la peau, lumière vivante, enzyme miracle), ni science-fiction, ni surnaturel.",
       "",
       "Règles d'écriture :",
       "- Montre plutôt qu'expliquer : la notion scientifique se découvre à travers l'action et les dialogues.",
@@ -213,7 +230,10 @@ export class PromptHelper {
    */
   static buildStoryPrompt(params) {
     const { theme, age, day, numCharacters, charNames, seriesName, previousSummary, previousChapter, existingThemes, themeDescription,
-      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint, avoidTitles, reservedNames, seriesSheet } = params;
+      weekSeries, weekPlan, previousDays, previousEnding, characters, weekNumber, lengthHint, avoidTitles, reservedNames, seriesSheet,
+      cast, castFacts, castRecaps, castDriftNotes } = params;
+    // Framed generation: the bible of the series replaces the free character settings
+    const hasCast = Array.isArray(cast?.characters) && cast.characters.length > 0;
     const isWeek = day === ALL_WEEK;
     const ageKey = this.normalizeAge(age);
     const profile = this.getAgeProfile(ageKey);
@@ -233,9 +253,16 @@ export class PromptHelper {
       this.getCalendarRule(weekNumber, year),
       themeDescription && String(themeDescription).trim() ? `- Précisions sur le sujet : ${String(themeDescription).trim()}` : "",
       `- Tranche d'âge : ${ageKey} ans.`,
-      this.getCharacterPrompt(numCharacters, charNames),
-      this.getSeriesContext(seriesName, seriesSheet),
-      this.getReservedNamesRule(reservedNames, [seriesName, charNames])
+      ...(hasCast
+        ? [
+          this.getCastSection(cast, { seriesName, facts: castFacts, recaps: castRecaps, isWeek, driftNotes: castDriftNotes }),
+          this.getReservedNamesRule(reservedNames, [seriesName, ...cast.characters.map(character => character.name)])
+        ]
+        : [
+          this.getCharacterPrompt(numCharacters, charNames),
+          this.getSeriesContext(seriesName, seriesSheet),
+          this.getReservedNamesRule(reservedNames, [seriesName, charNames])
+        ])
     ].filter(Boolean).join("\n");
 
     const audience = [
@@ -256,9 +283,11 @@ export class PromptHelper {
     const illustration = [
       `- Pour chaque histoire, une seule description d'illustration (champ "illustration_prompt"), très détaillée : scène, personnages (apparence, vêtements, expressions), action, décor, lumière, couleurs, cadrage.`,
       `- ${profile.illustrationStyle}`,
-      this.cleanCharacters(characters).length > 0
-        ? `- Décrivez les personnages exactement comme dans la fiche PERSONNAGES (même âge, mêmes cheveux, mêmes vêtements).`
-        : `- Continuité visuelle : les personnages récurrents sont décrits avec les mêmes traits d'un jour à l'autre.`,
+      hasCast
+        ? `- Pour chaque personnage de la BIBLE présent dans la scène, reprenez mot pour mot sa ligne d'APPARENCE (âge de cette semaine, cheveux, yeux, tenue, signe distinctif).`
+        : this.cleanCharacters(characters).length > 0
+          ? `- Décrivez les personnages exactement comme dans la fiche PERSONNAGES (même âge, mêmes cheveux, mêmes vêtements).`
+          : `- Continuité visuelle : les personnages récurrents sont décrits avec les mêmes traits d'un jour à l'autre.`,
       `- Aucun texte écrit dans l'image.`
     ].join("\n");
 
@@ -273,7 +302,7 @@ export class PromptHelper {
       audience,
       "",
       "## CONTINUITÉ",
-      this.getContinuityPrompt({ isWeek, previousSummary, previousChapter, weekSeries, targetDay, weekPlan, previousDays, previousEnding, characters }),
+      this.getContinuityPrompt({ isWeek, previousSummary, previousChapter, weekSeries, targetDay, weekPlan, previousDays, previousEnding, characters, hasCast }),
       "",
       "## SPÉCIFICITÉS DU JOUR",
       dayRules,
@@ -374,6 +403,86 @@ export class PromptHelper {
   }
 
   /**
+   * Bible of a framed series: the fixed cast (age of this week, look, character, ties), the rules of its world,
+   * the facts established by the previous weeks and what they told. The cast never changes; the topic of the week
+   * adapts to it.
+   * @param {Object} cast - Cast as told this week (castForWeek: currentAge, birthdayThisWeek).
+   * @param {{seriesName?: string, facts?: {weekNumber: number, text: string}[], recaps?: {weekNumber: number, recap: string}[],
+   *   isWeek?: boolean, driftNotes?: string[]}} [options] - driftNotes: drifts the audit found in the version rewritten.
+   * @returns {string}
+   */
+  static getCastSection(cast, { seriesName, facts = [], recaps = [], isWeek = false, driftNotes = [] } = {}) {
+    const characters = (cast?.characters || []).filter(character => character?.name);
+    const byKey = new Map(characters.map(character => [character.key, character.name]));
+    const title = seriesName && String(seriesName).trim() ? ` « ${String(seriesName).trim()} »` : "";
+    const lines = [`- BIBLE DE LA SÉRIE${title} : distribution fixe, à respecter à l'identique dans chaque histoire.`];
+    if (cast.universe) lines.push(`  Univers : ${cast.universe}`);
+
+    // What the story tells (who they are, how they behave), apart from how they look (for the pictures only)
+    lines.push("  Personnages (pour le récit) :");
+    for (const character of characters) {
+      const identity = [
+        character.role === "main" ? "personnage principal" : "personnage récurrent",
+        character.species,
+        character.gender,
+        character.currentAge !== null && character.currentAge !== undefined ? `${character.currentAge} ans` : ""
+      ].filter(Boolean).join(", ");
+      const ties = (character.relations || [])
+        .filter(relation => byKey.has(relation.to))
+        .map(relation => `${RELATION_LABELS[relation.type] || RELATION_LABELS.other} ${byKey.get(relation.to)}`)
+        .join(", ");
+      const parts = [
+        `${character.name} (${identity})`,
+        character.personality ? `Caractère : ${character.personality}` : "",
+        character.speech ? `Façon de parler : ${character.speech}` : "",
+        ties ? `Liens : ${ties}` : "",
+        character.birthdayThisWeek && character.birthdayAge ? `Son anniversaire tombe cette semaine : il ou elle fête ses ${character.birthdayAge} ans` : ""
+      ].filter(Boolean);
+      lines.push(`  • ${parts.join(". ")}.`);
+    }
+    const looks = characters.map(characterLook).filter(line => line.includes(" : "));
+    if (looks.length) {
+      lines.push("  Apparence (pour les illustrations uniquement : ne la décrivez pas dans le récit) :");
+      looks.forEach(line => lines.push(`  • ${line}`));
+    }
+
+    const rules = (cast.rules || []).map(rule => String(rule || "").trim()).filter(Boolean);
+    if (rules.length) {
+      lines.push("  Règles de l'univers :");
+      rules.forEach(rule => lines.push(`  • ${rule}`));
+    }
+    const established = (facts || []).filter(fact => fact?.text);
+    if (established.length) {
+      lines.push("  Faits établis par les semaines précédentes (toujours vrais) :");
+      established.forEach(fact => lines.push(`  • ${fact.text}`));
+    }
+    const told = (recaps || []).filter(entry => entry?.recap);
+    if (told.length) {
+      lines.push("  Précédemment dans la série (pour mémoire, à ne pas raconter de nouveau) :");
+      told.forEach(entry => lines.push(`  • Semaine ${entry.weekNumber} : ${String(entry.recap).trim()}`));
+    }
+
+    lines.push(
+      "- Règles de la bible :",
+      "  • Aucun personnage de la bible ne change de prénom, d'âge, d'apparence, de caractère ni de lien avec les autres.",
+      "  • Dans le texte, ne récitez jamais la fiche : on ne dit pas l'âge des adultes, et l'apparence n'est pas décrite (tout au plus une petite touche au fil de l'action, un geste ou un vêtement). La description d'illustration, elle, reprend l'apparence complète.",
+      "  • Remplacez ces descriptions par de l'action, des dialogues et des sensations : la longueur demandée reste la même.",
+      isWeek
+        ? "  • Les personnages principaux sont au cœur de chacune des 7 histoires."
+        : "  • Les personnages principaux sont au cœur de l'histoire.",
+      "  • Un personnage nouveau peut apparaître pour le sujet de la semaine, mais il reste secondaire et ponctuel : il ne rejoint ni la famille ni la bande.",
+      "  • Le sujet de la semaine s'adapte à cet univers : il ne change jamais la distribution, les liens ni les règles.",
+      "  • Les semaines précédentes ont eu lieu : une brève allusion est possible, sans les contredire ni les raconter."
+    );
+    const drifts = (driftNotes || []).map(note => String(note || "").trim()).filter(Boolean);
+    if (drifts.length) {
+      lines.push("- IMPORTANT : la version précédente s'écartait de la bible. Corrigez ces écarts :");
+      drifts.forEach(note => lines.push(`  • ${note}`));
+    }
+    return lines.join("\n");
+  }
+
+  /**
    * Names of the heroes of the other series: a story outside a series must not borrow them
    * (the library had a bat called Léonie and a toad called Antonin next to the series of the same names).
    * @param {string[]} [reservedNames] - Names of the series heroes.
@@ -436,6 +545,8 @@ export class PromptHelper {
    * @returns {boolean}
    */
   static wantsCharacters(params = {}) {
+    // A framed series gives its cast: the AI never writes another sheet
+    if (Array.isArray(params.cast?.characters) && params.cast.characters.length > 0) return false;
     return params.day === ALL_WEEK || this.wantsWeekPlan(params);
   }
 
@@ -511,14 +622,17 @@ export class PromptHelper {
 
   /**
    * Feasts and school holidays of a week (metropolitan France, holidays common to every zone).
-   * @returns {{dates: Date[], feasts: {date: Date, name: string}[], holidays: {name: string, start: Date, end: Date}[]}}
+   * @returns {{dates: Date[], feasts: {date: Date, name: string}[], upcoming: {date: Date, name: string}[],
+   *   holidays: {name: string, start: Date, end: Date}[]}} upcoming: feasts of the next UPCOMING_DAYS days;
    *   holidays: end is the day school starts again.
    */
   static getCalendarEvents(weekNumber, year) {
     const dates = this.getWeekDates(weekNumber, year);
     const inWeek = (date) => dates.some(day => sameDay(day, date));
+    const horizon = addDays(dates[6], UPCOMING_DAYS);
     const feasts = [];
-    for (const y of new Set(dates.map(date => date.getUTCFullYear()))) {
+    const upcoming = [];
+    for (const y of new Set([...dates, horizon].map(date => date.getUTCFullYear()))) {
       const easter = easterSunday(y);
       const candidates = [
         ...FIXED_FEASTS.map(([month, day, name]) => ({ date: new Date(Date.UTC(y, month - 1, day)), name })),
@@ -527,8 +641,10 @@ export class PromptHelper {
         { date: addDays(easter, 1), name: "le lundi de Pâques" }
       ];
       feasts.push(...candidates.filter(feast => inWeek(feast.date)));
+      upcoming.push(...candidates.filter(feast => feast.date > dates[6] && feast.date <= horizon));
     }
     feasts.sort((a, b) => a.date - b.date);
+    upcoming.sort((a, b) => a.date - b.date);
 
     const holidays = [];
     for (const y of new Set(dates.map(date => date.getUTCFullYear()))) {
@@ -537,7 +653,7 @@ export class PromptHelper {
         if (holiday.start <= dates[6] && addDays(holiday.end, -1) >= dates[0]) holidays.push(holiday);
       }
     }
-    return { dates, feasts, holidays };
+    return { dates, feasts, upcoming, holidays };
   }
 
   /**
@@ -549,17 +665,26 @@ export class PromptHelper {
   static getCalendarRule(weekNumber, year = this.yearOfWeek(weekNumber)) {
     const week = Number(weekNumber);
     if (!Number.isInteger(week) || week < 1 || week > 53) return "";
-    const { dates, feasts, holidays } = this.getCalendarEvents(week, year);
+    const { dates, feasts, upcoming, holidays } = this.getCalendarEvents(week, year);
     const facts = [
       ...feasts.map(feast => `${feast.name} le ${frenchDate(feast.date)}`),
       ...holidays.map(holiday => {
         const during = holiday.start <= dates[0] && holiday.end > dates[6] ? "toute la semaine" : `du ${frenchDate(holiday.start)} au ${frenchDate(addDays(holiday.end, -1))}`;
-        return `vacances scolaires ${holiday.name} ${during} (l'école reprend le ${frenchDate(holiday.end)})`;
+        // Holidays starting or ending within the week: the school days are said, the models anticipate the holidays otherwise
+        const schoolDays = [
+          holiday.start > dates[0] && holiday.start <= dates[6] ? `avant le ${frenchDate(holiday.start)}, c'est encore l'école` : null,
+          holiday.end > dates[0] && holiday.end <= dates[6] ? `à partir du ${frenchDate(holiday.end)}, c'est de nouveau l'école` : null,
+        ].filter(Boolean);
+        return `vacances scolaires ${holiday.name} ${during} (l'école reprend le ${frenchDate(holiday.end)}${schoolDays.length ? ` ; ${schoolDays.join(" ; ")}` : ""})`;
       })
     ];
     const lines = [`- Calendrier : la semaine va du ${frenchDate(dates[0])} au ${frenchDate(dates[6])} ${dates[6].getUTCFullYear()}.`];
-    if (facts.length > 0) {
-      lines.push(`  Cette semaine : ${facts.join(" ; ")}.`);
+    if (facts.length > 0) lines.push(`  Cette semaine : ${facts.join(" ; ")}.`);
+    // S43 (19-25 October): the stories had the Halloween trick-or-treat a week early
+    if (upcoming.length > 0) {
+      lines.push(`  À venir, après cette semaine : ${upcoming.map(feast => `${feast.name} le ${frenchDate(feast.date)}`).join(" ; ")}. Cette semaine, on peut le préparer ou l'attendre, mais pas encore le fêter.`);
+    }
+    if (facts.length > 0 || upcoming.length > 0) {
       lines.push("  Une fête ne se célèbre que le jour où elle tombe : avant, on la prépare ou on l'attend ; après, on s'en souvient. Pendant les vacances, il n'y a pas d'école.");
     }
     return lines.join("\n");
@@ -636,7 +761,7 @@ export class PromptHelper {
     return lines.join("\n");
   }
 
-  static getContinuityPrompt({ isWeek, previousSummary, previousChapter, weekSeries = false, targetDay = null, weekPlan, previousDays, previousEnding, characters }) {
+  static getContinuityPrompt({ isWeek, previousSummary, previousChapter, weekSeries = false, targetDay = null, weekPlan, previousDays, previousEnding, characters, hasCast = false }) {
     if (weekSeries && !isWeek) {
       const series = this.getWeekSeriesContinuity({ targetDay, weekPlan, previousDays, previousEnding, characters });
       if (series) return series;
@@ -660,11 +785,16 @@ export class PromptHelper {
       // Same rules as a week generated day by day, written in one answer
       return [
         "Les 7 histoires forment une seule aventure suivie, du lundi au dimanche, avec les mêmes personnages : mêmes noms, même apparence (âge, cheveux, vêtements), même caractère et mêmes liens entre eux (frère, cousine, ami…), dans le texte comme dans les illustrations.",
-        "- Établissez d'abord la fiche des personnages (champ \"characters\") et suivez-la à l'identique pendant les 7 jours.",
+        hasCast
+          ? "- Suivez la BIBLE DE LA SÉRIE à l'identique pendant les 7 jours."
+          : "- Établissez d'abord la fiche des personnages (champ \"characters\") et suivez-la à l'identique pendant les 7 jours.",
         "- Les 7 histoires sont toutes différentes : n'en recopiez aucune, et chaque histoire parle de son propre jour.",
         "- Chaque histoire se passe un nouveau jour et doit se comprendre seule : elle s'ouvre sur une scène nouvelle, puis rappelle en une phrase où en était l'aventure la veille, en nommant le personnage principal.",
         OPENING_RULE,
         "- Les 7 débuts sont tous différents (pas la même tournure, ni la même météo, ni le même geste). Ne recopiez aucune phrase d'une histoire à l'autre, et ne répétez pas les mêmes tics descriptifs.",
+        // A week in one answer copies its own pattern: 7 openings on a line of the hero, then "Hier, …, et aujourd'hui …"
+        `- Une manière d'ouvrir par jour : ${WEEK_OPENINGS.map((kind, index) => `${STORY_DAYS[index]} ${kind}`).join(" ; ")}.`,
+        "- Le rappel de la veille tient en une demi-phrase glissée dans la scène, jamais avec la formule « Hier, …, et aujourd'hui … ».",
         "- Chaque jour apporte une découverte nouvelle : ne recommencez pas une recherche ou une découverte déjà racontée.",
         "- Du lundi au jeudi, le suspense de fin mène directement à l'histoire du lendemain ; n'ouvrez aucun mystère qui ne sera pas résolu. Le vendredi résout tous les mystères de la semaine. Le samedi et le dimanche n'en rouvrent aucun."
       ].join("\n");
@@ -674,7 +804,9 @@ export class PromptHelper {
       ? [
         "Cette histoire ouvre une aventure suivie sur 7 jours, du lundi au dimanche, avec les mêmes personnages : posez les personnages et l'enjeu de la semaine.",
         "Avant d'écrire, établissez le plan de la semaine (champ \"week_plan\") : 7 phrases, une par jour de Lundi à Dimanche, qui décrivent l'étape de l'aventure ce jour-là. Une seule intrigue qui progresse : suspense du lundi au jeudi, résolution le vendredi, activité en famille le samedi, conclusion le dimanche. Chaque jour apporte une découverte nouvelle, sans répéter les précédentes.",
-        "Établissez aussi la fiche des personnages (champ \"characters\") : 1 à 4 personnages, chacun avec \"name\" et \"description\" (âge, apparence précise : cheveux, vêtements, signe distinctif, caractère, et lien avec les autres personnages). Reprenez les noms demandés. Cette fiche sera suivie à l'identique tous les jours, dans le texte et les illustrations.",
+        hasCast
+          ? "Les personnages sont ceux de la BIBLE DE LA SÉRIE : n'en créez pas d'autres comme personnages principaux, et suivez la bible à l'identique tous les jours, dans le texte et les illustrations."
+          : "Établissez aussi la fiche des personnages (champ \"characters\") : 1 à 4 personnages, chacun avec \"name\" et \"description\" (âge, apparence précise : cheveux, vêtements, signe distinctif, caractère, et lien avec les autres personnages). Reprenez les noms demandés. Cette fiche sera suivie à l'identique tous les jours, dans le texte et les illustrations.",
         "L'histoire de ce lundi raconte seulement la première étape du plan : ne dévoilez pas les découvertes des jours suivants.",
         "Le suspense de fin annonce la deuxième étape de votre plan. N'introduisez pas de mystère qui n'est pas dans le plan : chaque question ouverte cette semaine sera résolue vendredi."
       ].join("\n")
@@ -683,11 +815,15 @@ export class PromptHelper {
 
   static getOutputFormat(exampleDay, { withWeekPlan = false, withCharacters = withWeekPlan } = {}) {
     const characterField = "\"characters\" (tableau de personnages { \"name\", \"description\" } : âge, apparence, caractère et lien avec les autres personnages, par exemple frère, cousine ou ami)";
-    const opening = withWeekPlan
-      ? `Un objet JSON avec trois clés : "week_plan" (tableau de 7 phrases, une par jour, de Lundi à Dimanche), ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
-      : withCharacters
-        ? `Un objet JSON avec deux clés : ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
-        : "Un objet JSON avec une seule clé \"stories\" : un tableau d'histoires. Chaque histoire a exactement ces champs :";
+    const weekPlanField = "\"week_plan\" (tableau de 7 phrases, une par jour, de Lundi à Dimanche)";
+    const opening = withWeekPlan && withCharacters
+      ? `Un objet JSON avec trois clés : ${weekPlanField}, ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
+      : withWeekPlan
+        // Framed series: the cast is given, the first day writes the plan only
+        ? `Un objet JSON avec deux clés : ${weekPlanField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
+        : withCharacters
+          ? `Un objet JSON avec deux clés : ${characterField}, puis "stories" : un tableau d'histoires. Chaque histoire a exactement ces champs :`
+          : "Un objet JSON avec une seule clé \"stories\" : un tableau d'histoires. Chaque histoire a exactement ces champs :";
     return [
       opening,
       `- "day" : jour de la semaine, parmi ${STORY_DAYS.map(d => `"${d}"`).join(", ")}.`,

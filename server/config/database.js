@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 import { migrateThemes } from './theme.migration.js';
 import { migrateGeneration } from './generation.migration.js';
+import { migrateSeriesCasts } from './series_cast.migration.js';
 
 dotenv.config();
 
@@ -188,6 +189,24 @@ export async function initializeDatabase() {
         console.log('Migration: locale column added to story_series.');
       }
 
+      // Databases created before the 13-15 and 16-18 groups: saving a version of a teenagers' story failed
+      // ("Data truncated for column 'age_group'"), so such a story could not be edited
+      for (const table of ['stories', 'story_versions']) {
+        const [ageColumns] = await pool.query(`SHOW COLUMNS FROM ${table} LIKE "age_group"`);
+        if (ageColumns.length > 0 && !String(ageColumns[0].Type).includes("'16-18'")) {
+          await pool.query(`ALTER TABLE ${table} MODIFY COLUMN age_group ENUM('2-3', '4-6', '7-9', '10-12', '13-15', '16-18') NOT NULL`);
+          console.log(`Migration: age_group of ${table} extended to 16-18.`);
+        }
+      }
+
+      // Character sheet of a series, written by its first generated week and given to the next ones
+      // (kept apart from the description the user writes)
+      const [seriesSheetColumns] = await pool.query('SHOW COLUMNS FROM story_series LIKE "character_sheet"');
+      if (seriesSheetColumns.length === 0) {
+        await pool.query('ALTER TABLE story_series ADD COLUMN character_sheet TEXT NULL AFTER description');
+        console.log('Migration: character_sheet column added to story_series.');
+      }
+
       const [storySourceColumns] = await pool.query('SHOW COLUMNS FROM stories LIKE "source"');
       if (storySourceColumns.length === 0) {
         await pool.query(`
@@ -226,6 +245,7 @@ export async function initializeDatabase() {
 
       await migrateGeneration(pool);
       await migrateThemes(pool);
+      await migrateSeriesCasts(pool);
     } catch (migError) {
        console.error("Migration Failed:", migError);
        fs.writeFileSync(path.join(__dirname, '../../migration_debug.log'), `Migration Error: ${migError.message}\n${migError.stack}`);

@@ -29,7 +29,10 @@ const toJob = (row) => row && ({
   log: parseJson(row.log, []),
   createdAt: row.created_at,
   startedAt: row.started_at,
-  finishedAt: row.finished_at
+  finishedAt: row.finished_at,
+  resumeAt: row.resume_at ?? null,
+  budgetDay: row.budget_day ?? null,
+  budgetUsed: Number(row.budget_used ?? 0)
 });
 
 const toUnit = (row) => row && ({
@@ -51,7 +54,8 @@ const toUnit = (row) => row && ({
 const JOB_COLUMNS = {
   status: 'status', totalUnits: 'total_units', doneUnits: 'done_units', createdCount: 'created_count',
   failedCount: 'failed_count', skippedCount: 'skipped_count', currentLabel: 'current_label', model: 'model',
-  log: 'log', startedAt: 'started_at', finishedAt: 'finished_at'
+  log: 'log', startedAt: 'started_at', finishedAt: 'finished_at',
+  resumeAt: 'resume_at', budgetDay: 'budget_day', budgetUsed: 'budget_used'
 };
 const UNIT_COLUMNS = {
   status: 'status', context: 'context', storyIds: 'story_ids', error: 'error', attempts: 'attempts', model: 'model'
@@ -120,6 +124,12 @@ export const generationJobRepository = {
     return toJob(row) || null;
   },
 
+  /** Scheduled jobs whose quota day has come back to the queue. */
+  async promoteDueScheduled() {
+    const result = await query("UPDATE generation_jobs SET status = 'queued', resume_at = NULL WHERE status = 'scheduled' AND resume_at <= ?", [now()]);
+    return result?.affectedRows ?? 0;
+  },
+
   /** After a restart: jobs that were running go back to the queue, their running unit back to pending. */
   async requeueInterrupted() {
     await query("UPDATE generation_units SET status = 'pending' WHERE status = 'running'");
@@ -130,7 +140,9 @@ export const generationJobRepository = {
   /** Stories already written for a (week, age) cell, in day order. */
   async existingStories(weekNumber, ageGroup, locale = 'fr') {
     return query(
-      'SELECT id, title, content, summary, day_order FROM stories WHERE week_number = ? AND age_group = ? AND locale = ? ORDER BY day_order ASC',
+      `SELECT s.id, s.title, s.content, s.summary, s.illustration_prompt, s.day_order, ss.name AS series_name
+       FROM stories s LEFT JOIN story_series ss ON ss.id = s.series_id
+       WHERE s.week_number = ? AND s.age_group = ? AND s.locale = ? ORDER BY s.day_order ASC`,
       [weekNumber, ageGroup, locale]
     );
   },
@@ -157,6 +169,44 @@ export const generationJobRepository = {
         'SELECT title FROM stories WHERE series_id IS NULL AND age_group = ? ORDER BY created_at DESC LIMIT ?',
         [ageGroup, String(limit)]);
     return rows.map(row => row.title);
+  },
+
+  /**
+   * Titles to avoid for a new story: those of its series first, then the whole library (same age group first),
+   * as the same title came back in other series and ages ("Le festin des oiseaux" 3 times).
+   * @returns {Promise<string[]>} Unique titles, most relevant first.
+   */
+  async titlesToAvoid({ seriesName, ageGroup, limit = 150 }) {
+    const series = await this.recentTitles({ seriesName, ageGroup });
+    const library = await query(
+      'SELECT title FROM stories ORDER BY (age_group = ?) DESC, created_at DESC LIMIT ?',
+      [ageGroup, String(limit)]);
+    return [...new Set([...series, ...library.map(row => row.title)])];
+  },
+
+  /** Names of the series: their heroes' names, kept out of the other stories. */
+  async seriesNames() {
+    const rows = await query('SELECT name FROM story_series');
+    // Heroes of the framed series (their bible): kept out of the other stories too
+    const casts = await query('SELECT characters FROM series_casts');
+    const heroes = casts.flatMap(row => parseJson(row.characters, []).map(character => character?.name)).filter(Boolean);
+    return [...new Set([...rows.map(row => row.name), ...heroes])];
+  },
+
+  /**
+   * Fixed sheet of a series: the description written by the user, then the character sheet of its first week.
+   * @returns {Promise<string>} "" for no series or no sheet.
+   */
+  async seriesSheet(seriesName) {
+    if (!seriesName) return '';
+    const [row] = await query('SELECT description, character_sheet FROM story_series WHERE name = ? LIMIT 1', [seriesName]);
+    return [row?.description, row?.character_sheet].map(text => String(text || '').trim()).filter(Boolean).join(' ');
+  },
+
+  /** Keeps the first character sheet of a series (never overwrites one). */
+  async saveSeriesSheet(seriesName, sheet) {
+    if (!seriesName || !sheet) return;
+    await query('UPDATE story_series SET character_sheet = ? WHERE name = ? AND (character_sheet IS NULL OR character_sheet = \'\')', [sheet, seriesName]);
   },
 
   async jobStoryIds(jobId) {

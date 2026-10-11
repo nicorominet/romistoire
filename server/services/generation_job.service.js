@@ -6,8 +6,11 @@ import { storyService } from './story.service.js';
 import { defaultProvider, PROVIDERS } from './settings.service.js';
 import { ALL_WEEK } from './helpers/prompt.helper.js';
 import { GENERATION_DAYS_FR, GENERATION_MIN_INTERVAL_MS, WEEK_STORY_COUNT, requestsPerUnit } from './helpers/generation_plan.helper.js';
-import { geminiConfig } from './gemini.service.js';
+import { FLASH_FIRST_AGES, geminiConfig, isFlashModel } from './gemini.service.js';
 import { aiUsageService } from './ai_usage.service.js';
+import { seriesCastService } from './series_cast.service.js';
+import { modelLimits } from './helpers/model_limits.helper.js';
+import { msUntilPacificMidnight } from './helpers/model_cooldown.helper.js';
 
 export const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
 const MAX_WEEK = 53;
@@ -17,7 +20,11 @@ const MAX_UNITS = MAX_WEEK * AGE_GROUPS.length;
 /** Rough length of one request, for the estimate shown before launching (seconds). */
 const ESTIMATED_SECONDS = { gemini: 25, local: 90 };
 
-const ACTIVE = ['queued', 'running'];
+const ACTIVE = ['queued', 'running', 'scheduled'];
+/** Framed generation (tab "Génération cadrée"): a series bible, its audit and the quota planning. */
+export const FRAMED = 'framed';
+export const isFramed = (params) => params?.mode === FRAMED;
+const MAX_DAILY_BUDGET = 10000;
 const FINISHED = ['done', 'failed', 'cancelled'];
 
 /**
@@ -47,7 +54,15 @@ export const normalizeJobParams = (input = {}) => {
     throw new ValidationError('Number of characters must be between 1 and 10');
   }
 
-  return {
+  // Regenerate: the stories already written are rewritten in place (same ids, illustrations kept, old text in
+  // the versions); regenerateDays limits it to some days, the other days being the context
+  const regenerate = input.regenerate === true;
+  if (regenerate && day !== ALL_WEEK) throw new ValidationError('Regeneration works on whole weeks');
+  const regenerateDays = regenerate && Array.isArray(input.regenerateDays)
+    ? GENERATION_DAYS_FR.filter(d => input.regenerateDays.includes(d))
+    : [];
+
+  const params = {
     weeks,
     ages,
     day,
@@ -56,9 +71,62 @@ export const normalizeJobParams = (input = {}) => {
     seriesName: String(input.seriesName ?? '').trim().slice(0, 255),
     provider,
     model: input.model ? String(input.model).trim().slice(0, 100) : null,
-    skipExisting: input.skipExisting !== false
+    skipExisting: input.skipExisting !== false,
+    regenerate,
+    regenerateDays,
+    // Only the recommended Flash models: a saturated day fails (retry later) instead of falling back to Flash Lite
+    flashOnly: input.flashOnly === true
+  };
+  if (input.mode !== FRAMED) return params;
+
+  // Framed: the cast of the series is the only source of characters
+  if (!input.castId) throw new ValidationError('Choose a cast');
+  const dailyBudget = input.dailyBudget === undefined || input.dailyBudget === null || input.dailyBudget === ''
+    ? null : Number(input.dailyBudget);
+  if (dailyBudget !== null && (!Number.isInteger(dailyBudget) || dailyBudget < 1 || dailyBudget > MAX_DAILY_BUDGET)) {
+    throw new ValidationError('The daily budget must be a positive number of requests');
+  }
+  return {
+    ...params,
+    mode: FRAMED,
+    castId: String(input.castId),
+    numCharacters: null,
+    charNames: '',
+    audit: input.audit !== false,
+    dailyBudget,
+    // Regeneration of the days the audit found drifting: its findings are given to the AI
+    fixDrift: params.regenerate && input.fixDrift === true
   };
 };
+
+/**
+ * A framed job takes its series from its cast, and only the age groups of that cast.
+ * @throws {ValidationError}
+ */
+export const frameJobParams = async (params) => {
+  if (!isFramed(params)) return params;
+  const cast = await seriesCastService.get(params.castId);
+  const outside = params.ages.filter(age => !cast.ageGroups.includes(age));
+  if (outside.length) throw new ValidationError(`No cast for the age group(s) ${outside.join(', ')}`);
+  const seriesName = await seriesCastService.seriesName(cast.seriesId);
+  return { ...params, seriesId: cast.seriesId, seriesName };
+};
+
+/** Next reset of the Gemini daily quotas (Pacific midnight), with a margin. */
+export const nextQuotaReset = (now = new Date()) =>
+  new Date(now.getTime() + msUntilPacificMidnight(now) + 5 * 60 * 1000);
+
+/** Day name of a story ("Lundi"). */
+export const storyDayName = (story) => GENERATION_DAYS_FR[Number(story.day_order) - 1];
+
+/** Stories of a cell that belong to the series of the job (no series: the stories without series). */
+export const seriesStories = (stories, seriesName) => stories.filter(story => (story.series_name || '') === (seriesName || ''));
+
+/**
+ * Stories of a cell a job counts as written: every story of the cell (free generation),
+ * only those of its series for a framed job (a free story of the same week does not fill the series).
+ */
+export const cellStoriesOf = (params, stories) => (isFramed(params) ? seriesStories(stories, params.seriesName) : stories);
 
 /** Days of a request already written in a cell (day_order 1-7). */
 const writtenDays = (stories) => new Set(stories.map(story => Number(story.day_order)));
@@ -71,11 +139,17 @@ export const planJob = async (params) => {
   const topics = new Map((await weeklyThemeService.findAll()).map(week => [Number(week.week_number), week]));
   const units = [];
   let requests = 0;
+  // Requests written by the Flash models (from 7 years old, or every age with flashOnly): their daily quota is small
+  let flashRequests = 0;
   let position = 0;
   const missingTopics = new Set();
 
   for (const weekNumber of params.weeks) {
     for (const ageGroup of params.ages) {
+      const before = requests;
+      const countFlash = () => {
+        if (params.flashOnly || FLASH_FIRST_AGES.includes(ageGroup)) flashRequests += requests - before;
+      };
       const unit = { id: uuidv4(), position: position++, weekNumber, ageGroup, day: params.day, status: 'pending', error: null };
       units.push(unit);
       if (!topics.has(weekNumber)) {
@@ -84,7 +158,21 @@ export const planJob = async (params) => {
         missingTopics.add(weekNumber);
         continue;
       }
-      const done = params.skipExisting ? writtenDays(await repo.existingStories(weekNumber, ageGroup)) : new Set();
+      if (params.regenerate) {
+        const days = params.regenerateDays.length ? params.regenerateDays : GENERATION_DAYS_FR;
+        const toRewrite = seriesStories(await repo.existingStories(weekNumber, ageGroup), params.seriesName)
+          .filter(story => days.includes(storyDayName(story)));
+        if (toRewrite.length === 0) {
+          unit.status = 'skipped';
+          unit.error = 'Nothing to regenerate';
+          continue;
+        }
+        requests += days.length === WEEK_STORY_COUNT ? requestsPerUnit(ALL_WEEK, ageGroup, params.provider) : days.length;
+        countFlash();
+        if (isFramed(params) && params.audit) requests += 1;
+        continue;
+      }
+      const done = params.skipExisting ? writtenDays(cellStoriesOf(params, await repo.existingStories(weekNumber, ageGroup))) : new Set();
       if (params.day === ALL_WEEK) {
         const missing = WEEK_STORY_COUNT - [...done].filter(order => order >= 1 && order <= 7).length;
         if (missing === 0) {
@@ -102,14 +190,37 @@ export const planJob = async (params) => {
         }
         requests += 1;
       }
+      countFlash();
+      // Framed: the audit of the week, written by Flash Lite
+      if (isFramed(params) && params.audit) requests += 1;
     }
   }
-  return { units, requests, skipped: units.filter(u => u.status === 'skipped').length, missingTopics: [...missingTopics] };
+  return { units, requests, flashRequests, skipped: units.filter(u => u.status === 'skipped').length, missingTopics: [...missingTopics] };
 };
 
 /** Seconds for `requests` calls: the model time, at least the pacing interval for the cloud. */
 const estimateSeconds = (requests, provider) =>
   requests * Math.max(ESTIMATED_SECONDS[provider] ?? 30, provider === 'local' ? 0 : GENERATION_MIN_INTERVAL_MS / 1000);
+
+/**
+ * Quota planning of a framed job: requests it may send a day (free tier limits of its models, daily budget),
+ * today and the next days, and the number of quota days it takes.
+ * @returns {{perDay: number|null, today: number|null, days: number|null}} null: unknown limits.
+ */
+export const scheduleOf = (requests, flashRequests, { flashModels, liteModels, remainingFlash, remainingLite, dailyBudget = null, flashOnly = false }) => {
+  const sum = (models) => models.reduce((total, model) => total + (modelLimits(model).rpd ?? 0), 0);
+  // Flash requests fall back to Flash Lite unless flashOnly: the families are counted together, Flash first
+  const capacity = flashOnly ? sum(flashModels) : sum(flashModels) + sum(liteModels);
+  const left = remainingFlash === null || remainingLite === null ? null
+    : (flashOnly ? remainingFlash : remainingFlash + remainingLite);
+  const cap = (value) => (value === null ? null : dailyBudget ? Math.min(value, dailyBudget) : value);
+  const perDay = cap(capacity || null);
+  const today = cap(left);
+  const needed = flashOnly ? flashRequests : requests;
+  if (perDay === null || today === null || perDay <= 0) return { perDay, today, days: null };
+  const days = needed <= today ? 1 : 1 + Math.ceil((needed - today) / perDay);
+  return { perDay, today, days };
+};
 
 class GenerationJobService {
   constructor() {
@@ -119,29 +230,59 @@ class GenerationJobService {
 
   /** What a job would do, without creating it. */
   async estimate(input) {
-    const params = normalizeJobParams(input);
-    const { units, requests, skipped, missingTopics } = await planJob(params);
-    // Free tier: requests left today on the fast models; Gemma (slow, last resort) is left out
-    const fastModels = (params.model ? [params.model] : geminiConfig().models).filter(model => !model.startsWith('gemma-'));
-    const remainingRequests = params.provider === 'gemini' ? await aiUsageService.remainingToday(fastModels) : null;
-    return {
+    const params = await frameJobParams(normalizeJobParams(input));
+    const { units, requests, flashRequests, skipped, missingTopics } = await planJob(params);
+    const base = {
       units: units.length,
       toGenerate: units.length - skipped,
       skipped,
       missingTopics,
       requests,
-      estimatedSeconds: estimateSeconds(requests, params.provider),
-      remainingRequests,
-      quotaWarning: remainingRequests !== null && requests > remainingRequests
+      estimatedSeconds: estimateSeconds(requests, params.provider)
+    };
+    if (params.provider !== 'gemini') return { ...base, remainingRequests: null, quota: null, quotaWarning: false };
+
+    // Free tier, per family: the Flash models have about 20 requests a day each (5 a minute for some), Flash Lite
+    // much more. A total over every model hid that the Flash ones were spent (Gemma, slow last resort, left out).
+    if (params.model) {
+      const remaining = await aiUsageService.remainingToday([params.model]);
+      return { ...base, remainingRequests: remaining, quota: null, quotaWarning: remaining !== null && requests > remaining };
+    }
+    const models = geminiConfig().models;
+    const flashModels = models.filter(model => isFlashModel(model) && !(params.flashOnly && model === 'gemini-2.5-flash'));
+    const liteModels = models.filter(model => model.includes('flash-lite'));
+    const remainingFlash = await aiUsageService.remainingToday(flashModels);
+    const remainingLite = await aiUsageService.remainingToday(liteModels);
+    const liteRequests = requests - flashRequests;
+    // Framed: what the job can send a day, and how many quota days it takes (it waits for the next day by itself)
+    const schedule = isFramed(params) ? scheduleOf(requests, flashRequests, {
+      flashModels, liteModels, remainingFlash, remainingLite, dailyBudget: params.dailyBudget, flashOnly: params.flashOnly
+    }) : undefined;
+    // Not enough Flash: the rest falls back to Flash Lite (or fails with flashOnly, to be retried later)
+    const flashShortfall = remainingFlash !== null && flashRequests > remainingFlash;
+    const liteShortfall = remainingLite !== null
+      && liteRequests + (flashShortfall && !params.flashOnly ? flashRequests - remainingFlash : 0) > remainingLite;
+    return {
+      ...base,
+      remainingRequests: remainingFlash === null || remainingLite === null ? null : remainingFlash + remainingLite,
+      quota: {
+        flash: { requests: flashRequests, remaining: remainingFlash },
+        lite: { requests: liteRequests, remaining: remainingLite },
+        flashShortfall
+      },
+      quotaWarning: flashShortfall || liteShortfall,
+      ...(schedule ? { schedule } : {})
     };
   }
 
   async create(input) {
-    const params = normalizeJobParams(input);
+    const params = await frameJobParams(normalizeJobParams(input));
     const { units } = await planJob(params);
     if (units.length > MAX_UNITS) throw new ValidationError('Too many units');
     if (units.every(unit => unit.status === 'skipped')) {
-      throw new ValidationError('Nothing to generate: every selected week is already written or has no topic');
+      throw new ValidationError(params.regenerate
+        ? 'Nothing to regenerate: the selected weeks have no story'
+        : 'Nothing to generate: every selected week is already written or has no topic');
     }
     const id = uuidv4();
     await repo.insertJob({ id, params, provider: params.provider, model: params.model, units });
@@ -169,10 +310,11 @@ class GenerationJobService {
     return this.get(id);
   }
 
+  /** A paused job, or a job waiting for the quota (resumed now, at the risk of failing on the quota). */
   async resume(id) {
     const job = await this._require(id);
-    if (job.status !== 'paused') throw new ConflictError('Only a paused job can be resumed');
-    await repo.updateJob(id, { status: 'queued', finishedAt: null });
+    if (!['paused', 'scheduled'].includes(job.status)) throw new ConflictError('Only a paused or scheduled job can be resumed');
+    await repo.updateJob(id, { status: 'queued', finishedAt: null, resumeAt: null });
     await this.log(id, 'Resumed');
     this.onQueued();
     return this.get(id);
@@ -243,6 +385,14 @@ class GenerationJobService {
       failedCount: units.filter(u => u.status === 'failed').length,
       skippedCount: units.filter(u => u.status === 'skipped').length
     });
+  }
+
+  /** Framed job short of quota: waits for the next quota day (resumed by the worker). */
+  async schedule(id, reason, now = new Date()) {
+    const resumeAt = nextQuotaReset(now);
+    await repo.updateJob(id, { status: 'scheduled', resumeAt: resumeAt.toISOString().slice(0, 19).replace('T', ' '), currentLabel: null });
+    await this.log(id, `${reason}: scheduled, resumes at ${resumeAt.toISOString()}`);
+    return resumeAt;
   }
 
   /** Appends a line to the job log (last 300 kept). */

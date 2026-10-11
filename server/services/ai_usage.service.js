@@ -4,6 +4,8 @@ import { query } from '../config/database.js';
 import { modelLimits, peakPerMinute, quotaDayStart } from './helpers/model_limits.helper.js';
 
 export const AI_OUTCOMES = ['ok', 'rate_limit', 'daily_quota', 'overloaded', 'timeout', 'error'];
+/** Label of the week audits of the framed generation (series_audit.service.js). */
+const AUDIT_LABEL = 'WeekAudit';
 
 const toSql = (date) => date.toISOString().slice(0, 23).replace('T', ' ');
 
@@ -61,7 +63,7 @@ class AiUsageService {
     const dayStart = quotaDayStart(now);
     const since = new Date(Math.min(dayStart.getTime(), now.getTime() - days * 24 * 3600 * 1000));
     const rows = await query(
-      'SELECT at, model, outcome FROM ai_requests WHERE at >= ? ORDER BY at ASC',
+      'SELECT at, model, outcome, label FROM ai_requests WHERE at >= ? ORDER BY at ASC',
       [toSql(since)]
     );
 
@@ -69,12 +71,13 @@ class AiUsageService {
     for (const row of rows) {
       const at = row.at instanceof Date ? row.at : new Date(`${String(row.at).replace(' ', 'T')}Z`);
       if (!byModel.has(row.model)) byModel.set(row.model, []);
-      byModel.get(row.model).push({ at: at.getTime(), outcome: row.outcome });
+      byModel.get(row.model).push({ at: at.getTime(), outcome: row.outcome, label: row.label });
     }
 
     const models = [...byModel.entries()].map(([model, requests]) => {
       const today = requests.filter(r => r.at >= dayStart.getTime());
       const count = (list, outcome) => list.filter(r => r.outcome === outcome).length;
+      const audits = (list) => list.filter(r => r.label === AUDIT_LABEL).length;
       const limited = requests.filter(r => r.outcome === 'rate_limit' || r.outcome === 'daily_quota');
       const limits = modelLimits(model);
       const todayPeak = peakPerMinute(today.map(r => r.at));
@@ -86,7 +89,9 @@ class AiUsageService {
           ok: count(today, 'ok'),
           peakPerMinute: todayPeak,
           rateLimited: count(today, 'rate_limit'),
-          dailyQuota: count(today, 'daily_quota')
+          dailyQuota: count(today, 'daily_quota'),
+          // Week audits of the framed generation, part of the requests above
+          audits: audits(today)
         },
         period: {
           requests: requests.length,
@@ -97,6 +102,7 @@ class AiUsageService {
           overloaded: count(requests, 'overloaded'),
           timeouts: count(requests, 'timeout'),
           errors: count(requests, 'error'),
+          audits: audits(requests),
           lastLimitedAt: limited.length ? new Date(limited[limited.length - 1].at).toISOString() : null
         },
         // A limit was hit: Google answered 429, or the counted use reached the indicative limit

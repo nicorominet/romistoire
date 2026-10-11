@@ -136,10 +136,11 @@ export interface PausedModel {
 export interface ModelQuotaUsage {
     model: string;
     limits: { rpm: number | null; rpd: number | null };
-    today: { requests: number; ok: number; peakPerMinute: number; rateLimited: number; dailyQuota: number };
+    /** audits: week audits of the framed generation, part of the requests */
+    today: { requests: number; ok: number; peakPerMinute: number; rateLimited: number; dailyQuota: number; audits?: number };
     period: {
         requests: number; ok: number; peakPerMinute: number; rateLimited: number; dailyQuota: number;
-        overloaded: number; timeouts: number; errors: number; lastLimitedAt: string | null;
+        overloaded: number; timeouts: number; errors: number; lastLimitedAt: string | null; audits?: number;
     };
     /** Google answered 429, or the counted use reached the limit */
     exceeded: boolean;

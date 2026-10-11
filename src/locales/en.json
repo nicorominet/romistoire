@@ -470,9 +470,9 @@
       "defaultProvider": "Provider",
       "keyConfigured": "API key configured",
       "keyMissing": "API key missing (GEMINI_API_KEY in .env)",
-      "geminiDescription": "Models are tried in order: when one fails (quota, overload), the next one takes over.",
+      "geminiDescription": "Models are tried in order: if one fails (quota, overload), the next one takes over. They write the stories (from 7 years old, the Flash models first) and run the checks: the week audit of the framed generation uses the Flash Lite models of this list, then Gemma, never the Flash models.",
       "quotaNote": "Free tier: about 5 requests per minute for the Flash models. Put the more generous Flash Lite models first.",
-      "storyModels": "Story models",
+      "storyModels": "Models for the stories and the checks",
       "audioModels": "Audio reading models",
       "custom": "Custom",
       "fromEnv": ".env configuration",
@@ -630,7 +630,8 @@
       "limitedValue": "{{minute}} min · {{day}} day",
       "lastLimited": "Last refusal: {{time}}",
       "otherErrors": "Other errors",
-      "note": "Indicative free tier limits (Google may change them). \"Peak / minute\": the largest number of requests started within 60 seconds. A \"min\" 429 refusal is a per-minute overrun, a \"day\" one an exhausted daily quota."
+      "note": "Indicative free tier limits (Google may change them). \"Peak / minute\": the largest number of requests started within 60 seconds. A \"min\" 429 refusal is a per-minute overrun, a \"day\" one an exhausted daily quota.",
+      "audits": "including {{count}} week audit(s)"
     }
   },
   "stories": {
@@ -778,6 +779,21 @@
       "modified": "Modified",
       "weekShort": "W{{week}}",
       "navigation": "Previous and next stories"
+    },
+    "regenerate": {
+      "menu": "Regenerate the week…",
+      "title": "Regenerate with the AI?",
+      "description": "The stories of {{where}} will be rewritten by the AI with the current generation rules.",
+      "wholeWeek": "The whole week (7 stories)",
+      "onlyDay": "Only {{day}} (the other days are the context)",
+      "keepIllustrations": "The illustrations are kept, but they may no longer match the new text.",
+      "versions": "The old text stays in the version history: you can restore it.",
+      "audio": "The audio is deleted, and the stories go back to \"to review\".",
+      "estimating": "Estimating the cost…",
+      "cost": "{{requests}} AI request(s), about {{minutes}} min.",
+      "confirm": "Regenerate",
+      "started": "Regeneration started.",
+      "follow": "Follow"
     }
   },
   "filters": {
@@ -1051,7 +1067,8 @@
     "tabs": {
       "new": "New generation",
       "jobs": "Jobs",
-      "coverage": "Coverage"
+      "coverage": "Coverage",
+      "framed": "Framed generation"
     },
     "form": {
       "launched": "Generation started on the server.",
@@ -1072,7 +1089,8 @@
       "done": "Done",
       "failed": "Failed",
       "pending": "To do",
-      "skipped": "Skipped"
+      "skipped": "Skipped",
+      "scheduled": "Scheduled"
     },
     "actions": {
       "pause": "Pause",
@@ -1096,11 +1114,22 @@
       "attempts": "{{count}} attempts",
       "log": "Log"
     },
+    "quota": {
+      "flash": "Flash models (from 7 years old): {{requests}} request(s), {{remaining}} left today.",
+      "lite": "Flash Lite (2-6 years old): {{requests}} request(s), {{remaining}} left today.",
+      "flashShortfall": "Only {{remaining}} Flash request(s) left today: the rest will be written by Flash Lite, weaker for these ages. Tick \"Flash only\" to wait until tomorrow instead.",
+      "flashShortfallStrict": "Only {{remaining}} Flash request(s) left today: the extra days will fail and can be run again tomorrow with \"Retry failed\".",
+      "chosenModel": "About {{remaining}} request(s) left today on the chosen model: beyond that, the generation fails (failures can be retried later).",
+      "flashOnly": "Flash only",
+      "flashOnlyHint": "Uses only the recommended Flash models. When they are saturated or spent, the day fails and is retried later, instead of being written by Flash Lite."
+    },
     "jobs": {
       "empty": "No generation yet.",
       "summary": "Weeks {{weeks}} · {{ages}}",
       "counts": "{{created}} story(ies) created, {{failed}} failure(s), {{skipped}} skipped",
-      "current": "now: {{label}}"
+      "current": "now: {{label}}",
+      "framed": "framed",
+      "resumeAt": "resumes {{date}} (quota)"
     },
     "coverage": {
       "error": "Could not load the coverage.",
@@ -1192,6 +1221,172 @@
       "urlPlaceholder": "https://…",
       "add": "Insert",
       "hint": "The picture shows at this place on the story page. The PDF and the audio keep the text only."
+    }
+  },
+  "framed": {
+    "intro": "A framed series follows a bible: the same characters (age, looks, ties) from one week to the next, only the topic of the week moves the story forward. Each week is then checked for drifts. The free generation stays available in its own tab.",
+    "noSeries": "Create a series first: the bible belongs to it.",
+    "openSeries": "Manage series",
+    "chooseSeries": "Choose a series…",
+    "casts": "Casts",
+    "newCast": "New cast",
+    "sections": {
+      "bible": "Bible",
+      "memory": "Memory and checks",
+      "launch": "Launch"
+    },
+    "bible": {
+      "name": "Cast name",
+      "namePlaceholder": "e.g. The Martins (little ones)",
+      "referenceWeek": "Week these ages are right",
+      "referenceWeekHint": "Give today's ages (week {{week}}): with a birthday, they grow by themselves afterwards.",
+      "ageGroups": "Age groups written with this cast",
+      "ageGroupsHint": "An age group has one cast per series. Each age group tells its own story with these characters.",
+      "ageTaken": "Already taken by another cast of the series",
+      "universe": "World",
+      "universePlaceholder": "Place, time, mood: a seaside village today…",
+      "rules": "Rules of the world (one per line)",
+      "rulesPlaceholder": "No magic\nAnimals do not talk",
+      "characters": "Characters",
+      "addCharacter": "Add a character",
+      "removeCharacter": "Remove this character",
+      "addRelation": "Add a tie",
+      "removeRelation": "Remove this tie",
+      "checking": "Checking consistency…",
+      "create": "Create the cast",
+      "saveVersion": "Save (version {{version}})",
+      "saved": "Bible saved",
+      "delete": "Delete",
+      "deleteConfirm": "Delete the cast \"{{name}}\", its facts and checks? The stories stay.",
+      "fixErrors": "{{count}} error(s) to fix before saving.",
+      "useThisWeek": "Use week {{week}}"
+    },
+    "character": {
+      "name": "First name",
+      "role": "Role",
+      "roles": {
+        "main": "Main",
+        "recurring": "Recurring"
+      },
+      "age": "Age",
+      "birthday": "Birthday",
+      "species": "Species",
+      "speciesPlaceholder": "human (empty), owl, robot…",
+      "gender": "Gender",
+      "genderPlaceholder": "girl, boy…",
+      "physical": {
+        "hair": "Hair / fur",
+        "eyes": "Eyes",
+        "build": "Build",
+        "clothing": "Clothes",
+        "distinctive": "Distinctive sign"
+      },
+      "personality": "Personality",
+      "speech": "Way of speaking",
+      "visual": "Description for the illustrations",
+      "visualPlaceholder": "Sentence repeated word for word in every illustration: 5-year-old boy, brown curls, green dungarees…",
+      "relations": "Ties with the other characters",
+      "relationType": "Tie",
+      "relationTo": "With",
+      "genders": {
+        "none": "not specified",
+        "féminin": "female",
+        "masculin": "male"
+      },
+      "ageNow": "Age told this week ({{week}}): {{age}}",
+      "ageAfterBirthday": "after the birthday (week {{week}}): {{age}}"
+    },
+    "relations": {
+      "parent": "parent of",
+      "child": "child of",
+      "grandparent": "grandparent of",
+      "grandchild": "grandchild of",
+      "sibling": "sibling of",
+      "cousin": "cousin of",
+      "friend": "friend of",
+      "partner": "partner of",
+      "pet": "pet of",
+      "owner": "owner of",
+      "other": "tied to"
+    },
+    "issues": {
+      "name-required": "Give the cast a name.",
+      "age-groups-required": "Choose at least one age group.",
+      "age-group-taken": "Age group {{detail}} already has a cast in this series.",
+      "characters-required": "Add at least one character.",
+      "main-required": "At least one main character is needed.",
+      "too-many-main": "Many main characters for this age ({{detail}}): young readers follow 1 to 3 heroes better.",
+      "character-name-required": "A character has no first name.",
+      "duplicate-name": "The name \"{{detail}}\" is used twice.",
+      "reserved-name": "\"{{detail}}\" is already the hero of another series.",
+      "invalid-age": "Impossible age.",
+      "age-missing": "No age: the AI will choose one, and it may vary.",
+      "appearance-missing": "No appearance: the illustrations may vary.",
+      "unknown-relation": "Tie to an unknown character.",
+      "self-relation": "A character cannot be tied to itself.",
+      "parent-age": "Too young to be the parent of {{detail}}.",
+      "grandparent-age": "Too young to be the grandparent of {{detail}}.",
+      "hero-age-range": "Hero's age far from the readers' ({{detail}}).",
+      "universe-character": "\"{{detail}}\" is named in the world without being a character: if it is one (a pet, a friend), add it to fix its looks."
+    },
+    "memory": {
+      "facts": "Established facts",
+      "factsHint": "What the weeks set up and stays true afterwards (a pet adopted, a move). The check proposes them, you approve them; only approved facts are given to the next weeks.",
+      "noFacts": "No fact yet.",
+      "newFact": "New fact",
+      "newFactPlaceholder": "e.g. They adopted a cat called Pompon",
+      "addFact": "Add",
+      "approve": "Approve",
+      "reject": "Reject",
+      "factStatus": {
+        "proposed": "proposed",
+        "approved": "approved",
+        "rejected": "rejected"
+      },
+      "weeks": "Written weeks and checks",
+      "noWeeks": "No week generated with this cast yet.",
+      "issueCount": "{{count}} drift(s)",
+      "auditAgain": "Check again",
+      "audited": "Week {{week}} checked",
+      "fixDays": "Rewrite the {{count}} drifting day(s)",
+      "stale": "to check again",
+      "outdated": "bible changed since",
+      "auditStatus": {
+        "done": "checked",
+        "local": "local check",
+        "postponed": "check postponed (quota)",
+        "failed": "check failed"
+      },
+      "severity": {
+        "high": "serious",
+        "medium": "medium",
+        "low": "minor"
+      },
+      "rewriteWeek": "Rewrite the week",
+      "rewriteWeekConfirm": "Rewrite the 7 stories of week {{week}} with the current bible? The old texts stay in the version history, the illustrations are kept."
+    },
+    "launch": {
+      "month": "A month…",
+      "season": "A season…",
+      "seasons": {
+        "winter": "Winter",
+        "spring": "Spring",
+        "summer": "Summer",
+        "autumn": "Autumn"
+      },
+      "year": "The whole year",
+      "dailyBudget": "Daily request budget",
+      "dailyBudgetPlaceholder": "no limit",
+      "dailyBudgetHint": "Leaves quota to the free generation. Beyond it, the generation waits for the next day.",
+      "audit": "Consistency check of each week (+1 request a week)",
+      "auditHint": "Compares the 7 stories to the bible, sums the week up for the next ones and proposes the facts it established. Written by the Flash Lite models of the settings list (then Gemma), counted in the quota. Free local checks run in any case.",
+      "skipExistingHint": "Only the stories of this series count: a free story of the same week does not replace it.",
+      "estimate": "{{units}} week(s) to write, about {{requests}} request(s), checks included.",
+      "scheduleToday": "Today's quota is enough.",
+      "scheduleSpread": "Not enough quota today: the generation will spread over {{days}} ({{today}} request(s) today, then about {{perDay}} a day). It resumes by itself after each quota reset.",
+      "day": "{{count}} day",
+      "days": "{{count}} days",
+      "launch": "Launch the framed generation"
     }
   }
 }

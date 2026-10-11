@@ -14,12 +14,15 @@ import { assignWeekDays, countRepetitiveOpenings, extractWeekContext, parseStory
 import { ALL_WEEK, FORBIDDEN_OPENINGS, PromptHelper } from './helpers/prompt.helper.js';
 import { STORY_DAYS } from './helpers/story_schema.js';
 import { SHORT_STORY_RATIO } from './helpers/generation_plan.helper.js';
+import { LONG_RATIO, blockingCount, detectDefects, normalizeTypography } from './helpers/story_quality.helper.js';
 import { logger } from './logger.service.js';
 import { resolveAudioOptions, validateAudioOptions } from './helpers/voice.helper.js';
 import { NotFoundError, ValidationError } from '../middleware/error.middleware.js';
 
-// A single story (or a week whose median story) under SHORT_STORY_RATIO of the minimum length of its age
-// is asked once more (one more request at most).
+// A single story (or a week whose median story) under SHORT_STORY_RATIO of the minimum length of its age,
+// or an answer with a blocking defect, is asked once more (one more request at most).
+/** Defect instructions added to the second request (the most useful first, a short prompt stays readable). */
+const MAX_DEFECT_HINTS = 6;
 
 const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
 const LOCALES = ['fr', 'en'];
@@ -62,12 +65,30 @@ export const validateStoryInput = (data = {}, { partial = false } = {}) => {
 
 /**
  * Whether a second answer is better than the first: more complete first (up to the expected number of stories),
- * then longer (typical length).
+ * then with fewer generation slips (see story_quality.helper), then with fewer stories out of the length of their
+ * age (far too short or far too long), then with fewer bible defects (framed series), then longer (typical length).
+ * @param {{words: number[], defects: Object[]}} candidate
+ * @param {{words: number[], defects: Object[]}} current
+ * @param {number} expectedStories
+ * @param {{min: number, max: number}|null} [targetWords] - Length of the age group.
  */
-const isBetterAnswer = (candidateWords, currentWords, expectedStories) => {
+export const isBetterAnswer = (candidate, current, expectedStories, targetWords = null) => {
   const complete = (words) => Math.min(words.length, expectedStories);
-  if (complete(candidateWords) !== complete(currentWords)) return complete(candidateWords) > complete(currentWords);
-  return typicalLength(candidateWords) > typicalLength(currentWords);
+  if (complete(candidate.words) !== complete(current.words)) return complete(candidate.words) > complete(current.words);
+  // "too-long" is a length problem, weighed with the stories too short below
+  const slipCount = (answer) => blockingCount(answer.defects.filter(defect => defect.code !== 'too-long'), { cast: false });
+  const slips = slipCount(candidate) - slipCount(current);
+  if (slips !== 0) return slips < 0;
+  // Stories far too short or far too long: a week of 7 stories of 171 words for 300 lost to one of 560 words with a
+  // single day over the limit (week 43, Oct. 2026). A bible defect (one word to fix) never outweighs the length.
+  const outOfLength = (answer) => (targetWords?.min
+    ? answer.words.filter(words => words < targetWords.min * SHORT_STORY_RATIO || (targetWords.max && words > targetWords.max * LONG_RATIO)).length
+    : answer.defects.filter(defect => defect.code === 'too-long').length);
+  const length = outOfLength(candidate) - outOfLength(current);
+  if (length !== 0) return length < 0;
+  const bible = blockingCount(candidate.defects, { cast: true }) - blockingCount(current.defects, { cast: true });
+  if (bible !== 0) return bible < 0;
+  return typicalLength(candidate.words) > typicalLength(current.words);
 };
 
 /** Length of an answer: the word count of a single story, the median of several. */
@@ -181,28 +202,32 @@ class StoryService {
       if (beforeRequest) await beforeRequest();
       let attempt = await this._generateOnce(aiProvider, promptParams);
 
-      // Ask once more when the answer is incomplete (a week with fewer than 7 stories) or far below the length
-      // of its age (small models), and keep the better answer: the most complete, then the longest.
+      // Ask once more when the answer is incomplete (a week with fewer than 7 stories), far below the length
+      // of its age (small models) or has a blocking defect (generation slip, copied story, far too long),
+      // and keep the better answer: the most complete, then the one with fewer defects, then the longest.
       let lengthRetry = null;
       const firstWords = typicalLength(attempt.words);
       const firstCount = attempt.words.length;
+      const firstDefects = attempt.defects;
       const incompleteFirst = firstCount > 0 && firstCount < expectedStories;
       const shortFirst = firstCount > 0 && targetWords.min > 0 && firstWords < targetWords.min * SHORT_STORY_RATIO;
-      if (incompleteFirst || shortFirst) {
-        const hints = [];
+      const blockingFirst = firstDefects.filter(defect => defect.blocking);
+      if (incompleteFirst || shortFirst || blockingFirst.length > 0) {
+        const hints = [...new Set(blockingFirst.map(defect => defect.hint))].slice(0, MAX_DEFECT_HINTS);
         if (incompleteFirst) {
           hints.push(`Votre réponse ne contenait que ${firstCount} histoire(s) : écrivez les ${expectedStories} histoires, une par jour du lundi au dimanche.`);
         }
         if (shortFirst) {
           hints.push(isWeek
-            ? `Vos histoires faisaient environ ${firstWords} mots chacune : écrivez au moins ${targetWords.min} mots pour chacune des ${expectedStories} histoires, en développant les scènes, les dialogues et les sensations.`
-            : `Votre précédente version faisait ${firstWords} mots : écrivez au moins ${targetWords.min} mots, en développant les scènes, les dialogues et les sensations.`);
+            // A range, not only a minimum: asked "at least 300", a model answered 560 words a day (week 43, Oct. 2026)
+            ? `Vos histoires faisaient environ ${firstWords} mots chacune : écrivez au moins ${targetWords.min} mots, sans dépasser ${targetWords.max} mots, pour chacune des ${expectedStories} histoires, en développant les scènes, les dialogues et les sensations.`
+            : `Votre précédente version faisait ${firstWords} mots : écrivez au moins ${targetWords.min} mots, sans dépasser ${targetWords.max} mots, en développant les scènes, les dialogues et les sensations.`);
         }
         try {
           if (beforeRequest) await beforeRequest();
           const retry = await this._generateOnce(aiProvider, { ...promptParams, lengthHint: hints.join(' ') });
           lengthRetry = { before: firstWords, after: typicalLength(retry.words), storiesBefore: firstCount, storiesAfter: retry.words.length };
-          if (isBetterAnswer(retry.words, attempt.words, expectedStories)) {
+          if (isBetterAnswer(retry, attempt, expectedStories, targetWords)) {
             attempt = {
               ...retry,
               weekPlan: retry.weekPlan ?? attempt.weekPlan,
@@ -215,7 +240,7 @@ class StoryService {
         }
       }
 
-      const { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, weekPlan, characters, daysFixed } = attempt;
+      const { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, weekPlan, characters, daysFixed, defects } = attempt;
       const incomplete = words.length > 0 && words.length < expectedStories ? { stories: words.length, expected: expectedStories } : null;
 
       // Length and continuity context, so short or disconnected stories show up in the AI log
@@ -230,10 +255,13 @@ class StoryService {
           model: result.model, finishReason: result.finishReason, parsed: Boolean(stories), stories: words.length, words, targetWords,
           repeatedOpeningRemoved, cleanedParagraphs, lengthRetry, incomplete, daysFixed, weekPlan, characters,
           // Stories opening with "Hier…" or the same words as another day: measures the opening rule
-          repetitiveOpenings: countRepetitiveOpenings(stories || [], FORBIDDEN_OPENINGS)
+          repetitiveOpenings: countRepetitiveOpenings(stories || [], FORBIDDEN_OPENINGS),
+          // Quality gate: defects of the first answer and of the answer kept
+          defectsFirst: firstDefects.map(({ index, code, detail }) => ({ index, code, detail })),
+          defects: defects.map(({ index, code, detail }) => ({ index, code, detail }))
         });
 
-      return { ...result, stories, targetWords, weekPlan, characters };
+      return { ...result, stories, targetWords, weekPlan, characters, defects };
   }
 
   /**
@@ -270,15 +298,30 @@ class StoryService {
         });
       }
 
-      // Paragraphs sized for the age group (no change to the text)
-      if (stories) stories = stories.map(story => ({ ...story, paragraphs: splitParagraphsForAge(story.paragraphs, promptParams.age) }));
+      // Paragraphs sized for the age group (no change to the text), French quotes and spaces
+      if (stories) {
+        stories = stories.map(story => ({
+          ...story,
+          title: normalizeTypography(story.title),
+          paragraphs: splitParagraphsForAge(story.paragraphs, promptParams.age).map(normalizeTypography)
+        }));
+      }
 
       // First day of a week generated day by day: the plan and the characters the following days will follow
       const { weekPlan, characters } = extractWeekContext(result.text);
       const words = (stories || []).map(story => story.paragraphs.join(' ').split(/\s+/).filter(Boolean).length);
       // Filler and illustration paragraphs removed by parseStoryOutput
       const cleanedParagraphs = (stories || []).reduce((total, story) => total + (story.cleanedParagraphs || 0), 0);
-      return { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, daysFixed, weekPlan, characters };
+      // Generation slips, length and quotes (content audit of October 2026)
+      const defects = detectDefects(stories || [], {
+        targetWords: PromptHelper.getTargetWords(promptParams.age),
+        avoidTitles: promptParams.avoidTitles || [],
+        previousTexts: promptParams.previousTexts || [],
+        // Framed series: checked against its bible too
+        cast: promptParams.cast || null,
+        reservedNames: promptParams.cast ? promptParams.reservedNames || [] : []
+      });
+      return { result, stories, words, repeatedOpeningRemoved, cleanedParagraphs, daysFixed, weekPlan, characters, defects };
   }
 
   /**
@@ -506,8 +549,14 @@ class StoryService {
 
   /**
    * Update an existing story with versioning.
+   * @param {string} id
+   * @param {Object} storyData - Fields to change (others keep their value).
+   * @param {{regenerated?: boolean, mechanical?: boolean}} [options] - regenerated: the new text comes from the AI
+   *   (regeneration job), so the story goes back to "to review" and is not marked as edited by hand.
+   *   mechanical: a fix that changes no word (typography): review status, "edited" flag and audio are kept.
+   *   Default: saved by a person.
    */
-  async update(id, storyData) {
+  async update(id, storyData, { regenerated = false, mechanical = false } = {}) {
     validateStoryInput(storyData, { partial: true });
     const connection = await getConnection();
     try {
@@ -517,8 +566,8 @@ class StoryService {
       // Fields not sent keep their value
       const title = storyData.title !== undefined ? storyData.title.trim() : oldStory.title;
       const content = storyData.content !== undefined ? storyData.content : oldStory.content;
-      // The audio reads the title and the text: it is kept unless one of them changed
-      const textChanged = title !== oldStory.title || content !== oldStory.content;
+      // The audio reads the title and the text: it is kept unless one of them changed (not for a typography fix)
+      const textChanged = !mechanical && (title !== oldStory.title || content !== oldStory.content);
       
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
       const [oldThemes] = await connection.query('SELECT * FROM story_themes WHERE story_id = ?', [id]);
@@ -606,11 +655,19 @@ class StoryService {
       // Snapshot only after confirming the submitted values differ from the stored story.
       await storyVersionService.createSnapshot(connection, oldStory, oldThemes);
 
-      // Saved from the edit page: a person read the story, so it counts as reviewed
+      // Saved from the edit page: a person read the story, so it counts as reviewed.
+      // Regenerated by the AI: a new text to read again, not a manual edit.
+      // A typography fix keeps both as they were.
+      const reviewStatus = regenerated ? 'to_review' : mechanical ? oldStory.review_status : 'validated';
+      const manuallyEdited = regenerated ? false : mechanical ? Boolean(oldStory.is_manually_edited) : !isCurrentlyManual;
       await connection.query(
-           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, series_id = ?, illustration_prompt = ?, review_status = 'validated', audio_path = ? WHERE id = ?`,
-           [title, content, ageGroup, weekNumber, dayOrder, now, locale, nextVersion, !isCurrentlyManual, seriesId, illustrationPrompt, textChanged ? null : oldStory.audio_path, id]
+           `UPDATE stories SET title = ?, content = ?, age_group = ?, week_number = ?, day_order = ?, modified_at = ?, locale = ?, version = ?, is_manually_edited = ?, series_id = ?, illustration_prompt = ?, review_status = ?, audio_path = ? WHERE id = ?`,
+           [title, content, ageGroup, weekNumber, dayOrder, now, locale, nextVersion, manuallyEdited, seriesId, illustrationPrompt, reviewStatus, textChanged ? null : oldStory.audio_path, id]
       );
+      // The summary is the context of the next day (generation)
+      if ('summary' in storyData) {
+        await connection.query('UPDATE stories SET summary = ? WHERE id = ?', [storyData.summary ?? null, id]);
+      }
 
       // Refresh Themes (only when sent: a partial update keeps them)
       if (Array.isArray(storyData.themes)) {
@@ -642,7 +699,7 @@ class StoryService {
       themeService.invalidateCache();
       // A new text makes the audio wrong: delete the old file
       if (textChanged) await fileCleanup.removeAudioIfUnused(oldStory.audio_path);
-      return { id, ...storyData, title, content, series_id: seriesId, modified_at: now, review_status: 'validated', audio_path: textChanged ? null : oldStory.audio_path, aliasSeries };
+      return { id, ...storyData, title, content, series_id: seriesId, modified_at: now, review_status: reviewStatus, audio_path: textChanged ? null : oldStory.audio_path, aliasSeries };
     } catch (error) {
       await connection.rollback();
       throw error;

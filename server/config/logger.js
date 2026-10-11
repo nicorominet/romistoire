@@ -67,6 +67,9 @@ export function getLoggerConfig() {
     return config;
 }
 
+/** Categories whose INFO lines are written to the file only (the generation messages stay readable). */
+const QUIET_CONSOLE = new Set(['DB', 'BATCH_LOGS']);
+
 /**
  * Appends a log entry to the JSONL file.
  * @param {string} category - Category of log (DB, API, SYSTEM, etc.)
@@ -102,8 +105,9 @@ export function log(category, message, data = {}, level = 'INFO') {
         });
     }
 
-    // Also log to console in dev
-    if (process.env.NODE_ENV !== 'production') {
+    // Also log to console in dev, except the routine of the chatty categories (one line per SQL query,
+    // per batch of browser logs): they stay in the file, the console keeps their warnings and errors
+    if (process.env.NODE_ENV !== 'production' && !(level === 'INFO' && QUIET_CONSOLE.has(category))) {
         const color = level === 'ERROR' ? '\x1b[31m' : level === 'WARN' ? '\x1b[33m' : '\x1b[36m';
         console.log(`${color}[${category}] ${message}\x1b[0m`);
     }

@@ -77,7 +77,12 @@ export const QuotaUsageCard = () => {
                       {m.model}
                       {m.exceeded && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">429</Badge>}
                     </TableCell>
-                    <TableCell className="text-right"><AgainstLimit value={m.today.requests} limit={m.limits.rpd} /></TableCell>
+                    <TableCell className="text-right">
+                      <AgainstLimit value={m.today.requests} limit={m.limits.rpd} />
+                      {(m.today.audits ?? 0) > 0 && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t("settings.quota.audits", { count: String(m.today.audits) })}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right"><AgainstLimit value={m.today.peakPerMinute} limit={m.limits.rpm} /></TableCell>
                     <TableCell className="text-right"><AgainstLimit value={m.period.peakPerMinute} limit={m.limits.rpm} /></TableCell>
                     <TableCell className="text-right" title={m.period.lastLimitedAt ? t("settings.quota.lastLimited", { time: new Date(m.period.lastLimitedAt).toLocaleString() }) : undefined}>

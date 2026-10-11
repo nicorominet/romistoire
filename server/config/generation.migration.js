@@ -65,6 +65,26 @@ export async function migrateGeneration(pool) {
     )
   `);
 
+  // Framed jobs wait for the next quota day instead of failing: status "scheduled" until resume_at,
+  // and a daily budget of requests counted per quota day
+  const [statusColumn] = await pool.query("SHOW COLUMNS FROM generation_jobs LIKE 'status'");
+  if (statusColumn.length > 0 && !String(statusColumn[0].Type).includes("'scheduled'")) {
+    await pool.query(`
+      ALTER TABLE generation_jobs
+      MODIFY COLUMN status ENUM('queued', 'running', 'paused', 'scheduled', 'cancelled', 'done', 'failed') NOT NULL DEFAULT 'queued'
+    `);
+    console.log('Migration: scheduled status added to generation_jobs.');
+  }
+  if (!(await hasColumn(pool, 'generation_jobs', 'resume_at'))) {
+    await pool.query(`
+      ALTER TABLE generation_jobs
+      ADD COLUMN resume_at DATETIME NULL AFTER finished_at,
+      ADD COLUMN budget_day VARCHAR(10) NULL AFTER resume_at,
+      ADD COLUMN budget_used INT NOT NULL DEFAULT 0 AFTER budget_day
+    `);
+    console.log('Migration: resume_at and budget columns added to generation_jobs.');
+  }
+
   if (!(await hasColumn(pool, 'stories', 'generation_job_id'))) {
     await pool.query(`
       ALTER TABLE stories

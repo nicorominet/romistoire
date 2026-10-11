@@ -74,4 +74,11 @@ describe('detectDefects', () => {
     expect(defects[0].hint).toContain('ne dépassez pas 450 mots');
     expect(defects.map(defect => defect.blocking)).toEqual([true, false, false]);
   });
+
+  it('should accept dialogues opened by a dash', () => {
+    // S42 7-9 (3-flash-preview): « — Pourquoi… ? demande Marius » is correct French
+    expect(detectDefects([
+      story(['— Pourquoi l\'arbre pique-t-il autant ? demande Marius.', '— Tu as raison, Soline, répond le vieil homme, explique-t-il.'])
+    ])).toEqual([]);
+  });
 });

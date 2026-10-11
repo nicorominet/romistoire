@@ -470,9 +470,9 @@
       "defaultProvider": "Fournisseur",
       "keyConfigured": "Clé API configurée",
       "keyMissing": "Clé API absente (GEMINI_API_KEY dans .env)",
-      "geminiDescription": "Les modèles sont essayés dans l'ordre : si l'un échoue (quota, surcharge), le suivant prend le relais.",
+      "geminiDescription": "Les modèles sont essayés dans l'ordre : si l'un échoue (quota, surcharge), le suivant prend le relais. Ils écrivent les histoires (dès 7 ans, les modèles Flash d'abord) et font les vérifications : l'analyse des semaines de la génération cadrée utilise les modèles Flash Lite de cette liste, puis Gemma, jamais les modèles Flash.",
       "quotaNote": "Offre gratuite : environ 5 requêtes par minute pour les modèles Flash. Mettez en premier les modèles Flash Lite, plus généreux.",
-      "storyModels": "Modèles pour les histoires",
+      "storyModels": "Modèles pour les histoires et les vérifications",
       "audioModels": "Modèles pour la lecture audio",
       "custom": "Personnalisé",
       "fromEnv": "Configuration .env",
@@ -630,7 +630,8 @@
       "limitedValue": "{{minute}} min · {{day}} jour",
       "lastLimited": "Dernier refus : {{time}}",
       "otherErrors": "Autres erreurs",
-      "note": "Limites indicatives de l'offre gratuite (Google peut les modifier). « Pic / minute » : le plus grand nombre de requêtes parties en 60 secondes. Un refus 429 « min » est un dépassement par minute, « jour » un quota journalier épuisé."
+      "note": "Limites indicatives de l'offre gratuite (Google peut les modifier). « Pic / minute » : le plus grand nombre de requêtes parties en 60 secondes. Un refus 429 « min » est un dépassement par minute, « jour » un quota journalier épuisé.",
+      "audits": "dont {{count}} analyse(s) de semaine"
     }
   },
   "stories": {
@@ -778,6 +779,21 @@
       "modified": "Modifiée le",
       "weekShort": "S{{week}}",
       "navigation": "Histoires précédente et suivante"
+    },
+    "regenerate": {
+      "menu": "Régénérer la semaine…",
+      "title": "Régénérer avec l'IA ?",
+      "description": "Les histoires de {{where}} seront réécrites par l'IA avec les règles de génération actuelles.",
+      "wholeWeek": "Toute la semaine (7 histoires)",
+      "onlyDay": "Seulement le {{day}} (les autres jours servent de contexte)",
+      "keepIllustrations": "Les illustrations sont gardées, mais elles peuvent ne plus correspondre au nouveau texte.",
+      "versions": "L'ancien texte reste dans l'historique des versions : vous pouvez le restaurer.",
+      "audio": "L'audio est supprimé, et les histoires repassent « à relire ».",
+      "estimating": "Calcul du coût…",
+      "cost": "{{requests}} requête(s) à l'IA, environ {{minutes}} min.",
+      "confirm": "Régénérer",
+      "started": "Régénération lancée.",
+      "follow": "Suivre"
     }
   },
   "filters": {
@@ -1051,7 +1067,8 @@
     "tabs": {
       "new": "Nouvelle génération",
       "jobs": "Tâches",
-      "coverage": "Couverture"
+      "coverage": "Couverture",
+      "framed": "Génération cadrée"
     },
     "form": {
       "launched": "Génération lancée sur le serveur.",
@@ -1072,7 +1089,8 @@
       "done": "Terminée",
       "failed": "Échec",
       "pending": "À faire",
-      "skipped": "Ignorée"
+      "skipped": "Ignorée",
+      "scheduled": "Planifiée"
     },
     "actions": {
       "pause": "Mettre en pause",
@@ -1096,11 +1114,22 @@
       "attempts": "{{count}} essais",
       "log": "Journal"
     },
+    "quota": {
+      "flash": "Modèles Flash (à partir de 7 ans) : {{requests}} requête(s), {{remaining}} restante(s) aujourd'hui.",
+      "lite": "Flash Lite (2-6 ans) : {{requests}} requête(s), {{remaining}} restante(s) aujourd'hui.",
+      "flashShortfall": "Il ne reste que {{remaining}} requête(s) Flash aujourd'hui : le reste sera écrit par Flash Lite, plus faible pour ces âges. Cochez « Flash uniquement » pour attendre demain plutôt que de descendre.",
+      "flashShortfallStrict": "Il ne reste que {{remaining}} requête(s) Flash aujourd'hui : les jours en trop échoueront, et pourront être relancés demain avec « Relancer les échecs ».",
+      "chosenModel": "Il reste environ {{remaining}} requête(s) aujourd'hui sur le modèle choisi : au-delà, la génération échoue (les échecs se relancent ensuite).",
+      "flashOnly": "Flash uniquement",
+      "flashOnlyHint": "N'utilise que les modèles Flash recommandés. Quand ils sont saturés ou épuisés, le jour échoue et se relance plus tard, au lieu d'être écrit par Flash Lite."
+    },
     "jobs": {
       "empty": "Aucune génération pour le moment.",
       "summary": "Semaines {{weeks}} · {{ages}}",
       "counts": "{{created}} histoire(s) créée(s), {{failed}} échec(s), {{skipped}} ignorée(s)",
-      "current": "en cours : {{label}}"
+      "current": "en cours : {{label}}",
+      "framed": "cadrée",
+      "resumeAt": "reprise le {{date}} (quota)"
     },
     "coverage": {
       "error": "Impossible de charger la couverture.",
@@ -1192,6 +1221,172 @@
       "urlPlaceholder": "https://…",
       "add": "Insérer",
       "hint": "L'image s'affiche à cet endroit sur la page de l'histoire. Le PDF et l'audio ne gardent que le texte."
+    }
+  },
+  "framed": {
+    "intro": "Une série cadrée suit une bible : les mêmes personnages (âge, apparence, liens) d'une semaine à l'autre, seul le sujet de la semaine fait avancer l'histoire. Chaque semaine est ensuite analysée pour repérer les dérives. La génération libre reste disponible dans son onglet.",
+    "noSeries": "Créez d'abord une série : la bible lui sera rattachée.",
+    "openSeries": "Gérer les séries",
+    "chooseSeries": "Choisir une série…",
+    "casts": "Distributions",
+    "newCast": "Nouvelle distribution",
+    "sections": {
+      "bible": "Bible",
+      "memory": "Mémoire et analyses",
+      "launch": "Lancer"
+    },
+    "bible": {
+      "name": "Nom de la distribution",
+      "namePlaceholder": "ex. Famille Martin (petits)",
+      "referenceWeek": "Semaine où ces âges sont justes",
+      "referenceWeekHint": "Indiquez les âges d'aujourd'hui (semaine {{week}}) : avec un anniversaire, ils augmentent ensuite tout seuls.",
+      "ageGroups": "Tranches d'âge écrites avec cette distribution",
+      "ageGroupsHint": "Une tranche d'âge n'a qu'une distribution par série. Chaque tranche raconte sa propre histoire avec ces personnages.",
+      "ageTaken": "Déjà prise par une autre distribution de la série",
+      "universe": "Univers",
+      "universePlaceholder": "Lieu, époque, ambiance : un village breton d'aujourd'hui, au bord de la mer…",
+      "rules": "Règles de l'univers (une par ligne)",
+      "rulesPlaceholder": "Pas de magie\nLes animaux ne parlent pas",
+      "characters": "Personnages",
+      "addCharacter": "Ajouter un personnage",
+      "removeCharacter": "Retirer ce personnage",
+      "addRelation": "Ajouter un lien",
+      "removeRelation": "Retirer ce lien",
+      "checking": "Vérification de la cohérence…",
+      "create": "Créer la distribution",
+      "saveVersion": "Enregistrer (version {{version}})",
+      "saved": "Bible enregistrée",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer la distribution « {{name}} », ses faits et ses analyses ? Les histoires restent.",
+      "fixErrors": "{{count}} erreur(s) à corriger avant d'enregistrer.",
+      "useThisWeek": "Utiliser la semaine {{week}}"
+    },
+    "character": {
+      "name": "Prénom",
+      "role": "Rôle",
+      "roles": {
+        "main": "Principal",
+        "recurring": "Récurrent"
+      },
+      "age": "Âge",
+      "birthday": "Anniversaire",
+      "species": "Espèce",
+      "speciesPlaceholder": "humain (vide), hibou, robot…",
+      "gender": "Genre",
+      "genderPlaceholder": "fille, garçon…",
+      "physical": {
+        "hair": "Cheveux / pelage",
+        "eyes": "Yeux",
+        "build": "Silhouette",
+        "clothing": "Vêtements",
+        "distinctive": "Signe distinctif"
+      },
+      "personality": "Caractère",
+      "speech": "Façon de parler",
+      "visual": "Description pour les illustrations",
+      "visualPlaceholder": "Phrase reprise mot pour mot dans chaque illustration : petit garçon de 5 ans, boucles brunes, salopette verte…",
+      "relations": "Liens avec les autres personnages",
+      "relationType": "Lien",
+      "relationTo": "Avec",
+      "genders": {
+        "none": "non précisé",
+        "féminin": "féminin",
+        "masculin": "masculin"
+      },
+      "ageNow": "Âge raconté cette semaine ({{week}}) : {{age}} ans",
+      "ageAfterBirthday": "après son anniversaire (semaine {{week}}) : {{age}} ans"
+    },
+    "relations": {
+      "parent": "parent de",
+      "child": "enfant de",
+      "grandparent": "grand-parent de",
+      "grandchild": "petit-enfant de",
+      "sibling": "frère ou sœur de",
+      "cousin": "cousin(e) de",
+      "friend": "ami(e) de",
+      "partner": "en couple avec",
+      "pet": "animal de compagnie de",
+      "owner": "maître de",
+      "other": "lié(e) à"
+    },
+    "issues": {
+      "name-required": "Donnez un nom à la distribution.",
+      "age-groups-required": "Choisissez au moins une tranche d'âge.",
+      "age-group-taken": "La tranche {{detail}} a déjà une distribution dans cette série.",
+      "characters-required": "Ajoutez au moins un personnage.",
+      "main-required": "Il faut au moins un personnage principal.",
+      "too-many-main": "Beaucoup de personnages principaux pour cet âge ({{detail}}) : les jeunes lecteurs suivent mieux 1 à 3 héros.",
+      "character-name-required": "Un personnage n'a pas de prénom.",
+      "duplicate-name": "Le prénom « {{detail}} » est utilisé deux fois.",
+      "reserved-name": "« {{detail}} » est déjà le héros d'une autre série.",
+      "invalid-age": "Âge impossible.",
+      "age-missing": "Âge non renseigné : l'IA le choisira, et il pourra varier.",
+      "appearance-missing": "Apparence non décrite : les illustrations pourront varier.",
+      "unknown-relation": "Lien vers un personnage inconnu.",
+      "self-relation": "Un personnage ne peut pas être lié à lui-même.",
+      "parent-age": "Trop jeune pour être le parent de {{detail}}.",
+      "grandparent-age": "Trop jeune pour être le grand-parent de {{detail}}.",
+      "hero-age-range": "Âge du héros éloigné de celui des lecteurs ({{detail}} ans).",
+      "universe-character": "« {{detail}} » est cité dans l'univers sans être un personnage : si c'en est un (un animal, un ami), ajoutez-le pour fixer son apparence."
+    },
+    "memory": {
+      "facts": "Faits établis",
+      "factsHint": "Ce que les semaines ont installé et qui reste vrai ensuite (un animal adopté, un déménagement). L'analyse en propose, vous les validez ; seuls les faits validés sont donnés aux semaines suivantes.",
+      "noFacts": "Aucun fait pour l'instant.",
+      "newFact": "Nouveau fait",
+      "newFactPlaceholder": "ex. Ils ont adopté un chat nommé Pompon",
+      "addFact": "Ajouter",
+      "approve": "Valider",
+      "reject": "Rejeter",
+      "factStatus": {
+        "proposed": "proposé",
+        "approved": "validé",
+        "rejected": "rejeté"
+      },
+      "weeks": "Semaines écrites et analyses",
+      "noWeeks": "Aucune semaine générée avec cette distribution.",
+      "issueCount": "{{count}} écart(s)",
+      "auditAgain": "Relancer l'analyse",
+      "audited": "Semaine {{week}} analysée",
+      "fixDays": "Réécrire les {{count}} jour(s) en dérive",
+      "stale": "à revérifier",
+      "outdated": "bible modifiée depuis",
+      "auditStatus": {
+        "done": "analysée",
+        "local": "contrôle local",
+        "postponed": "analyse reportée (quota)",
+        "failed": "analyse en échec"
+      },
+      "severity": {
+        "high": "grave",
+        "medium": "moyen",
+        "low": "léger"
+      },
+      "rewriteWeek": "Réécrire la semaine",
+      "rewriteWeekConfirm": "Réécrire les 7 histoires de la semaine {{week}} avec la bible actuelle ? Les anciens textes restent dans l'historique des versions, les illustrations sont gardées."
+    },
+    "launch": {
+      "month": "Un mois…",
+      "season": "Une saison…",
+      "seasons": {
+        "winter": "Hiver",
+        "spring": "Printemps",
+        "summer": "Été",
+        "autumn": "Automne"
+      },
+      "year": "Toute l'année",
+      "dailyBudget": "Budget de requêtes par jour",
+      "dailyBudgetPlaceholder": "sans limite",
+      "dailyBudgetHint": "Laisse du quota à la génération libre. Au-delà, la génération attend le lendemain.",
+      "audit": "Analyse de cohérence de chaque semaine (+1 requête par semaine)",
+      "auditHint": "Compare les 7 histoires à la bible, résume la semaine pour les suivantes et propose les faits établis. Écrite par les modèles Flash Lite de la liste des paramètres (puis Gemma), comptée dans le quota. Des contrôles locaux gratuits sont faits dans tous les cas.",
+      "skipExistingHint": "Seules les histoires de cette série comptent : une histoire libre de la même semaine ne la remplace pas.",
+      "estimate": "{{units}} semaine(s) à écrire, environ {{requests}} requête(s), analyses comprises.",
+      "scheduleToday": "Le quota du jour suffit.",
+      "scheduleSpread": "Quota insuffisant pour aujourd'hui : la génération s'étalera sur {{days}} ({{today}} requête(s) aujourd'hui, puis environ {{perDay}} par jour). Elle reprend seule après chaque remise à zéro du quota.",
+      "day": "{{count}} jour",
+      "days": "{{count}} jours",
+      "launch": "Lancer la génération cadrée"
     }
   }
 }
