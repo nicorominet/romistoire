@@ -16,6 +16,10 @@ vi.mock("@/api/generationJobs.api", () => ({
   generationJobsApi: { coverage: vi.fn(), suggestTopics: vi.fn() },
 }));
 
+vi.mock("@/hooks/useSeries", () => ({
+  useSeries: () => ({ data: [{ id: "ser1", name: "Famille Silvestre", castCount: 1 }, { id: "ser2", name: "Antonin", castCount: 0 }] }),
+}));
+
 const wrap = (ui: ReactNode) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
@@ -60,5 +64,28 @@ describe("CoverageGrid", () => {
     fireEvent.click(screen.getByText("generation.coverage.generateSelection"));
 
     expect(onGenerate).toHaveBeenCalledWith({ weeks: [1, 3], ages: ["7-9"] });
+  });
+
+  it("counts one series: an age group without cast is greyed, the selection carries the series", async () => {
+    const onGenerate = vi.fn();
+    (generationJobsApi.coverage as ReturnType<typeof vi.fn>).mockImplementation(async (series: string) => ({
+      weeks: [{ weekNumber: 1, topic: "Les volcans" }],
+      ages: ["4-6", "7-9"],
+      cells: {},
+      ...(series === "ser1" ? { series: { id: "ser1", name: "Famille Silvestre", framed: true, castAges: ["4-6"] } } : {}),
+    }));
+    wrap(<CoverageGrid onGenerate={onGenerate} />);
+    await screen.findAllByRole("button", { pressed: false });
+
+    fireEvent.change(screen.getByLabelText("generation.coverage.seriesFilter"), { target: { value: "ser1" } });
+    expect(generationJobsApi.coverage).toHaveBeenLastCalledWith("ser1");
+    await screen.findByText(/Famille Silvestre :/);
+    const cells = screen.getAllByRole("button", { pressed: false }).filter((b) => b.getAttribute("aria-label")?.startsWith("generation.coverage.cellLabel"));
+    expect(cells[0]).not.toBeDisabled(); // 4-6: cast
+    expect(cells[1]).toBeDisabled(); // 7-9: no cast
+
+    fireEvent.click(cells[0]);
+    fireEvent.click(screen.getByText("generation.coverage.generateSelection"));
+    expect(onGenerate).toHaveBeenCalledWith({ weeks: [1], ages: ["4-6"], seriesId: "ser1", seriesName: "Famille Silvestre", framed: true });
   });
 });

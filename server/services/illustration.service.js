@@ -30,12 +30,12 @@ const castOfStory = (story, casts) => {
 class IllustrationService {
   /**
    * Stories to illustrate, in book order (week, age group, series, day).
-   * @param {{locale?: string, weekNumber?: string, ageGroup?: string, hasImage?: 'no'|'all'}} filters
-   *   hasImage defaults to "no": stories without any illustration.
+   * @param {Object} filters - Same filters as the story list (storyQueryHelper.buildWhere): week, age, theme, day,
+   *   series, source, review… hasImage defaults to "no": stories without any illustration.
    * @returns {Promise<Array<Object>>} Rows with code, imagePrompt, illustrationCount and cover (first image path).
    */
-  async findTodo({ locale, weekNumber, ageGroup, hasImage = 'no' } = {}) {
-    const { whereClause, params } = storyQueryHelper.buildWhere({ locale, weekNumber, ageGroup, hasImage });
+  async findTodo({ hasImage = 'no', ...filters } = {}) {
+    const { whereClause, params } = storyQueryHelper.buildWhere({ ...filters, hasImage });
     const rows = await query(
       `SELECT s.id, s.title, s.week_number, s.day_order, s.age_group, s.series_id, s.illustration_prompt,
               (SELECT COUNT(*) FROM illustrations i WHERE i.story_id = s.id) AS illustration_count,

@@ -15,7 +15,7 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 import { useGenerationJobMutations } from "@/hooks/useGenerationJobs";
 import { generationJobsApi } from "@/api/generationJobs.api";
 import { currentIsoWeek, weekMonth } from "@/utils/weekUtils";
-import { GenerationJobInput } from "@/types/generation.types";
+import { GenerationJobInput, JobPrefill } from "@/types/generation.types";
 import { Cast } from "@/types/framed.types";
 import { selectClass } from "./CastEditor";
 
@@ -34,6 +34,8 @@ const formatDays = (days: number) => i18n.t(days > 1 ? "framed.launch.days" : "f
 interface FramedJobFormProps {
   cast: Cast;
   weeklyThemes: WeeklyTheme[];
+  /** Cells chosen in the coverage of the series */
+  prefill?: JobPrefill | null;
   onCreated: (jobId: string) => void;
 }
 
@@ -43,7 +45,7 @@ interface FramedJobFormProps {
  * Launches a framed job: weeks (by month, season or year), the age groups of the cast, the audit of each week and
  * a daily budget of requests. A job short of quota waits for the next quota day by itself.
  */
-export const FramedJobForm = ({ cast, weeklyThemes, onCreated }: FramedJobFormProps) => {
+export const FramedJobForm = ({ cast, weeklyThemes, prefill = null, onCreated }: FramedJobFormProps) => {
   const { t } = i18n;
   const [weeks, setWeeks] = useState<string[]>([]);
   const [ages, setAges] = useState<string[]>(cast.ageGroups);
@@ -56,6 +58,13 @@ export const FramedJobForm = ({ cast, weeklyThemes, onCreated }: FramedJobFormPr
   const { create } = useGenerationJobMutations();
 
   useEffect(() => setAges(cast.ageGroups), [cast.id, cast.ageGroups]);
+  // Cells chosen in the coverage: their weeks, and their age groups written by this cast
+  useEffect(() => {
+    if (!prefill) return;
+    setWeeks(prefill.weeks.map(String));
+    const ages = prefill.ages.filter((age) => cast.ageGroups.includes(age));
+    if (ages.length) setAges(ages);
+  }, [prefill, cast.id, cast.ageGroups]);
 
   const { data: appSettings } = useAppSettings();
   const settingsProvider = appSettings?.effective.defaultProvider;

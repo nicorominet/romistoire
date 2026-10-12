@@ -71,6 +71,8 @@ export const JobForm = ({ weeklyThemes, series, prefill, onCreated }: JobFormPro
     if (!prefill) return;
     setWeeks(prefill.weeks.map(String));
     setAges(prefill.ages);
+    // Cells chosen in the coverage of a series: written in it
+    if (prefill.seriesName) setSeriesName(prefill.seriesName);
     setDay(ALL_WEEK);
   }, [prefill]);
 

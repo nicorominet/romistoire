@@ -1095,7 +1095,11 @@
     "actions": {
       "pause": "Pause",
       "resume": "Resume",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "replay": "Replay (new job with the same parameters)",
+      "deleteJob": "Delete the job",
+      "deleteJobConfirm": "Delete this job and its log? The stories it wrote stay in the library (to delete them too, first use \"Delete the stories\" in its detail).",
+      "jobDeleted": "Job deleted"
     },
     "detail": {
       "retrying": "Retrying failures.",
@@ -1142,7 +1146,12 @@
       "legendNoTopic": "No topic",
       "selectColumn": "Select the whole column",
       "noTopic": "no topic",
-      "cellLabel": "Week {{week}}, {{age}}: {{days}} day(s) written"
+      "cellLabel": "Week {{week}}, {{age}}: {{days}} day(s) written",
+      "seriesFilter": "Stories counted",
+      "allStories": "All stories",
+      "noSeries": "Stories without series",
+      "noCast": "No cast for this age in the bible of the series",
+      "legendNoTopicOrCast": "No topic or no cast"
     },
     "topics": {
       "title": "Topics suggested by the AI",

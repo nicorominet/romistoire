@@ -1095,7 +1095,11 @@
     "actions": {
       "pause": "Mettre en pause",
       "resume": "Reprendre",
-      "cancel": "Annuler"
+      "cancel": "Annuler",
+      "replay": "Rejouer (nouvelle tâche avec les mêmes paramètres)",
+      "deleteJob": "Supprimer la tâche",
+      "deleteJobConfirm": "Supprimer cette tâche et son journal ? Les histoires qu'elle a écrites restent dans la bibliothèque (pour les supprimer aussi, utilisez d'abord « Supprimer les histoires » dans son détail).",
+      "jobDeleted": "Tâche supprimée"
     },
     "detail": {
       "retrying": "Relance des échecs en cours.",
@@ -1142,7 +1146,12 @@
       "legendNoTopic": "Sans sujet",
       "selectColumn": "Sélectionner toute la colonne",
       "noTopic": "sans sujet",
-      "cellLabel": "Semaine {{week}}, {{age}} : {{days}} jour(s) écrit(s)"
+      "cellLabel": "Semaine {{week}}, {{age}} : {{days}} jour(s) écrit(s)",
+      "seriesFilter": "Histoires comptées",
+      "allStories": "Toutes les histoires",
+      "noSeries": "Histoires sans série",
+      "noCast": "Pas de distribution pour cet âge dans la bible de la série",
+      "legendNoTopicOrCast": "Sans sujet ou sans distribution"
     },
     "topics": {
       "title": "Sujets proposés par l'IA",

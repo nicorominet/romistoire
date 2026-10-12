@@ -1,11 +1,11 @@
 import { illustrationService } from '../services/illustration.service.js';
 import { handleError } from '../middleware/error.middleware.js';
 
+/** Same filters as the story list (story_query.helper.js); without image by default. */
+const FILTER_KEYS = ['locale', 'weekNumber', 'ageGroup', 'theme', 'dayOfWeek', 'search', 'hasAudio', 'seriesId', 'source', 'editStatus', 'reviewStatus', 'generationJobId'];
 const filtersOf = (req) => ({
-  locale: req.query.locale,
-  weekNumber: req.query.weekNumber,
-  ageGroup: req.query.ageGroup,
-  hasImage: req.query.hasImage === 'all' ? 'all' : 'no'
+  ...Object.fromEntries(FILTER_KEYS.filter(key => req.query[key]).map(key => [key, String(req.query[key])])),
+  hasImage: ['all', 'yes'].includes(req.query.hasImage) ? req.query.hasImage : 'no'
 });
 
 export const getTodo = async (req, res) => {

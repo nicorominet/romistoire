@@ -21,10 +21,20 @@ export interface IllustrationTodo {
   cover: string | null;
 }
 
+/** Same filters as the stories page ('all' or empty: no filter); hasImage defaults to "no" (stories without image). */
 export interface IllustrationFilters {
   weekNumber?: number;
   ageGroup?: string;
-  hasImage?: 'no' | 'all';
+  hasImage?: string;
+  theme?: string;
+  dayOfWeek?: string;
+  hasAudio?: string;
+  seriesId?: string;
+  source?: string;
+  editStatus?: string;
+  reviewStatus?: string;
+  search?: string;
+  generationJobId?: string;
 }
 
 interface PromptResult {
@@ -33,9 +43,9 @@ interface PromptResult {
   imagePrompt: string;
 }
 
-const filterParams = ({ weekNumber, ageGroup, hasImage }: IllustrationFilters = {}) => ({
+const filterParams = ({ weekNumber, hasImage, ...others }: IllustrationFilters = {}) => ({
   ...(weekNumber ? { weekNumber } : {}),
-  ...(ageGroup && ageGroup !== 'all' ? { ageGroup } : {}),
+  ...Object.fromEntries(Object.entries(others).filter(([, value]) => value && value !== 'all')),
   hasImage: hasImage ?? 'no',
 });
 

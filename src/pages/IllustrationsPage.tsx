@@ -1,17 +1,19 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileJson, Image, ImagePlus, Loader2, MoreHorizontal, RefreshCw, Sparkles, Square, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import PageLayout from "@/components/Layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { i18n } from "@/lib/i18n";
 import { getApiError } from "@/lib/apiError";
-import { AGE_GROUPS } from "@/types/Story";
-import { MAX_ISO_WEEKS } from "@/utils/weekUtils";
+import { AgeGroup } from "@/types/Story";
+import { Series } from "@/types/Series";
+import { Theme, WeeklyTheme } from "@/types/Theme";
+import StoriesSearch from "@/components/Story/StoriesList/StoriesSearch";
+import { useThemes, useWeeklyThemes } from "@/hooks/useThemes";
+import { useSeries } from "@/hooks/useSeries";
 import { IllustrationFilters, IllustrationTodo, illustrationApi } from "@/api/illustrations.api";
 import { shrinkImage } from "@/utils/illustrationImport";
 import { IllustrationTodoRow } from "@/components/Illustrations/IllustrationTodoRow";
@@ -36,11 +38,46 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const IllustrationsPage = () => {
   const { t } = i18n;
   const queryClient = useQueryClient();
-  const [weekNumber, setWeekNumber] = useState<number | undefined>();
-  const [ageGroup, setAgeGroup] = useState("all");
-  const [hasImage, setHasImage] = useState<"no" | "all">("no");
-  const filters: IllustrationFilters = { weekNumber, ageGroup, hasImage };
+  // Same filters as the stories page, kept in the URL; the workshop shows the stories without image by default
+  const [searchParams, setSearchParams] = useSearchParams();
+  const param = (key: string) => searchParams.get(key) || "all";
+  const setFilter = useCallback((key: string, value: string | null) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      const isDefault = key === "hasImage" ? value === "no" : !value || value === "all";
+      if (isDefault) next.delete(key);
+      else next.set(key, value as string);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const weekParam = parseInt(searchParams.get("weekNumber") || "", 10);
+  const weekNumber = Number.isNaN(weekParam) ? null : weekParam;
+  const hasImage = searchParams.get("hasImage") || "no";
+  const search = searchParams.get("search") || "";
+  const [searchTerm, setSearchTerm] = useState(search);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchTerm !== search) setFilter("search", searchTerm.trim() || null);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm, search, setFilter]);
+
+  const filters: IllustrationFilters = {
+    theme: param("theme"), ageGroup: param("ageGroup"), weekNumber: weekNumber ?? undefined, dayOfWeek: param("dayOfWeek"),
+    hasImage, hasAudio: param("hasAudio"), seriesId: param("seriesId"), source: param("source"),
+    editStatus: param("editStatus"), reviewStatus: param("reviewStatus"), search,
+    generationJobId: searchParams.get("generationJobId") || undefined,
+  };
   const queryKey = ["illustrations", filters];
+
+  const { data: themesData } = useThemes();
+  const { data: weeklyThemesData } = useWeeklyThemes();
+  const { data: seriesData } = useSeries();
+  const weeklyThemesMap = useMemo(() => {
+    const map: { [week: number]: string } = {};
+    ((weeklyThemesData as WeeklyTheme[]) || []).forEach(wt => { map[wt.week_number] = wt.theme_name; });
+    return map;
+  }, [weeklyThemesData]);
 
   const { data: items = [], isLoading, isFetching, refetch } = useQuery({
     queryKey,
@@ -57,7 +94,6 @@ const IllustrationsPage = () => {
 
   const missingPrompts = items.filter(item => !item.illustration_prompt);
   const illustratedCount = items.filter(item => item.illustrationCount > 0).length;
-  const hasActiveFilters = weekNumber !== undefined || ageGroup !== "all" || hasImage !== "no";
 
   const updateItem = (id: string, changes: Partial<IllustrationTodo>) =>
     queryClient.setQueryData<IllustrationTodo[]>(queryKey, current => current?.map(item => (item.id === id ? { ...item, ...changes } : item)));
@@ -213,62 +249,39 @@ const IllustrationsPage = () => {
           </div>
         </section>
 
-        <section className="rounded-xl border bg-card p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="font-semibold">{t("illustrations.filtersTitle")}</h2>
-            {hasActiveFilters && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setWeekNumber(undefined);
-                  setAgeGroup("all");
-                  setHasImage("no");
-                }}
-              >
-                {t("illustrations.resetFilters")}
-              </Button>
-            )}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1">
-              <Label htmlFor="illustrations-week">{t("illustrations.filters.week")}</Label>
-              <Input
-                id="illustrations-week"
-                type="number"
-                min={1}
-                max={MAX_ISO_WEEKS}
-                value={weekNumber ?? ""}
-                placeholder={t("illustrations.filters.allWeeks")}
-                onChange={event => {
-                  const value = Number(event.target.value);
-                  setWeekNumber(Number.isInteger(value) && value >= 1 && value <= MAX_ISO_WEEKS ? value : undefined);
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t("illustrations.filters.age")}</Label>
-              <Select value={ageGroup} onValueChange={setAgeGroup}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("illustrations.filters.allAges")}</SelectItem>
-                  {AGE_GROUPS.map(age => <SelectItem key={age} value={age}>{t(`ages.${age}`)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>{t("illustrations.filters.show")}</Label>
-              <Select value={hasImage} onValueChange={value => setHasImage(value as "no" | "all")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no">{t("illustrations.filters.withoutImage")}</SelectItem>
-                  <SelectItem value="all">{t("illustrations.filters.all")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </section>
+        <StoriesSearch
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          handleSearch={() => setFilter("search", searchTerm.trim() || null)}
+          selectedTheme={param("theme")}
+          handleThemeChange={value => setFilter("theme", value)}
+          themes={(themesData as Theme[]) || []}
+          weeklyThemesMap={weeklyThemesMap}
+          selectedAgeGroup={param("ageGroup") as AgeGroup | "all"}
+          handleAgeGroupChange={value => setFilter("ageGroup", value)}
+          selectedWeekNumber={weekNumber}
+          handleWeekNumberChange={value => setFilter("weekNumber", value === null ? null : String(value))}
+          selectedDayOfWeek={param("dayOfWeek")}
+          handleDayOfWeekChange={value => setFilter("dayOfWeek", value)}
+          hasImage={hasImage}
+          handleHasImageChange={value => setFilter("hasImage", value)}
+          hasAudio={param("hasAudio")}
+          handleHasAudioChange={value => setFilter("hasAudio", value)}
+          series={(seriesData as Series[]) || []}
+          selectedSeries={param("seriesId")}
+          handleSeriesChange={value => setFilter("seriesId", value)}
+          selectedSource={param("source")}
+          handleSourceChange={value => setFilter("source", value)}
+          selectedEditStatus={param("editStatus")}
+          handleEditStatusChange={value => setFilter("editStatus", value)}
+          selectedReviewStatus={param("reviewStatus")}
+          handleReviewStatusChange={value => setFilter("reviewStatus", value)}
+          handleResetFilters={() => {
+            // Back to the default view of the workshop: every story without image
+            setSearchTerm("");
+            setSearchParams({}, { replace: true });
+          }}
+        />
 
         {batch && (
           <div className="space-y-2 rounded-lg border bg-card p-4" role="status">

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { CheckCheck, ExternalLink, Loader2, Pause, Play, RotateCcw, Square, Trash2 } from "lucide-react";
+import { CheckCheck, Copy, ExternalLink, Loader2, Pause, Play, RotateCcw, Square, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { i18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
@@ -51,11 +51,22 @@ const weeksLabel = (weeks: number[]) => {
   return ranges.join(", ");
 };
 
-const JobActions = ({ job }: { job: GenerationJob }) => {
+const JobActions = ({ job, onReplayed }: { job: GenerationJob; onReplayed?: (jobId: string) => void }) => {
   const { t } = i18n;
-  const { action } = useGenerationJobMutations();
+  const { action, remove, replay } = useGenerationJobMutations();
   const run = (name: "pause" | "resume" | "cancel") =>
     action.mutate({ id: job.id, action: name }, { onError: (error) => toast.error((error as Error).message) });
+  const onError = (error: unknown) => toast.error((error as Error).message);
+  const handleReplay = () => replay.mutate(job.id, {
+    onSuccess: (created) => { toast.success(t("generation.form.launched")); onReplayed?.(created.id); },
+    onError,
+  });
+  const handleRemove = () => {
+    if (!window.confirm(t("generation.actions.deleteJobConfirm"))) return;
+    remove.mutate(job.id, { onSuccess: () => toast.success(t("generation.actions.jobDeleted")), onError });
+  };
+  // A queued or running job must be paused or cancelled first
+  const busy = job.status === "queued" || job.status === "running";
 
   return (
     <div className="flex gap-1">
@@ -77,6 +88,14 @@ const JobActions = ({ job }: { job: GenerationJob }) => {
       {(isActiveJob(job) || job.status === "paused" || job.status === "scheduled") && (
         <Button size="icon" variant="ghost" onClick={() => run("cancel")} disabled={action.isPending} aria-label={t("generation.actions.cancel")} title={t("generation.actions.cancel")}>
           <Square className="h-4 w-4" />
+        </Button>
+      )}
+      <Button size="icon" variant="ghost" onClick={handleReplay} disabled={replay.isPending} aria-label={t("generation.actions.replay")} title={t("generation.actions.replay")}>
+        <Copy className="h-4 w-4" />
+      </Button>
+      {!busy && (
+        <Button size="icon" variant="ghost" className="text-red-600" onClick={handleRemove} disabled={remove.isPending} aria-label={t("generation.actions.deleteJob")} title={t("generation.actions.deleteJob")}>
+          <X className="h-4 w-4" />
         </Button>
       )}
     </div>
@@ -230,7 +249,7 @@ export const JobsPanel = ({ selectedJobId, onSelect }: JobsPanelProps) => {
                 <span className="text-sm text-gray-500 dark:text-gray-400">· {dayLabel(job.params.day)} · {job.provider}</span>
               </div>
               <div onClick={(e) => e.stopPropagation()}>
-                <JobActions job={job} />
+                <JobActions job={job} onReplayed={(jobId) => onSelect(jobId)} />
               </div>
             </div>
             <div className="mt-2 flex items-center gap-3">

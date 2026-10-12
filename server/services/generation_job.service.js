@@ -359,20 +359,49 @@ class GenerationJobService {
     return { deleted: ids.length };
   }
 
+  /** Deletes a finished, paused or cancelled job and its units; its stories stay in the library. */
+  async remove(id) {
+    const job = await this._require(id);
+    if (['queued', 'running'].includes(job.status)) throw new ConflictError('Pause or cancel the job before deleting it');
+    await repo.deleteJob(id);
+    return { deleted: true };
+  }
+
+  /**
+   * A new job with the same parameters (the cells already written are skipped as usual, a regeneration rewrites
+   * them again). The series of a framed job is read again from its cast.
+   */
+  async replay(id) {
+    const job = await this._require(id);
+    const { seriesId, ...params } = job.params;
+    return this.create(params);
+  }
+
   /**
    * Weeks x ages grid: stories per cell and the topic of each week.
    * @returns {Promise<{weeks: {weekNumber: number, topic: string|null}[], ages: string[], cells: Object<string, {total: number, days: number}>}>}
    */
-  async coverage() {
+  /**
+   * @param {{series?: string|null}} [options] - series: null or 'all' (every story), 'none' (without series), a series id.
+   *   A series answer also says whether it is framed and which age groups have a cast.
+   */
+  async coverage({ series = null } = {}) {
+    const filter = series && series !== 'all' ? series : null;
     const topics = new Map((await weeklyThemeService.findAll()).map(week => [Number(week.week_number), week.theme_name]));
     const cells = {};
-    for (const row of await repo.coverage()) {
+    for (const row of await repo.coverage('fr', filter)) {
       cells[`${row.week_number}:${row.age_group}`] = { total: Number(row.total), days: Number(row.days) };
     }
     const weeks = Array.from({ length: 52 }, (_, i) => i + 1).map(weekNumber => ({ weekNumber, topic: topics.get(weekNumber) ?? null }));
     // Week 53 only when it has a topic
     if (topics.has(53)) weeks.push({ weekNumber: 53, topic: topics.get(53) });
-    return { weeks, ages: AGE_GROUPS, cells };
+    const result = { weeks, ages: AGE_GROUPS, cells };
+    if (filter && filter !== 'none') {
+      const { casts } = await seriesCastService.list(filter);
+      const castAges = AGE_GROUPS.filter(age => casts.some(cast => cast.ageGroups.includes(age)));
+      result.series = { id: filter, name: await seriesCastService.seriesName(filter), framed: casts.length > 0, castAges };
+    }
+    return result;
   }
 
   /** Recomputes the counters of a job from its units. */

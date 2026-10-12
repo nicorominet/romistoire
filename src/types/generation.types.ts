@@ -103,6 +103,8 @@ export interface Coverage {
     ages: string[];
     /** Key "week:age", e.g. "12:4-6" */
     cells: Record<string, CoverageCell>;
+    /** Coverage of one series: whether it has a bible (framed) and the age groups of its casts */
+    series?: { id: string; name: string; framed: boolean; castAges: string[] };
 }
 
 export interface TopicSuggestion {
@@ -115,4 +117,8 @@ export interface TopicSuggestion {
 export interface JobPrefill {
     weeks: number[];
     ages: string[];
+    /** Cells chosen in the coverage of one series: launched with it (framed tab when it has a bible) */
+    seriesId?: string;
+    seriesName?: string;
+    framed?: boolean;
 }

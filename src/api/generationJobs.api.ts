@@ -20,11 +20,17 @@ export const generationJobsApi = {
     action: (id: string, action: 'pause' | 'resume' | 'cancel' | 'retry-failed' | 'validate') =>
         client.post<GenerationJob | { updated: number }>(`${API_ENDPOINTS.GENERATION_JOBS}/${id}/${action}`),
 
+    /** Deletes a job that is not queued or running (its stories stay). */
+    remove: (id: string) => client.delete<{ deleted: boolean }>(`${API_ENDPOINTS.GENERATION_JOBS}/${id}`),
+
+    /** Queues a new job with the same parameters. */
+    replay: (id: string) => client.post<GenerationJob>(`${API_ENDPOINTS.GENERATION_JOBS}/${id}/replay`),
+
     /** Deletes the stories written by the job. */
     deleteStories: (id: string) => client.delete<{ deleted: number }>(`${API_ENDPOINTS.GENERATION_JOBS}/${id}/stories`),
 
     /** Stories per (week, age) cell and topic of each week. */
-    coverage: () => client.get<Coverage>(`${API_ENDPOINTS.GENERATION_JOBS}/coverage`),
+    coverage: (series: string = 'all') => client.get<Coverage>(`${API_ENDPOINTS.GENERATION_JOBS}/coverage`, { params: { series } }),
 
     /** AI topic proposals for weeks of the program (nothing saved). */
     suggestTopics: (weeks: number[]) => client.post<TopicSuggestion[]>(`${API_ENDPOINTS.WEEKLY_THEMES}/suggest`, { weeks }),

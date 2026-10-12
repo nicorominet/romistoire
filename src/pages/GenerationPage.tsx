@@ -45,6 +45,8 @@ const GenerationPage = () => {
   const selectedJobId = searchParams.get("job");
   const framedSeriesId = searchParams.get("series");
   const [prefill, setPrefill] = useState<JobPrefill | null>(() => prefillFromUrl(searchParams));
+  // Cells of a framed series chosen in the coverage: launched from the framed tab
+  const [framedPrefill, setFramedPrefill] = useState<JobPrefill | null>(null);
 
   const { data: weeklyThemes = [] } = useWeeklyThemes();
   const { data: series = [] } = useSeries();
@@ -87,6 +89,7 @@ const GenerationPage = () => {
                 series={series as Series[]}
                 weeklyThemes={weeklyThemes as WeeklyTheme[]}
                 initialSeriesId={framedSeriesId}
+                prefill={framedPrefill}
                 onJobCreated={(jobId) => go("jobs", jobId)}
               />
             </TabsContent>
@@ -96,7 +99,15 @@ const GenerationPage = () => {
             </TabsContent>
 
             <TabsContent value="coverage">
-              <CoverageGrid onGenerate={(cells) => { setPrefill(cells); go("new"); }} />
+              <CoverageGrid onGenerate={(cells) => {
+                if (cells.framed && cells.seriesId) {
+                  setFramedPrefill(cells);
+                  setSearchParams({ tab: "framed", series: cells.seriesId }, { replace: true });
+                } else {
+                  setPrefill(cells);
+                  go("new");
+                }
+              }} />
             </TabsContent>
           </Tabs>
         </div>

@@ -31,8 +31,9 @@ export const useGenerationJob = (id: string | null) =>
         refetchInterval: (query) => (isActiveJob(query.state.data as GenerationJob | undefined) ? POLL_MS : false),
     });
 
-export const useCoverage = () =>
-    useQuery({ queryKey: COVERAGE_KEY, queryFn: () => generationJobsApi.coverage() });
+/** Coverage of every story ("all"), of the stories without series ("none") or of one series (its id). */
+export const useCoverage = (series: string = 'all') =>
+    useQuery({ queryKey: [...COVERAGE_KEY, series], queryFn: () => generationJobsApi.coverage(series) });
 
 /**
  * Job actions. Every change refreshes the jobs; stories and coverage too when stories may have changed.
@@ -53,6 +54,8 @@ export const useGenerationJobMutations = () => {
         onSuccess: refreshAll,
     });
     const deleteStories = useMutation({ mutationFn: (id: string) => generationJobsApi.deleteStories(id), onSuccess: refreshAll });
+    const remove = useMutation({ mutationFn: (id: string) => generationJobsApi.remove(id), onSuccess: refreshJobs });
+    const replay = useMutation({ mutationFn: (id: string) => generationJobsApi.replay(id), onSuccess: refreshJobs });
 
-    return { create, action, deleteStories };
+    return { create, action, deleteStories, remove, replay };
 };

@@ -27,6 +27,10 @@ const mem = vi.hoisted(() => {
       return state.stories.filter(s => s.week_number === week && s.age_group === age).sort((a, b) => a.day_order - b.day_order);
     },
     async coverage() { return []; },
+    async deleteJob(id) {
+      state.jobs.delete(id);
+      for (const [unitId, unit] of state.units) if (unit.jobId === id) state.units.delete(unitId);
+    },
     async jobStoryIds(jobId) { return state.stories.filter(s => s.generation_job_id === jobId).map(s => s.id); },
     async recentTitles({ ageGroup }) { return state.stories.filter(s => s.age_group === ageGroup).map(s => s.title).reverse(); },
     async titlesToAvoid({ ageGroup }) { return state.stories.filter(s => s.age_group === ageGroup).map(s => s.title).reverse(); },
@@ -647,5 +651,30 @@ describe('framed generation: quota of the audit', () => {
     expect(auditCheck.length).toBeGreaterThan(0);
     expect(auditCheck.every(model => model.includes('flash-lite'))).toBe(true);
     remaining.mockRestore();
+  });
+});
+
+describe('job delete and replay', () => {
+  it('deletes a finished job but not a queued one, and keeps its stories', async () => {
+    storyService.generateFromAI.mockResolvedValue({ model: 'm1', stories: DAYS.map(d => story(d)) });
+    const job = await createJob({ weeks: [1], ages: ['4-6'] });
+    await expect(generationJobService.remove(job.id)).rejects.toThrow('Pause or cancel');
+    await worker.kick();
+
+    await generationJobService.remove(job.id);
+    await expect(generationJobService.get(job.id)).rejects.toThrow('not found');
+    expect(mem.state.stories).toHaveLength(7);
+  });
+
+  it('replays a job with the same parameters', async () => {
+    storyService.generateFromAI.mockResolvedValue({ model: 'm1', stories: DAYS.map(d => story(d)) });
+    const job = await createJob({ weeks: [1, 2], ages: ['4-6'], charNames: 'Zoé' });
+    await worker.kick();
+    mem.state.stories = [];
+
+    const again = await generationJobService.replay(job.id);
+    expect(again.id).not.toBe(job.id);
+    expect(again.params).toMatchObject({ weeks: [1, 2], ages: ['4-6'], charNames: 'Zoé' });
+    expect(again.status).toBe('queued');
   });
 });

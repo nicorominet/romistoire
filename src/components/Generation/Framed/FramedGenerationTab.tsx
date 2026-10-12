@@ -9,6 +9,7 @@ import { APP_ROUTES } from "@/constants";
 import { useSeriesCasts } from "@/hooks/useSeriesCasts";
 import { Series } from "@/types/Series";
 import { WeeklyTheme } from "@/types/Theme";
+import { JobPrefill } from "@/types/generation.types";
 import { CastEditor, selectClass } from "./CastEditor";
 import { FactsAndRecaps } from "./FactsAndRecaps";
 import { FramedJobForm } from "./FramedJobForm";
@@ -21,6 +22,8 @@ interface FramedGenerationTabProps {
   weeklyThemes: WeeklyTheme[];
   /** Series chosen from a link (?tab=framed&series=<id>) */
   initialSeriesId: string | null;
+  /** Cells of this series chosen in the coverage: the launch section opens with them */
+  prefill?: JobPrefill | null;
   onJobCreated: (jobId: string) => void;
 }
 
@@ -30,7 +33,7 @@ interface FramedGenerationTabProps {
  * Framed generation: a series bible (cast per age groups) followed week after week, its memory (facts and recaps)
  * and audits, and the launch of the jobs. The free generation tab is not affected.
  */
-export const FramedGenerationTab = ({ series, weeklyThemes, initialSeriesId, onJobCreated }: FramedGenerationTabProps) => {
+export const FramedGenerationTab = ({ series, weeklyThemes, initialSeriesId, prefill = null, onJobCreated }: FramedGenerationTabProps) => {
   const { t } = i18n;
   const [seriesId, setSeriesId] = useState<string | null>(initialSeriesId);
   const [castId, setCastId] = useState<string>(NEW_CAST);
@@ -45,6 +48,17 @@ export const FramedGenerationTab = ({ series, weeklyThemes, initialSeriesId, onJ
     if (!isLoading) setCastId((current) => (casts.some((c) => c.id === current) ? current : casts[0]?.id ?? NEW_CAST));
   }, [seriesId, isLoading, casts]);
   useEffect(() => { if (!cast) setSection("bible"); }, [cast]);
+  // Cells from the coverage: the cast that writes the most of their age groups, then its launch section
+  useEffect(() => {
+    if (!prefill || isLoading || prefill.seriesId !== seriesId) return;
+    const covering = (c: { ageGroups: string[] }) => prefill.ages.filter((age) => c.ageGroups.includes(age)).length;
+    const best = [...casts].sort((a, b) => covering(b) - covering(a))[0];
+    if (best && covering(best) > 0) {
+      setCastId(best.id);
+      setSection("launch");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill, isLoading, seriesId]);
 
   if (series.length === 0) {
     return (
@@ -110,7 +124,8 @@ export const FramedGenerationTab = ({ series, weeklyThemes, initialSeriesId, onJ
                 <FactsAndRecaps cast={cast} onJobCreated={onJobCreated} />
               </TabsContent>
               <TabsContent value="launch">
-                <FramedJobForm cast={cast} weeklyThemes={weeklyThemes} onCreated={onJobCreated} />
+                <FramedJobForm cast={cast} weeklyThemes={weeklyThemes} onCreated={onJobCreated}
+                  prefill={prefill?.seriesId === seriesId ? prefill : null} />
               </TabsContent>
             </>
           )}

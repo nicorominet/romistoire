@@ -147,11 +147,16 @@ export const generationJobRepository = {
     );
   },
 
-  /** Number of stories per (week, age) cell. */
-  async coverage(locale = 'fr') {
+  /**
+   * Number of stories per (week, age) cell.
+   * @param {string} [locale]
+   * @param {string|null} [series] - null: every story; 'none': stories without series; else a series id.
+   */
+  async coverage(locale = 'fr', series = null) {
+    const filter = series === 'none' ? ' AND series_id IS NULL' : series ? ' AND series_id = ?' : '';
     return query(
-      'SELECT week_number, age_group, COUNT(*) AS total, COUNT(DISTINCT day_order) AS days FROM stories WHERE locale = ? GROUP BY week_number, age_group',
-      [locale]
+      `SELECT week_number, age_group, COUNT(*) AS total, COUNT(DISTINCT day_order) AS days FROM stories WHERE locale = ?${filter} GROUP BY week_number, age_group`,
+      series && series !== 'none' ? [locale, series] : [locale]
     );
   },
 
@@ -207,6 +212,11 @@ export const generationJobRepository = {
   async saveSeriesSheet(seriesName, sheet) {
     if (!seriesName || !sheet) return;
     await query('UPDATE story_series SET character_sheet = ? WHERE name = ? AND (character_sheet IS NULL OR character_sheet = \'\')', [sheet, seriesName]);
+  },
+
+  /** Deletes a job; its units go with it (foreign key on delete cascade). */
+  async deleteJob(id) {
+    await query('DELETE FROM generation_jobs WHERE id = ?', [id]);
   },
 
   async jobStoryIds(jobId) {

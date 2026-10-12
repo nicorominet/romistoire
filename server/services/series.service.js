@@ -28,7 +28,8 @@ class SeriesService {
       // Need story count?
       // Old route: SELECT s.*, COUNT(st.id) as storyCount FROM story_series s LEFT JOIN stories st ON s.id = st.series_id GROUP BY s.id
       const results = await query(`
-        SELECT ss.*, CAST(COUNT(s.id) AS UNSIGNED) as storyCount 
+        SELECT ss.*, CAST(COUNT(s.id) AS UNSIGNED) as storyCount,
+          (SELECT COUNT(*) FROM series_casts sc WHERE sc.series_id = ss.id) AS castCount
         FROM story_series ss 
         LEFT JOIN stories s ON ss.id = s.series_id 
         WHERE ss.locale = ? OR ss.locale IS NULL

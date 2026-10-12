@@ -23,10 +23,10 @@ const handle = (fn) => async (req, res) => {
 router.post('/estimate', handle(req => generationJobService.estimate(req.body)));
 
 /**
- * GET /api/generation-jobs/coverage
- * Stories per (week, age) cell and the topic of each week.
+ * GET /api/generation-jobs/coverage?series=all|none|<series id>
+ * Stories per (week, age) cell and the topic of each week; for a series, whether it is framed and its cast age groups.
  */
-router.get('/coverage', handle(() => generationJobService.coverage()));
+router.get('/coverage', handle(req => generationJobService.coverage({ series: req.query.series ? String(req.query.series) : null })));
 
 /**
  * GET /api/generation-jobs
@@ -62,5 +62,17 @@ router.post('/:id/validate', handle(req => generationJobService.validate(req.par
  * Deletes the stories written by the job (the job stays in the history).
  */
 router.delete('/:id/stories', handle(req => generationJobService.deleteStories(req.params.id)));
+
+/**
+ * DELETE /api/generation-jobs/:id
+ * Deletes a job that is not queued or running (its stories stay). 409 otherwise.
+ */
+router.delete('/:id', handle(req => generationJobService.remove(req.params.id)));
+
+/**
+ * POST /api/generation-jobs/:id/replay
+ * Queues a new job with the same parameters.
+ */
+router.post('/:id/replay', handle(req => generationJobService.replay(req.params.id)));
 
 export default router;
