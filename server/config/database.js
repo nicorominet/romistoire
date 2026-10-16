@@ -1,17 +1,12 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 import { migrateThemes } from './theme.migration.js';
 import { migrateGeneration } from './generation.migration.js';
 import { migrateSeriesCasts } from './series_cast.migration.js';
+import { INIT_SCRIPT_PATH, readInitStatements } from './init_script.js';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -126,26 +121,21 @@ export async function initializeDatabase() {
     const tableList = tables.map((row) => Object.values(row)[0]);
     if (!tableList.includes('stories')) {
       console.log('Initializing database tables...');
-      
-      // Adjust path to point to root/scripts
-      const scriptPath = path.join(__dirname, '../../scripts/init-db.sql');
-      
-      if (fs.existsSync(scriptPath)) {
-        const initScript = fs.readFileSync(scriptPath, 'utf8');
-        const statements = initScript.split(';').filter((stmt) => stmt.trim().length > 0);
+      const statements = readInitStatements();
+      if (statements) {
         for (const stmt of statements) {
             await pool.query(stmt);
         }
         console.log('Database initialization complete');
       } else {
-        console.warn('Init script not found at:', scriptPath);
+        console.warn('Init script not found at:', INIT_SCRIPT_PATH);
       }
     }
 
-    // Migrations
+    // Migrations (tableList is read before the init script: a new database already has these tables)
     if (!tableList.includes('story_series')) {
       await pool.query(`
-        CREATE TABLE story_series (
+        CREATE TABLE IF NOT EXISTS story_series (
           id VARCHAR(36) PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           description TEXT,
@@ -247,12 +237,13 @@ export async function initializeDatabase() {
       await migrateThemes(pool);
       await migrateSeriesCasts(pool);
     } catch (migError) {
+       // The server must not run on a half-migrated schema: startup stops here
        console.error("Migration Failed:", migError);
-       fs.writeFileSync(path.join(__dirname, '../../migration_debug.log'), `Migration Error: ${migError.message}\n${migError.stack}`);
+       throw migError;
     }
 
   } catch (error) {
     console.error('Database initialization error:', error);
-    throw new Error('Failed to initialize database');
+    throw new Error(`Failed to initialize database: ${error.message}`);
   }
 }

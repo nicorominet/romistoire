@@ -6,7 +6,9 @@ import { generationWorker } from './server/services/generation_worker.js';
 import { aiUsageService } from './server/services/ai_usage.service.js';
 import { ENV_CONFIG } from './server/config/env.config.js';
 
-const port = process.env.API_PORT || 3001; 
+const port = process.env.API_PORT || 3001;
+// Local machine only by default: the API has no login. API_HOST=0.0.0.0 opens it to the network on purpose.
+const host = process.env.API_HOST || '127.0.0.1';
 
 // Housekeeping set in Settings > Storage (automatic backup, orphan uploads purge, old logs):
 // checked every hour, each task decides whether it is due.
@@ -19,8 +21,8 @@ async function startServer() {
     await initializeDatabase();
     
     if (await testConnection()) {
-       app.listen(port, () => {
-         logger.info(`API Server running at http://localhost:${port}`);
+       app.listen(port, host, () => {
+         logger.info(`API Server running at http://${host}:${port}`);
        });
        runMaintenance();
        // Quota statistics: the requests already in the AI logs, once

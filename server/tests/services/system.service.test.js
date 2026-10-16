@@ -5,7 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import AdmZip from 'adm-zip';
 import { ENV_CONFIG } from '../../config/env.config.js';
-import { systemService } from '../../services/system.service.js';
+import { systemService, EXPORTED_TABLES, NOT_EXPORTED_TABLES, toImportValue } from '../../services/system.service.js';
 import * as db from '../../config/database.js';
 
 vi.mock('../../config/database.js', () => ({
@@ -21,7 +21,9 @@ const COLUMNS = {
   story_themes: ['id', 'story_id', 'theme_id'],
   story_versions: ['id', 'story_id'],
   story_version_themes: ['id', 'story_version_id', 'theme_id'],
-  illustrations: ['id', 'story_id']
+  illustrations: ['id', 'story_id'],
+  series_casts: ['id', 'series_id', 'characters', 'updated_at'],
+  series_week_recaps: ['cast_id', 'age_group', 'week_number', 'audit']
 };
 
 /** Fake pooled connection: records every statement, answers SHOW COLUMNS / SELECT 1. */
@@ -34,7 +36,7 @@ const fakeConnection = (existingIds = []) => {
       calls.push(sql);
       const show = sql.match(/^SHOW COLUMNS FROM (\w+)/);
       if (show) return [COLUMNS[show[1]].map((Field) => ({ Field }))];
-      if (sql.startsWith('SELECT 1')) return [existingIds.includes(params[0]) ? [{ 1: 1 }] : []];
+      if (sql.startsWith('SELECT 1')) return [existingIds.includes(params.join(':')) ? [{ 1: 1 }] : []];
       return [{}];
     })
   };
@@ -197,5 +199,68 @@ describe('SystemService (settings > data)', () => {
 
     expect(result).toEqual({ success: true, inserted: 1, skipped: 1, failed: 1 });
     expect(connection.release).toHaveBeenCalledOnce();
+  });
+
+  it('exportData should include the bible of the framed series (casts, facts, recaps)', async () => {
+    db.query.mockImplementation(async (sql) => ({
+      'SELECT * FROM series_casts': [{ id: 'c1' }],
+      'SELECT * FROM series_facts': [{ id: 'f1' }],
+      'SELECT * FROM series_week_recaps': [{ cast_id: 'c1', age_group: '4-6', week_number: 3 }]
+    })[sql] || []);
+
+    const data = JSON.parse((await systemService.exportData(false)).buffer.toString());
+
+    expect(data.seriesCasts).toEqual([{ id: 'c1' }]);
+    expect(data.seriesFacts).toEqual([{ id: 'f1' }]);
+    expect(data.seriesWeekRecaps).toHaveLength(1);
+    expect(data).not.toHaveProperty('aiRequests');
+  });
+
+  it('importData should restore the recaps (composite key) and the JSON columns of a cast', async () => {
+    const connection = fakeConnection(['c1:4-6:3']);
+    db.getConnection.mockResolvedValue(connection);
+    const run = connection.query;
+
+    const result = await systemService.importData(writeBackup({
+      seriesCasts: [{ id: 'c1', series_id: 's1', characters: [{ name: 'Lila' }], updated_at: '2026-10-09T12:47:05.000Z' }],
+      seriesWeekRecaps: [
+        { cast_id: 'c1', age_group: '4-6', week_number: 3, audit: { issues: [] } },
+        { cast_id: 'c1', age_group: '7-9', week_number: 3, audit: null }
+      ]
+    }));
+
+    expect(result).toEqual({ success: true, inserted: 2, skipped: 1, failed: 0 });
+    expect(run).toHaveBeenCalledWith('INSERT INTO series_casts (id, series_id, characters, updated_at) VALUES (?, ?, ?, ?)',
+      ['c1', 's1', '[{"name":"Lila"}]', '2026-10-09 12:47:05']);
+    expect(run).toHaveBeenCalledWith('SELECT 1 FROM series_week_recaps WHERE cast_id = ? AND age_group = ? AND week_number = ?', ['c1', '7-9', 3]);
+  });
+});
+
+describe('Export / backup coverage', () => {
+  // Every table created by the init script or a migration
+  const schemaTables = () => {
+    const configDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'config');
+    const sources = [
+      path.join(ENV_CONFIG.PROJECT_ROOT, 'scripts', 'init-db.sql'),
+      ...fs.readdirSync(configDir).filter((f) => f.endsWith('.js')).map((f) => path.join(configDir, f))
+    ];
+    const names = sources.flatMap((file) =>
+      [...fs.readFileSync(file, 'utf8').matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/g)].map((m) => m[1]));
+    return [...new Set(names)];
+  };
+
+  it('every table of the schema is exported, or explicitly left out', () => {
+    const covered = new Set([...EXPORTED_TABLES.map((t) => t.table), ...NOT_EXPORTED_TABLES]);
+    const tables = schemaTables();
+    expect(tables).toEqual(expect.arrayContaining(['stories', 'series_casts', 'series_week_recaps']));
+    expect(tables.filter((table) => !covered.has(table))).toEqual([]);
+  });
+
+  it('toImportValue converts dates and JSON values', () => {
+    expect(toImportValue('created_at', '2026-10-09T12:47:05.123Z')).toBe('2026-10-09 12:47:05');
+    expect(toImportValue('updated_at', 'not a date')).toBe('not a date');
+    expect(toImportValue('characters', [{ name: 'A' }])).toBe('[{"name":"A"}]');
+    expect(toImportValue('audit', null)).toBeNull();
+    expect(toImportValue('title', '2026-10-09T12:47:05.000Z')).toBe('2026-10-09T12:47:05.000Z');
   });
 });

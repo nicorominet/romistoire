@@ -79,7 +79,7 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 
 3. **Database Setup / Configuration Base de Données**
    - Create a MySQL database (e.g., `imagitales`).
-   - Run the initialization script:
+   - Run the initialization script (or let the server do it at its first start). It only creates the missing tables and never drops anything:
      ```bash
      mysql -u root -p imagitales < scripts/init-db.sql
      ```
@@ -95,6 +95,9 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 
    # Server (the Vite dev server proxies /api to this port)
    API_PORT=3001
+   # The API has no login: it listens on this machine only and answers the app's own pages only.
+   # API_HOST=127.0.0.1            # 0.0.0.0 opens it to the network (not protected: trusted network only)
+   # ALLOWED_ORIGINS=http://localhost:8885,http://127.0.0.1:8885   # browser origins allowed to call it
 
    # AI (cloud)
    GEMINI_API_KEY=your_gemini_api_key

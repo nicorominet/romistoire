@@ -20,11 +20,15 @@ import generationJobRoutes from './routes/generation_jobs.routes.js';
 import { ENV_CONFIG } from './config/env.config.js';
 
 import { requestLogger } from './middleware/requestLogger.js';
+import { allowedOrigins, originGuard } from './middleware/origin.middleware.js';
 
 const app = express();
 
-app.use(cors());
-app.use(requestLogger); // Register logger early
+// Only the app may call the API from a browser (no login: any other website could reset the data)
+const origins = allowedOrigins();
+app.use(cors({ origin: origins }));
+app.use(requestLogger); // Register logger early (refused requests are logged too)
+app.use(originGuard(origins));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

@@ -13,6 +13,48 @@ const IMPORTABLE_MEDIA_EXTENSIONS = new Set([...Object.values(IMAGE_EXTENSIONS),
 import { logger } from '../config/logger.js';
 
 /**
+ * Tables of an export / backup, in an order that keeps the foreign keys valid on import.
+ * key: property of data.json. primaryKey: columns identifying a row (an existing row is skipped or overwritten).
+ * Every table of the schema must be listed here or in NOT_EXPORTED_TABLES (checked by a test).
+ */
+export const EXPORTED_TABLES = [
+  { key: 'storySeries', table: 'story_series' },
+  { key: 'themes', table: 'themes' },
+  { key: 'weeklyThemes', table: 'weekly_themes', primaryKey: ['week_number'] },
+  { key: 'stories', table: 'stories' },
+  { key: 'storyThemes', table: 'story_themes' },
+  { key: 'versions', table: 'story_versions' },
+  { key: 'versionThemes', table: 'story_version_themes' },
+  { key: 'illustrations', table: 'illustrations' },
+  { key: 'generationJobs', table: 'generation_jobs' },
+  { key: 'generationUnits', table: 'generation_units' },
+  // Bible of the framed series and what its weeks established
+  { key: 'seriesCasts', table: 'series_casts' },
+  { key: 'seriesFacts', table: 'series_facts' },
+  { key: 'seriesWeekRecaps', table: 'series_week_recaps', primaryKey: ['cast_id', 'age_group', 'week_number'] }
+];
+
+// Quota statistics: they describe the requests really sent from this installation
+export const NOT_EXPORTED_TABLES = ['ai_requests'];
+
+/** "2026-10-09T12:47:05.000Z" (dates of data.json) -> "2026-10-09 12:47:05" (UTC, as the app writes them). */
+const toSqlDateTime = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
+
+/**
+ * Value of data.json -> value for an INSERT: dates of the *_at columns in SQL form,
+ * JSON columns (read back by mysql2 as objects / arrays) as JSON text.
+ */
+export const toImportValue = (column, value) => {
+  if (value instanceof Date) return toSqlDateTime(value);
+  if (typeof value === 'string' && (column === 'at' || column.endsWith('_at'))) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : toSqlDateTime(date);
+  }
+  if (value !== null && typeof value === 'object') return JSON.stringify(value);
+  return value;
+};
+
+/**
  * Converts an absolute file path to the path stored in DB: relative to the project root, with "/" separators.
  * @param {string} absolutePath - Absolute path of a file inside the project.
  * @returns {string} e.g. "uploads/2026-10/file.png".
@@ -87,7 +129,7 @@ class SystemService {
 
       if (!dataToImport) throw new Error('No data found to import.');
 
-      const { stories, versions, illustrations, weeklyThemes: rawWeeklyThemes, themes: rawThemes, storyThemes: rawStoryThemes, versionThemes: rawVersionThemes, storySeries, generationJobs, generationUnits } = dataToImport;
+      const { themes: rawThemes, storyThemes: rawStoryThemes, versionThemes: rawVersionThemes } = dataToImport;
 
       // Themes are unique by normalized name: an imported "Nature" reuses the local "nature",
       // and the story / week links of the imported id are moved to the local theme.
@@ -110,8 +152,9 @@ class SystemService {
       const mapThemeId = (row) => (row.theme_id && themeIdMap.has(row.theme_id) ? { ...row, theme_id: themeIdMap.get(row.theme_id) } : row);
       const storyThemes = (rawStoryThemes || []).map(mapThemeId);
       const versionThemes = (rawVersionThemes || []).map(mapThemeId);
-      // Week topics are free text: unknown columns (theme_id from older exports) are ignored by insertData
-      const weeklyThemes = rawWeeklyThemes || [];
+      // Rows to insert per table. Week topics are free text: unknown columns (theme_id from older exports)
+      // are ignored by insertData, like every column the local schema does not have.
+      const rowsOf = { ...dataToImport, themes, storyThemes, versionThemes };
 
       // FOREIGN_KEY_CHECKS is a session variable: every statement must run on the same connection
       const connection = await getConnection();
@@ -121,42 +164,28 @@ class SystemService {
       };
       const stats = { inserted: 0, skipped: 0, failed: 0 };
 
-      const insertData = async (tableName, data) => {
-        if (!data || data.length === 0) return;
+      const insertData = async ({ table: tableName, primaryKey = ['id'] }, data) => {
+        if (!Array.isArray(data) || data.length === 0) return;
 
         let validColumns = [];
         try {
           const columnsResult = await run(`SHOW COLUMNS FROM ${tableName}`);
           validColumns = columnsResult.map(row => row.Field);
         } catch (err) { return; }
-        
+
         for (const item of data) {
           try {
             const columns = Object.keys(item).filter(key => validColumns.includes(key));
-            const values = columns.map(column => {
-              let value = item[column];
-              if (typeof value === 'string' && (column === 'created_at' || column === 'modified_at')) {
-                const parsedDate = new Date(value);
-                if (!isNaN(parsedDate.getTime())) {
-                  value = parsedDate.toISOString().slice(0, 19).replace('T', ' ');
-                }
-              } else if (value instanceof Date) {
-                value = value.toISOString().slice(0, 19).replace('T', ' ');
-              }
-              return value;
-            });
+            if (!primaryKey.every(column => columns.includes(column))) continue;
+            const values = columns.map(column => toImportValue(column, item[column]));
 
-            const idColumn = columns.find(col => col === 'id');
-            const pkColumn = tableName === 'weekly_themes' ? 'week_number' : (idColumn || 'id');
-            
-            if (!columns.includes(pkColumn)) continue;
-
-            const pkValue = item[pkColumn];
-            const existing = await run(`SELECT 1 FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+            const where = primaryKey.map(column => `${column} = ?`).join(' AND ');
+            const keyValues = primaryKey.map(column => item[column]);
+            const existing = await run(`SELECT 1 FROM ${tableName} WHERE ${where}`, keyValues);
 
             if (existing && existing.length > 0) {
               if (mode === 'overwrite') {
-                  await run(`DELETE FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+                  await run(`DELETE FROM ${tableName} WHERE ${where}`, keyValues);
               } else {
                   stats.skipped++;
                   continue;
@@ -176,16 +205,9 @@ class SystemService {
       try {
         try {
           await run('SET FOREIGN_KEY_CHECKS = 0');
-          await insertData('story_series', storySeries);
-          await insertData('themes', themes);
-          await insertData('weekly_themes', weeklyThemes);
-          await insertData('stories', stories);
-          await insertData('story_themes', storyThemes);
-          await insertData('story_versions', versions);
-          await insertData('story_version_themes', versionThemes);
-          await insertData('illustrations', illustrations);
-          await insertData('generation_jobs', generationJobs);
-          await insertData('generation_units', generationUnits);
+          for (const table of EXPORTED_TABLES) {
+            await insertData(table, rowsOf[table.key]);
+          }
         } finally {
           try { await run('SET FOREIGN_KEY_CHECKS = 1'); } finally { connection.release(); }
         }
@@ -226,30 +248,11 @@ class SystemService {
    * @returns {Promise<{buffer: Buffer, filename: string, type: string}>} Export file data.
    */
   async exportData(full = false) {
-    const stories = await query('SELECT * FROM stories');
-    const versions = await query('SELECT * FROM story_versions');
-    const illustrations = await query('SELECT * FROM illustrations');
-    const weeklyThemes = await query('SELECT * FROM weekly_themes');
-    const themes = await query('SELECT * FROM themes');
-    const storyThemes = await query('SELECT * FROM story_themes');
-    const versionThemes = await query('SELECT * FROM story_version_themes');
-    const storySeries = await query('SELECT * FROM story_series');
-    const generationJobs = await query('SELECT * FROM generation_jobs');
-    const generationUnits = await query('SELECT * FROM generation_units');
-
-    const exportData = {
-      stories,
-      versions,
-      illustrations,
-      weeklyThemes,
-      themes,
-      storyThemes,
-      versionThemes,
-      storySeries,
-      generationJobs,
-      generationUnits,
-      exportDate: new Date().toISOString()
-    };
+    const exportData = {};
+    for (const { key, table } of EXPORTED_TABLES) {
+      exportData[key] = await query(`SELECT * FROM ${table}`);
+    }
+    exportData.exportDate = new Date().toISOString();
 
     if (full) {
         const zip = new AdmZip();
