@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { query, getConnection } from '../config/database.js';
@@ -7,6 +8,7 @@ import { ENV_CONFIG } from '../config/env.config.js';
 import { IMAGE_EXTENSIONS } from '../config/upload.config.js';
 import { normalizeThemeName } from './helpers/theme_name.helper.js';
 import { themeService } from './theme.service.js';
+import { ValidationError } from '../middleware/error.middleware.js';
 
 // Files an imported archive may drop into uploads/: images and generated audio only (never .html, .js...)
 const IMPORTABLE_MEDIA_EXTENSIONS = new Set([...Object.values(IMAGE_EXTENSIONS), '.jpeg', '.wav', '.mp3', '.ogg', '.webm']);
@@ -33,6 +35,30 @@ export const EXPORTED_TABLES = [
   { key: 'seriesFacts', table: 'series_facts' },
   { key: 'seriesWeekRecaps', table: 'series_week_recaps', primaryKey: ['cast_id', 'age_group', 'week_number'] }
 ];
+
+// Limits of an imported ZIP, checked before extraction (zip bomb): a full backup holds the images and audio
+// of the library, already compressed (a ratio close to 1)
+export const ZIP_LIMITS = { maxEntries: 50000, maxUncompressedBytes: 4 * 1024 ** 3 };
+
+/**
+ * Refuses an archive too large once extracted, or holding a path outside the extraction folder.
+ * @param {AdmZip} zip
+ * @param {string} targetDir - Extraction folder.
+ * @throws {ValidationError}
+ */
+export const checkZipArchive = (zip, targetDir, limits = ZIP_LIMITS) => {
+  const entries = zip.getEntries();
+  if (entries.length > limits.maxEntries) throw new ValidationError(`Archive refused: more than ${limits.maxEntries} files`);
+  let total = 0;
+  for (const entry of entries) {
+    total += Number(entry.header?.size) || 0;
+    const target = path.resolve(targetDir, entry.entryName);
+    if (target !== targetDir && !target.startsWith(targetDir + path.sep)) {
+      throw new ValidationError(`Archive refused: invalid path ${entry.entryName}`);
+    }
+  }
+  if (total > limits.maxUncompressedBytes) throw new ValidationError('Archive refused: too large once extracted');
+};
 
 // Quota statistics: they describe the requests really sent from this installation
 export const NOT_EXPORTED_TABLES = ['ai_requests'];
@@ -106,7 +132,10 @@ class SystemService {
       try {
           if (isZip) {
               const zip = new AdmZip(filePath);
-              tempDir = path.join(process.cwd(), 'temp_import_' + Date.now());
+              // System temp folder: never inside the project (served or scanned folders)
+              const extractDir = path.join(os.tmpdir(), `romistoire-import-${Date.now()}`);
+              checkZipArchive(zip, extractDir);
+              tempDir = extractDir;
               zip.extractAllTo(tempDir, true);
 
               const dataPath = path.join(tempDir, 'data.json');

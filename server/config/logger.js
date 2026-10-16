@@ -15,8 +15,9 @@ const CONFIG_FILE = path.join(__dirname, 'log-config.json');
 // From least to most severe: entries below config.minLevel are dropped
 const LEVELS = ['INFO', 'WARN', 'ERROR'];
 
+// SQL log off by default: one line per query, useful only while debugging
 const DEFAULT_CONFIG = {
-    enableSqlLogging: true,
+    enableSqlLogging: false,
     enableAccessLogging: true,
     minLevel: 'INFO'
 };

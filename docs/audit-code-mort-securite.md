@@ -36,6 +36,16 @@ L'audit a en revanche trouvé **4 problèmes sérieux**, à traiter avant tout n
 | S3 | 🔴 Sauvegarde incomplète | Export, sauvegardes automatiques et import **ignorent** `series_casts`, `series_facts` et `series_week_recaps`, c'est-à-dire toute la bible et la mémoire des séries. Restaurer une sauvegarde perd ce travail. De plus, une sauvegarde complète de plus de 50 Mo (avec l'audio) **ne peut pas être réimportée**. |
 | S4 | 🟠 Sécurité | L'export PDF lit `image_path` **tel qu'envoyé par le client**, sans le confiner à `uploads/`, ce qui permet une traversée de chemin (`../../`). |
 
+## État d'avancement
+
+| Phase | État | Commit |
+|---|---|---|
+| 0 : correctifs critiques | ✅ Fait, sauf 0.2 (jeton d'accès, utile seulement si l'API est ouverte au réseau) et 0.6 (restauration des sauvegardes de plus de 50 Mo, avec la phase 4) | `80bb8d2` |
+| 1 : nettoyage du code mort | ✅ Fait. Gardés volontairement : migration `story_series` (vieilles bases), `/audio` statique (à vérifier en base), redirection `/theme`, composants shadcn | `0ede1d3` |
+| 2 : durcissement | ✅ Fait (2.7 : en-têtes de base ; la CSP viendra avec 4.7, quand Express servira le build) | voir l'historique git |
+| 3 : performances | À faire (3.1 fait en phase 1, 3.5 en phase 2) | |
+| 4 : qualité et outillage | À faire | |
+
 ## Méthode
 
 - **knip 5**, lancé deux fois : avec les tests comme points d'entrée, puis en mode production sans eux, pour repérer les fichiers, exports, types et dépendances inutilisés.

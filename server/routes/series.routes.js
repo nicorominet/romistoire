@@ -4,6 +4,7 @@ import { handleError } from '../middleware/error.middleware.js';
 import { seriesCastService } from '../services/series_cast.service.js';
 import { seriesAuditService } from '../services/series_audit.service.js';
 import { defaultProvider } from '../services/settings.service.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -105,7 +106,7 @@ router.get('/casts/:castId/recaps', handle(req => seriesCastService.listRecaps(r
  * its audit and the facts it proposes.
  * @param {Object} req.body - { ageGroup, weekNumber, useAI? }
  */
-router.post('/casts/:castId/audit', handle(req => seriesAuditService.auditStoredWeek({
+router.post('/casts/:castId/audit', LIMITS.aiText, handle(req => seriesAuditService.auditStoredWeek({
   castId: req.params.castId,
   ageGroup: String(req.body?.ageGroup || ''),
   weekNumber: Number(req.body?.weekNumber),

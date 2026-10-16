@@ -3,6 +3,7 @@ import { handleError } from '../middleware/error.middleware.js';
 import { generationJobService } from '../services/generation_job.service.js';
 // Importing the worker wires it to the job service (a created or resumed job wakes it up)
 import '../services/generation_worker.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ router.get('/', handle(() => generationJobService.list()));
  * POST /api/generation-jobs
  * Queues a job (same body as /estimate). 400 when there is nothing to generate.
  */
-router.post('/', handle(req => generationJobService.create(req.body)));
+router.post('/', LIMITS.jobs, handle(req => generationJobService.create(req.body)));
 
 /**
  * GET /api/generation-jobs/:id
@@ -73,6 +74,6 @@ router.delete('/:id', handle(req => generationJobService.remove(req.params.id)))
  * POST /api/generation-jobs/:id/replay
  * Queues a new job with the same parameters.
  */
-router.post('/:id/replay', handle(req => generationJobService.replay(req.params.id)));
+router.post('/:id/replay', LIMITS.jobs, handle(req => generationJobService.replay(req.params.id)));
 
 export default router;

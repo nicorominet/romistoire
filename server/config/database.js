@@ -17,7 +17,8 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true, // Ensure this is enabled for init scripts
+  // One statement per query (the init script is split by init_script.js): an injected "; DROP ..." cannot run
+  multipleStatements: false,
   // The app writes every DATETIME as a UTC string ("2026-10-09 12:47:05"): read them back as UTC too
   // (the default, local time, shifted every displayed time by the server offset)
   timezone: 'Z'
@@ -62,19 +63,28 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 
+/**
+ * Query parameters as written in the logs: long texts (a whole story) are cut, so the logs hold
+ * neither the library content nor megabytes per query.
+ */
+export const summarizeParams = (params = []) => params.map((value) =>
+  (typeof value === 'string' && value.length > 80 ? `${value.slice(0, 80)}… (${value.length} chars)` : value));
+
 export async function query(sql, params = []) {
   const start = Date.now();
   try {
     const [results] = await pool.execute(sql, params);
     const duration = Date.now() - start;
     
-    // Log successful query
-    logger.info('DB', 'Query Executed', {
-        sql: sql.substring(0, 1000), // Truncate very long queries
-        params: JSON.stringify(params), 
-        duration: `${duration}ms`,
-        rows: Array.isArray(results) ? results.length : 0
-    });
+    // Log successful query (SQL log off by default: Settings > Network > Config)
+    if (logger.getConfig().enableSqlLogging) {
+      logger.info('DB', 'Query Executed', {
+          sql: sql.substring(0, 1000), // Truncate very long queries
+          params: JSON.stringify(summarizeParams(params)),
+          duration: `${duration}ms`,
+          rows: Array.isArray(results) ? results.length : 0
+      });
+    }
 
     return results;
   } catch (error) {
@@ -82,16 +92,16 @@ export async function query(sql, params = []) {
     
     // Log error
     logger.error('DB', 'Query Failed', {
-        sql,
-        params,
+        sql: sql.substring(0, 1000),
+        params: summarizeParams(params),
         error: error.message,
         duration: `${duration}ms`
     });
 
     console.error('Database query error:', {
       message: error.message,
-      sql: error.sql,
-      parameters: params
+      sql: sql.substring(0, 1000),
+      parameters: summarizeParams(params)
     });
     throw error;
   }

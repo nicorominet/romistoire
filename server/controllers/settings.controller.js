@@ -1,4 +1,5 @@
 import { handleError, ValidationError } from '../middleware/error.middleware.js';
+import { localUrlError } from '../services/helpers/local_url.helper.js';
 import { settingsService, defaultProvider, DEFAULT_SETTINGS } from '../services/settings.service.js';
 import { geminiConfig, geminiService, modelCooldowns, DEFAULT_MODELS, DEFAULT_AUDIO_MODELS } from '../services/gemini.service.js';
 import { localLLMService, OLLAMA_DEFAULTS } from '../services/local_llm.service.js';
@@ -100,13 +101,10 @@ export const testOllama = async (req, res) => {
     const { baseUrl } = req.body || {};
     let url = localLLMService.baseUrl;
     if (baseUrl) {
-      // Same validation as the saved setting: only http(s) URLs are queried
-      try {
-        url = new URL(String(baseUrl)).toString().replace(/\/+$/, '');
-        if (!/^https?:/.test(url)) throw new Error();
-      } catch (e) {
-        throw new ValidationError('Invalid Ollama URL');
-      }
+      // Same validation as the saved setting: http(s) URLs of this machine or the local network only
+      const error = localUrlError(baseUrl);
+      if (error) throw new ValidationError(`Invalid Ollama URL: it ${error}`);
+      url = new URL(String(baseUrl).trim()).toString().replace(/\/+$/, '');
     }
     try {
       const models = await localLLMService.fetchModels(url);

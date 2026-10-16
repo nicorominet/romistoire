@@ -1,5 +1,6 @@
 import express from 'express';
 import * as settingsController from '../controllers/settings.controller.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/quota-usage', settingsController.getQuotaUsage);
  * @param {string} [req.body.baseUrl] - Instance to test (default: the configured one).
  * @returns {{ok: boolean, baseUrl: string, models: string[], error?: string}}
  */
-router.post('/test-ollama', settingsController.testOllama);
+router.post('/test-ollama', LIMITS.ollamaTest, settingsController.testOllama);
 
 /**
  * POST /api/settings/audio-preview
@@ -40,7 +41,7 @@ router.post('/test-ollama', settingsController.testOllama);
  * @param {Object} req.body - { voice, characterVoice, style, pace, multiSpeaker, ageGroup } (missing fields: saved settings).
  * @returns {Buffer} The audio file (Content-Type audio/wav or the model's format).
  */
-router.post('/audio-preview', settingsController.previewVoice);
+router.post('/audio-preview', LIMITS.aiAudio, settingsController.previewVoice);
 
 /**
  * GET /api/settings/storage-stats

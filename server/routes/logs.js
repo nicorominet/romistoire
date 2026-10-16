@@ -6,30 +6,39 @@ import { fileURLToPath } from 'url';
 import readline from 'readline';
 import { logger } from '../config/logger.js';
 import { systemService } from '../services/system.service.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOG_FILE = path.join(__dirname, '../debug/logs.jsonl');
 
+// What the client logger may write (src/lib/logger.ts sends batches of at most 50 entries)
+const CLIENT_LEVELS = { INFO: 'info', WARN: 'warn', ERROR: 'error' };
+const CATEGORY_RE = /^[A-Z][A-Z_]{0,63}$/;
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_BATCH = 100;
+
 /**
  * POST /api/logs
- * Ingest logs from the client.
+ * Ingest logs from the client: a known level, a category like "BATCH_LOGS", a short message.
+ * The body size is capped in app.js; the rate in LIMITS.clientLogs.
  * @param {Object} req.body - Log entry (category, message, data, level).
  * @returns {Object} Success status.
  */
-router.post('/', (req, res) => {
-    const { category, message, data, level } = req.body;
-    
-    // Basic validation
-    if (!category || !message) {
-        return res.status(400).json({ error: 'Missing category or message' });
+router.post('/', LIMITS.clientLogs, (req, res) => {
+    const { category, message, data, level = 'INFO' } = req.body || {};
+    const method = CLIENT_LEVELS[String(level).toUpperCase()];
+
+    if (typeof category !== 'string' || !CATEGORY_RE.test(category)
+        || typeof message !== 'string' || !message || message.length > MAX_MESSAGE_LENGTH || !method) {
+        return res.status(400).json({ error: 'Invalid log entry' });
+    }
+    if (Array.isArray(data?.logs) && data.logs.length > MAX_BATCH) {
+        return res.status(400).json({ error: `At most ${MAX_BATCH} entries per batch` });
     }
 
-    // Use our server logger to write to the file
-    // We add a specific category prefix or flag to know it came from Client
-    logger[level?.toLowerCase() || 'info'](category, message, data);
-
+    logger[method](category, message, data);
     res.status(200).json({ success: true });
 });
 
