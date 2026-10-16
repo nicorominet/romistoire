@@ -6,6 +6,7 @@ import { systemService } from './system.service.js';
 import { backupService } from './backup.service.js';
 import { settingsService } from './settings.service.js';
 import { aiUsageService } from './ai_usage.service.js';
+import { rotateDebugLog } from '../config/logger.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -52,6 +53,8 @@ class MaintenanceService {
       report.deletedLogs = await this.deleteOldLogs(logRetentionDays, now);
       // The quota statistics follow the same retention
       await aiUsageService.purge(logRetentionDays);
+      // The debug log (SQL, client logs) is one file: kept under a size limit
+      if (await rotateDebugLog()) logger.info('Debug log rotated (logs.1.jsonl).');
     } catch (error) {
       logger.error('Old logs cleanup failed:', {}, error);
     }

@@ -90,21 +90,28 @@ export const toStoredPath = (absolutePath) =>
 
 /**
  * Number of files and total size of a directory, recursively (missing directory: zeros).
+ * Asynchronous: a large uploads folder never blocks the server.
  * @param {string} dir
- * @returns {{files: number, bytes: number}}
+ * @returns {Promise<{files: number, bytes: number}>}
  */
-export const dirUsage = (dir) => {
+export const dirUsage = async (dir) => {
   const usage = { files: 0, bytes: 0 };
-  if (!fs.existsSync(dir)) return usage;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return usage;
+    throw error;
+  }
+  for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const sub = dirUsage(entryPath);
+      const sub = await dirUsage(entryPath);
       usage.files += sub.files;
       usage.bytes += sub.bytes;
     } else if (entry.isFile()) {
       usage.files++;
-      usage.bytes += fs.statSync(entryPath).size;
+      usage.bytes += (await fs.promises.stat(entryPath)).size;
     }
   }
   return usage;
@@ -246,22 +253,22 @@ class SystemService {
             const targetUploads = ENV_CONFIG.UPLOADS_DIR;
             if (!fs.existsSync(targetUploads)) fs.mkdirSync(targetUploads, { recursive: true });
 
-            const copyImages = (src, dest) => {
-                const entries = fs.readdirSync(src, { withFileTypes: true });
+            const copyImages = async (src, dest) => {
+                const entries = await fs.promises.readdir(src, { withFileTypes: true });
                 for (const entry of entries) {
                     const srcPath = path.join(src, entry.name);
                     const destPath = path.join(dest, entry.name);
                     if (entry.isDirectory()) {
-                        if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
-                        copyImages(srcPath, destPath);
+                        await fs.promises.mkdir(destPath, { recursive: true });
+                        await copyImages(srcPath, destPath);
                     } else if (IMPORTABLE_MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-                        fs.copyFileSync(srcPath, destPath);
+                        await fs.promises.copyFile(srcPath, destPath);
                     } else {
                         console.warn(`[Import] Skipped non-media file from archive: ${entry.name}`);
                     }
                 }
             };
-            copyImages(imagesDir, targetUploads);
+            await copyImages(imagesDir, targetUploads);
         }
       } finally {
          if (tempDir && fs.existsSync(tempDir)) {
@@ -320,28 +327,27 @@ class SystemService {
 
     if (!fs.existsSync(uploadsDir)) return { success: true, deletedCount: 0, reclaimedSpace: 0 };
 
-    function walkDir(dir) {
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
+    // Asynchronous walk: the hourly purge never blocks the requests
+    const walkDir = async (dir) => {
+      for (const file of await fs.promises.readdir(dir)) {
         const filePath = path.join(dir, file);
-        const stat = fs.statSync(filePath);
+        const stat = await fs.promises.stat(filePath);
         if (stat.isDirectory()) {
-          walkDir(filePath);
-          if (fs.readdirSync(filePath).length === 0) fs.rmdirSync(filePath);
+          await walkDir(filePath);
+          if ((await fs.promises.readdir(filePath)).length === 0) await fs.promises.rmdir(filePath);
         } else {
             const oldEnough = Date.now() - stat.mtimeMs >= minAgeMs;
             if (oldEnough && !usedPaths.has(toStoredPath(filePath))) {
                 try {
-                    const size = stat.size;
-                    fs.unlinkSync(filePath);
+                    await fs.promises.unlink(filePath);
                     deletedCount++;
-                    reclaimedSpace += size;
+                    reclaimedSpace += stat.size;
                 } catch (err) {}
             }
         }
       }
-    }
-    walkDir(uploadsDir);
+    };
+    await walkDir(uploadsDir);
     return { success: true, deletedCount, reclaimedSpace };
   }
 
@@ -360,9 +366,9 @@ class SystemService {
     return {
       counts,
       disk: {
-        uploads: dirUsage(ENV_CONFIG.UPLOADS_DIR),
-        logs: dirUsage(ENV_CONFIG.LOGS_DIR),
-        debugLog: dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
+        uploads: await dirUsage(ENV_CONFIG.UPLOADS_DIR),
+        logs: await dirUsage(ENV_CONFIG.LOGS_DIR),
+        debugLog: await dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
       }
     };
   }

@@ -43,7 +43,7 @@ L'audit a en revanche trouvé **4 problèmes sérieux**, à traiter avant tout n
 | 0 : correctifs critiques | ✅ Fait, sauf 0.2 (jeton d'accès, utile seulement si l'API est ouverte au réseau) et 0.6 (restauration des sauvegardes de plus de 50 Mo, avec la phase 4) | `80bb8d2` |
 | 1 : nettoyage du code mort | ✅ Fait. Gardés volontairement : migration `story_series` (vieilles bases), `/audio` statique (à vérifier en base), redirection `/theme`, composants shadcn | `0ede1d3` |
 | 2 : durcissement | ✅ Fait (2.7 : en-têtes de base ; la CSP viendra avec 4.7, quand Express servira le build) | voir l'historique git |
-| 3 : performances | À faire (3.1 fait en phase 1, 3.5 en phase 2) | |
+| 3 : performances | ✅ Fait : 3.4, 3.6, 3.9 (3.1 en phase 1, 3.5 en phase 2). 3.7 passe en phase 4 avec 0.6. 3.2, 3.3 et 3.8 abandonnés, voir la note de la phase 3 | voir l'historique git |
 | 4 : qualité et outillage | À faire | |
 
 ## Méthode
@@ -282,6 +282,10 @@ Une seule PR, qui supprime uniquement du code non référencé et doit garder le
 | 4.5 | **Un seul logger serveur** | Deux loggers coexistent : `server/config/logger.js` (catégorie, JSONL dans `server/debug/`) et `server/services/logger.service.js` (journaux `access` et `ai` dans `server/logs/`), avec des signatures différentes. En plus, `requestLogger` écrit son propre `access-*.log`. Les fusionner en un module (niveaux, catégories, rotation, création des dossiers au démarrage), ce qui corrige aussi le `ENOENT` de 1.6. | M |
 | 4.6 | **Intégration continue** | Workflow GitHub Actions : `typecheck`, `lint`, `test`, `knip` et `npm audit`, avec un service MySQL pour les tests qui en ont besoin. | S |
 | 4.7 | **Servir le build en production** | `npm start` ne sert que l'API : le `dist/` n'est servi par personne. Ajouter `express.static('dist')` avec repli sur `index.html` quand `NODE_ENV=production`, ce qui permet de lancer l'application sans Vite (et d'appliquer 2.7). | S |
+
+> **Note après réalisation.** Les points 3.2 et 3.3 reposaient sur une lecture erronée des noms de chunks : Rollup nomme un chunk partagé d'après son premier module. Le chunk « i18n » (307 Ko) contient surtout react-router et axios ; les traductions ne pèsent que 120 Ko non compressés, et charger seulement la langue active ferait gagner environ 15 Ko compressés en rendant le changement de langue asynchrone. Le chunk « StoryIllustrations » (542 Ko) regroupe zod, TipTap, ProseMirror et react-hook-form, et n'est chargé qu'à l'ouverture des pages de création et d'édition, ce qui est déjà le comportement voulu. Le point 3.8 est abandonné aussi : le texte brut est lu à cinq endroits (lecture, éditeur, aperçu, PDF, résumés) et l'import d'un ancien export en réintroduit. Ces branches doivent donc rester, et une migration du contenu ne permettrait de rien supprimer.
+>
+> Mesures du point 3.9 sur 26 000 histoires (MariaDB 10.11) : l'index `idx_stories_coverage (locale, series_id, week_number, age_group, day_order)` fait passer la couverture d'une série de 33 à 11 ms, et la détection de collision de 196 à 3 lignes lues. Un second index dédié à la collision était redondant.
 
 ### Ordre conseillé
 

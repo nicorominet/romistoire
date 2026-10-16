@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const LOG_DIR = path.join(__dirname, '../debug');
 const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
+export const DEBUG_LOG_FILE = LOG_FILE;
+// Beyond this size, the file is renamed logs.1.jsonl (replacing the previous one) by the hourly maintenance
+export const DEBUG_LOG_MAX_BYTES = 20 * 1024 * 1024;
 // Persisted settings (Settings > Network > Config): read at startup, rewritten on every update
 const CONFIG_FILE = path.join(__dirname, 'log-config.json');
 
@@ -63,6 +66,22 @@ export function updateLoggerConfig(newConfig) {
         console.error('Failed to write log config:', err);
     }
     return config;
+}
+
+/**
+ * Keeps the debug log under DEBUG_LOG_MAX_BYTES: the current file becomes logs.1.jsonl, a new one starts.
+ * @returns {Promise<boolean>} true when the file was rotated.
+ */
+export async function rotateDebugLog(maxBytes = DEBUG_LOG_MAX_BYTES, file = LOG_FILE) {
+    try {
+        const { size } = await fs.promises.stat(file);
+        if (size <= maxBytes) return false;
+        await fs.promises.rename(file, file.replace(/\.jsonl$/, '.1.jsonl'));
+        return true;
+    } catch (err) {
+        if (err.code === 'ENOENT') return false;
+        throw err;
+    }
 }
 
 /**
