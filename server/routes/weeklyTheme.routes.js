@@ -11,7 +11,7 @@ router.get('/', weeklyThemeController.getWeeklyThemes);
 
 /**
  * POST /api/weekly-themes
- * Batch update: [{ week_number, theme_name, theme_description? }] (legacy).
+ * Batch update: [{ week_number, theme_name, theme_description? }] (topics accepted in the AI suggestion dialog).
  */
 router.post('/', weeklyThemeController.updateWeeklyThemes);
 

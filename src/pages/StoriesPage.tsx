@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Book, FileText, LayoutGrid, List } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { storiesLocale } from '@/components/Home/useWeekStories';
-import 'flag-icons/css/flag-icons.min.css';
 import { APP_ROUTES } from '@/constants';
 
 // New Components

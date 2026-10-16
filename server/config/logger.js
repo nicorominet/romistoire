@@ -34,6 +34,11 @@ const pickConfig = (values = {}) => {
     return picked;
 };
 
+// Created at startup: fs.appendFile does not create it (a fresh clone has no server/debug/)
+if (ENV_CONFIG.FILE_LOGGING) {
+    try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (err) { console.error('Failed to create log directory:', err); }
+}
+
 const loadConfig = () => {
     try {
         return { ...DEFAULT_CONFIG, ...pickConfig(JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))) };
@@ -94,9 +99,6 @@ export function log(category, message, data = {}, level = 'INFO') {
 
     const line = JSON.stringify(entry) + '\n';
 
-    // Ensure directory exists (sync check is fast enough for low freq logging, 
-    // but better to rely on startup creation. We added mkdir in previous step)
-    
     if (ENV_CONFIG.FILE_LOGGING) {
         fs.appendFile(LOG_FILE, line, (err) => {
             if (err) {

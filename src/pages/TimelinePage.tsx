@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import PageLayout from "@/components/Layout/PageLayout";
 import { i18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import "@/App.css";
+import "@/App.css"; // Timeline layout classes
 import { storyPreview } from "@/lib/utils";
 import useDarkMode from '@/hooks/useDarkMode';
 import SafeImage from "@/components/ui/SafeImage";

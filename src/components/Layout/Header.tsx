@@ -1,6 +1,6 @@
 import { i18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Book, PenLine, Settings, GlobeIcon } from "lucide-react";
 import { useState } from "react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -26,9 +26,10 @@ const Header = () => {
     toast.success(t('settings.languageChanged'));
   };
 
+  // Router location: the active link follows every in-app navigation
+  const { pathname } = useLocation();
   const getNavLinkClass = (path: string) => {
-     // rudimentary check for active state, can be improved with useLocation but kept simple for now
-     const isActive = window.location.pathname === path; 
+     const isActive = pathname === path;
      return `relative px-3 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
         isActive 
           ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' 

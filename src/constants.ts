@@ -62,7 +62,6 @@ export const APP_ROUTES = {
     SETTINGS: '/settings',
     // Mass generation (server-side jobs, coverage of the program)
     GENERATION: '/generation',
-    TIMELINE: '/timeline',
     // Story themes (tags)
     THEMES: '/themes',
     // Topics of the weeks (free text guiding generation)

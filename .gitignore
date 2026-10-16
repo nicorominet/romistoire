@@ -48,3 +48,7 @@ public/audio/
 # App settings (Settings page) and backups
 server/config/app-settings.json
 backups/
+
+# Generated at runtime: logging settings (Settings > Network) and the model list of scripts/list_models.js
+server/config/log-config.json
+scripts/models.txt

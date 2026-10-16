@@ -33,7 +33,7 @@ export const useStoryMutations = () => {
 
     const updateStory = useMutation({
         mutationFn: async ({ id, data }: { id: string, data: any }) => (await storyApi.update(id, data)) as any,
-        onSuccess: (data, variables) => {
+        onSuccess: (_data, variables) => {
              queryClient.invalidateQueries({ queryKey: ['stories'] });
              queryClient.invalidateQueries({ queryKey: ['story', variables.id] });
         }
@@ -47,7 +47,7 @@ export const useStoryMutations = () => {
     
     const restoreVersion = useMutation({
         mutationFn: async ({ id, versionId }: { id: string, versionId: string }) => (await storyApi.restoreVersion(id, versionId)) as any,
-        onSuccess: (data, variables) => {
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['story', variables.id] });
             queryClient.invalidateQueries({ queryKey: ['storyVersions', variables.id] });
         }
@@ -55,14 +55,14 @@ export const useStoryMutations = () => {
 
     const deleteIllustration = useMutation({
         mutationFn: async ({ id, illustrationId }: { id: string, illustrationId: string }) => (await storyApi.deleteIllustration(id, illustrationId)) as any,
-        onSuccess: (data, variables) => {
+        onSuccess: (_data, variables) => {
              queryClient.invalidateQueries({ queryKey: ['story', variables.id] });
         }
     });
 
     const generateAudio = useMutation({
         mutationFn: async ({ id, voice }: { id: string; voice?: Partial<AudioSettings> }) => (await storyApi.generateAudio(id, voice)) as any,
-        onSuccess: (data, { id }) => {
+        onSuccess: (_data, { id }) => {
              queryClient.invalidateQueries({ queryKey: ['story', id] });
              // One TTS request spent (10 a day per model)
              queryClient.invalidateQueries({ queryKey: ['quota-usage'] });
@@ -71,7 +71,7 @@ export const useStoryMutations = () => {
 
     const validateStory = useMutation({
         mutationFn: (id: string) => storyReviewApi.setReviewStatus([id], 'validated'),
-        onSuccess: (data, id) => {
+        onSuccess: (_data, id) => {
              queryClient.invalidateQueries({ queryKey: ['story', id] });
              queryClient.invalidateQueries({ queryKey: ['stories'] });
         }

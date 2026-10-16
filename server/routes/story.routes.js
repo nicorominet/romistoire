@@ -111,6 +111,6 @@ router.put('/:id/illustrations/order', storyController.reorderIllustrations);
  *   (missing fields: Settings > AI > reading voice). 400 with `fields` when a value is unknown.
  * @returns {Object} Audio path.
  */
-router.post('/:id/audio', storyController.generateAIStoryAudio || storyController.generateAudio); // Using the exported name generateAudio
+router.post('/:id/audio', storyController.generateAudio);
 
 export default router;

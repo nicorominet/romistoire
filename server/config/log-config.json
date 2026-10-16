@@ -1,5 +1,0 @@
-{
-  "enableSqlLogging": true,
-  "enableAccessLogging": true,
-  "minLevel": "INFO"
-}

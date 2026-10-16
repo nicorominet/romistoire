@@ -1,8 +1,4 @@
 {
-  "ageGroups": {
-    "subtitle": "Trouvez l'histoire parfaite pour chaque niveau de lecture.",
-    "title": "Tranches d'âge"
-  },
   "ages": {
     "10-12": "10-12 ans",
     "13-15": "13-15 ans",
@@ -30,8 +26,6 @@
     "operationFailed": "Opération échouée",
     "save": "Enregistrer",
     "saving": "Enregistrement...",
-    "search": "Rechercher",
-    "noDaysAvailable": "Aucun jour disponible",
     "unsavedTitle": "Quitter sans enregistrer ?",
     "unsavedDesc": "Vos modifications n'ont pas été enregistrées et seront perdues.",
     "leave": "Quitter",
@@ -90,12 +84,10 @@
     "save": "Enregistrer l'histoire",
     "selectDayOfWeek": "Sélectionner le jour de la semaine",
     "selectWeekNumber": "Sélectionner le numéro de semaine",
-    "storyDetails": "Détails de l'histoire",
     "success": {
       "storyCreated": "Histoire créée avec succès !"
     },
     "tabs": {
-      "generate": "Générer",
       "illustrate": "Illustrer",
       "preview": "Aperçu",
       "write": "Écrire"
@@ -111,22 +103,6 @@
     "thursday": "Jeudi",
     "tuesday": "Mardi",
     "wednesday": "Mercredi"
-  },
-  "features": {
-    "create": {
-      "description": "Rédigez des histoires magiques qui captivent l’imagination des enfants grâce à notre éditeur facile à utiliser.",
-      "title": "Créer"
-    },
-    "illustrate": {
-      "description": "Ajoutez des illustrations colorées et des dessins pour donner vie à vos histoires.",
-      "title": "Illustrer"
-    },
-    "share": {
-      "description": "Organisez les histoires par thème et tranche d'âge, idéal pour un usage éducatif.",
-      "title": "Partager"
-    },
-    "subtitle": "Créez, illustrez et partagez vos histoires en trois étapes simples.",
-    "title": "Comment ça marche"
   },
   "footer": {
     "rights": "Tous droits réservés"
@@ -334,7 +310,6 @@
       "nameTooLong": "Le nom est limité à {{max}} caractères."
     },
     "selector": {
-      "create": "Créer",
       "existingSeries": "Séries existantes",
       "noSeriesFound": "Aucune série trouvée",
       "placeholder": "Sélectionner ou créer une série...",
@@ -684,19 +659,13 @@
     "dayOfWeek": "Jour de la semaine",
     "deleteError": "Erreur lors de la suppression de l'histoire",
     "deleteSuccess": "Histoire supprimée avec succès",
-    "edit": "Modifier",
-    "editor": "Éditeur",
     "illustrations": "Illustrations",
     "language": "Langue",
     "languagePlaceholder": "Saisir la langue",
-    "lastModified": "Dernière modification",
-    "modified": "Dernière modification",
     "next": "Histoire suivante",
     "previous": "Histoire précédente",
-    "restore": "Restaurer",
     "restoreError": "Erreur lors de la restauration de la version",
     "restoreSuccess": "Version restaurée avec succès",
-    "restoreVersion": "Restaurer la version",
     "savedIllustrations": "Illustrations enregistrées",
     "illustrationPrompt": "Prompt d'illustration (IA)",
     "illustrationPromptHint": "Description proposée par l'IA pour créer l'illustration de cette histoire.",
@@ -709,11 +678,7 @@
     "deleteIllustrationDesc": "L'image sera retirée de l'histoire. Cette action est définitive.",
     "invalidImageType": "Format non accepté : utilisez une image JPEG, PNG, GIF ou WebP.",
     "imageTooLarge": "Image trop lourde (5 Mo maximum).",
-    "years": "ans",
     "selectAgeGroup": "Sélectionner une tranche d'âge",
-    "selectVersion": "Sélectionner la version",
-    "settings": "Paramètres",
-    "theme": "Thème",
     "themes": "Thèmes",
     "title": "Titre",
     "titlePlaceholder": "Saisir le titre",
@@ -721,9 +686,7 @@
     "updateSuccess": "Histoire mise à jour avec succès",
     "uploadImage": "Télécharger une image",
     "version": "Version",
-    "weekNumber": "Semaine {{number}}",
     "week": "Semaine",
-    "weeklyTheme": "Thème de la semaine",
     "source": {
       "title": "Source",
       "manual": "Manuel",
@@ -798,9 +761,6 @@
   },
   "filters": {
     "title": "Filtres",
-    "reset": "Réinitialiser",
-    "allAges": "Tous les âges",
-    "allWeeks": "Toutes les semaines",
     "allSources": "Toutes les sources",
     "status": "Statut",
     "allStatus": "Tous les statuts",
@@ -810,7 +770,6 @@
   "themes": {
     "addNewTheme": "Ajouter un nouveau thème",
     "clearSearch": "Effacer la recherche",
-    "createFirstTheme": "Créez votre premier thème pour commencer.",
     "createFirstThemeDescription": "Créez votre premier thème pour commencer à organiser vos histoires.",
     "deleteTheme": "Supprimer le thème",
     "descriptionPlaceholder": "Décrivez ce thème...",
@@ -821,10 +780,8 @@
     "newTheme": "Nouveau thème",
     "noDescription": "Aucune description",
     "noResults": "Aucun résultat",
-    "search": "Rechercher",
     "searchThemes": "Rechercher des thèmes...",
     "sortBy": "Trier par",
-    "sort": "Trier",
     "themeAddedSuccess": "Thème ajouté avec succès",
     "themeDeletedSuccess": "Thème supprimé avec succès!",
     "themeUpdatedSuccess": "Thème mis à jour avec succès",
@@ -932,7 +889,6 @@
     "title": "Semaine"
   },
   "weeklyThemes": {
-    "week": "Semaine",
     "clearWeek": "Retirer le sujet de la semaine {{week}}",
     "current": "En cours",
     "nextYear": "Année suivante",
@@ -986,12 +942,9 @@
     "storiesShown": "Histoires affichées",
     "promptsToCreate": "Prompts à préparer",
     "storiesWithImages": "Histoires avec image",
-    "filtersTitle": "Filtrer les histoires",
-    "resetFilters": "Réinitialiser",
     "moreActions": "Autres actions",
     "promptReady": "Prompt prêt",
     "promptMissing": "Prompt à préparer",
-    "howTo": "Copiez le prompt, générez l'image dans votre outil, copiez l'image (clic droit › Copier l'image), cliquez sur la zone de la ligne puis Ctrl+V. Pour un lot : importez les fichiers téléchargés (ou le ZIP de l'outil Gemini Canvas).",
     "week": "Semaine {{week}}",
     "count": "{{count}} histoire(s) · {{done}} image(s) ajoutée(s) ici",
     "allDone": "Toutes les histoires de cette sélection ont une image.",
@@ -1017,15 +970,6 @@
     "createMissing": "Créer les prompts manquants ({{count}})",
     "stopBatch": "Arrêter ({{done}}/{{total}})",
     "refresh": "Actualiser la liste",
-    "filters": {
-      "week": "Semaine",
-      "allWeeks": "Toutes",
-      "age": "Âge",
-      "allAges": "Tous les âges",
-      "show": "Afficher",
-      "withoutImage": "Sans image",
-      "all": "Toutes les histoires"
-    },
     "import": {
       "title": "Importer des images",
       "description": "Images ou ZIP. Un fichier dont le nom contient le code (IMG-…) va à son histoire ; les autres vont aux histoires sans image, dans l'ordre de téléchargement. Vérifiez sur les miniatures avant d'envoyer.",
@@ -1062,7 +1006,6 @@
     "title": "Génération en masse",
     "description": "Les générations tournent sur le serveur : vous pouvez quitter la page ou fermer l'onglet, elles continuent et reprennent après un redémarrage.",
     "open": "Ouvrir la page Génération",
-    "createTabHint": "La génération par IA se lance désormais depuis la page Génération : plusieurs semaines et âges d'un coup, en arrière-plan, avec reprise et relance des échecs.",
     "indicator": "Génération en cours : {{percent}} %",
     "tabs": {
       "new": "Nouvelle génération",
@@ -1282,7 +1225,6 @@
       "species": "Espèce",
       "speciesPlaceholder": "humain (vide), hibou, robot…",
       "gender": "Genre",
-      "genderPlaceholder": "fille, garçon…",
       "physical": {
         "hair": "Cheveux / pelage",
         "eyes": "Yeux",

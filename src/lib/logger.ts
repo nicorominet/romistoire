@@ -92,8 +92,7 @@ class LoggerService {
                 data: { logs: logsToSend } // Wrap logs in data object
             });
         } catch (err) {
-            // Fallback: Retain logs if failed? Or just drop to avoid memory leak? 
-            // For now, console error and drop.
+            // Dropped: keeping them would grow the buffer while the API is down
             console.error('Failed to send logs to server', err);
         }
     }

@@ -95,7 +95,7 @@ class WeeklyThemeService {
   }
 
   /**
-   * Batch update (legacy endpoint): [{ week_number, theme_name, theme_description? }].
+   * Batch update: [{ week_number, theme_name, theme_description? }] (AI topic suggestions accepted together).
    * Weeks without a name are skipped.
    */
   async update(weeks) {

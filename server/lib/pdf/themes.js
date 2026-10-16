@@ -46,7 +46,7 @@ export const THEMES = {
   }
 };
 
-export const PDF_STYLES = ['auto', ...Object.keys(THEMES)];
+const PDF_STYLES = ['auto', ...Object.keys(THEMES)];
 
 /**
  * Theme of an export: the forced style, or in "auto" the youngest age group of the stories

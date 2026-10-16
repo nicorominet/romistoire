@@ -89,7 +89,7 @@ export const JSON_SCHEMA = {
 };
 
 /** Number of lines of a week plan (Monday to Sunday). */
-export const WEEK_PLAN_LENGTH = STORY_DAYS.length;
+const WEEK_PLAN_LENGTH = STORY_DAYS.length;
 
 /**
  * Adapts a base schema: number of stories (7 for a whole week in one answer), minimum number of

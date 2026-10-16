@@ -1,8 +1,4 @@
 {
-  "ageGroups": {
-    "subtitle": "Find the perfect story for every reading level.",
-    "title": "Age Groups"
-  },
   "ages": {
     "10-12": "10-12 years",
     "13-15": "13-15 years",
@@ -30,8 +26,6 @@
     "operationFailed": "Operation failed",
     "save": "Save",
     "saving": "Saving...",
-    "search": "Search",
-    "noDaysAvailable": "No days available",
     "unsavedTitle": "Leave without saving?",
     "unsavedDesc": "Your changes have not been saved and will be lost.",
     "leave": "Leave",
@@ -90,12 +84,10 @@
     "save": "Save Story",
     "selectDayOfWeek": "Select Day of Week",
     "selectWeekNumber": "Select Week Number",
-    "storyDetails": "Story Details",
     "success": {
       "storyCreated": "Story created successfully!"
     },
     "tabs": {
-      "generate": "Generate",
       "illustrate": "Illustrate",
       "preview": "Preview",
       "write": "Write"
@@ -111,22 +103,6 @@
     "thursday": "Thursday",
     "tuesday": "Tuesday",
     "wednesday": "Wednesday"
-  },
-  "features": {
-    "create": {
-      "description": "Write magical stories that captivate children's imagination with our easy-to-use editor.",
-      "title": "Create"
-    },
-    "illustrate": {
-      "description": "Add colorful illustrations and drawings to bring your stories to life.",
-      "title": "Illustrate"
-    },
-    "share": {
-      "description": "Organize stories by themes and age groups, perfect for educational settings.",
-      "title": "Share"
-    },
-    "subtitle": "Create, illustrate and share your stories in three simple steps.",
-    "title": "How it works"
   },
   "footer": {
     "rights": "All rights reserved"
@@ -334,7 +310,6 @@
       "nameTooLong": "The name is limited to {{max}} characters."
     },
     "selector": {
-      "create": "Create",
       "existingSeries": "Existing Series",
       "noSeriesFound": "No series found.",
       "placeholder": "Select or create a series...",
@@ -684,19 +659,13 @@
     "dayOfWeek": "Day of Week",
     "deleteError": "Error deleting story",
     "deleteSuccess": "Story deleted successfully",
-    "edit": "Edit",
-    "editor": "Editor",
     "illustrations": "Illustrations",
     "language": "Language",
     "languagePlaceholder": "Enter language",
-    "lastModified": "Last modified",
-    "modified": "Last modified",
     "next": "Next Story",
     "previous": "Previous Story",
-    "restore": "Restore",
     "restoreError": "Error restoring version",
     "restoreSuccess": "Version restored successfully",
-    "restoreVersion": "Restore Version",
     "savedIllustrations": "Saved Illustrations",
     "illustrationPrompt": "Illustration prompt (AI)",
     "illustrationPromptHint": "Description suggested by the AI to create this story's illustration.",
@@ -709,11 +678,7 @@
     "deleteIllustrationDesc": "The image will be removed from the story. This cannot be undone.",
     "invalidImageType": "Unsupported format: use a JPEG, PNG, GIF or WebP image.",
     "imageTooLarge": "Image too large (5 MB maximum).",
-    "years": "years",
     "selectAgeGroup": "Select Age Group",
-    "selectVersion": "Select Version",
-    "settings": "Settings",
-    "theme": "Theme",
     "themes": "Themes",
     "title": "Title",
     "titlePlaceholder": "Enter title",
@@ -722,8 +687,6 @@
     "uploadImage": "Upload Image",
     "version": "Version",
     "week": "Week",
-    "weekNumber": "Week {{number}}",
-    "weeklyTheme": "Weekly Theme",
     "source": {
       "title": "Source",
       "manual": "Manual",
@@ -798,9 +761,6 @@
   },
   "filters": {
     "title": "Filters",
-    "reset": "Reset",
-    "allAges": "All Ages",
-    "allWeeks": "All Weeks",
     "allSources": "All Sources",
     "status": "Status",
     "allStatus": "All Statuses",
@@ -810,7 +770,6 @@
   "themes": {
     "addNewTheme": "Add New Theme",
     "clearSearch": "Clear search",
-    "createFirstTheme": "Create your first theme to get started.",
     "createFirstThemeDescription": "Create your first theme to start organizing your stories.",
     "deleteTheme": "Delete Theme",
     "descriptionPlaceholder": "Describe this theme...",
@@ -822,9 +781,7 @@
     "newTheme": "New Theme",
     "noDescription": "No description",
     "noResults": "No results",
-    "search": "Search",
     "searchThemes": "Search themes...",
-    "sort": "Sort",
     "themeAddedSuccess": "Theme added successfully",
     "themeDeletedSuccess": "Theme deleted successfully!",
     "themeUpdatedSuccess": "Theme updated successfully",
@@ -932,7 +889,6 @@
     "title": "Week"
   },
   "weeklyThemes": {
-    "week": "Week",
     "clearWeek": "Remove the topic of week {{week}}",
     "current": "Current",
     "nextYear": "Next year",
@@ -986,12 +942,9 @@
     "storiesShown": "Stories shown",
     "promptsToCreate": "Prompts to prepare",
     "storiesWithImages": "Stories with images",
-    "filtersTitle": "Filter stories",
-    "resetFilters": "Reset filters",
     "moreActions": "More actions",
     "promptReady": "Prompt ready",
     "promptMissing": "Prompt to prepare",
-    "howTo": "Copy the prompt, generate the image in your tool, copy the image (right click › Copy image), click the zone of the row then Ctrl+V. For a batch: import the downloaded files (or the ZIP of the Gemini Canvas tool).",
     "week": "Week {{week}}",
     "count": "{{count}} story(ies) · {{done}} image(s) added here",
     "allDone": "Every story of this selection has an image.",
@@ -1017,15 +970,6 @@
     "createMissing": "Create the missing prompts ({{count}})",
     "stopBatch": "Stop ({{done}}/{{total}})",
     "refresh": "Refresh the list",
-    "filters": {
-      "week": "Week",
-      "allWeeks": "All",
-      "age": "Age",
-      "allAges": "All ages",
-      "show": "Show",
-      "withoutImage": "Without image",
-      "all": "All stories"
-    },
     "import": {
       "title": "Import images",
       "description": "Images or ZIP. A file whose name holds the code (IMG-…) goes to its story; the others go to the stories without image, in download order. Check the thumbnails before sending.",
@@ -1062,7 +1006,6 @@
     "title": "Mass generation",
     "description": "Generations run on the server: you can leave the page or close the tab, they go on and resume after a restart.",
     "open": "Open the Generation page",
-    "createTabHint": "AI generation now starts from the Generation page: several weeks and ages at once, in the background, with resume and retry of failures.",
     "indicator": "Generation running: {{percent}} %",
     "tabs": {
       "new": "New generation",
@@ -1282,7 +1225,6 @@
       "species": "Species",
       "speciesPlaceholder": "human (empty), owl, robot…",
       "gender": "Gender",
-      "genderPlaceholder": "girl, boy…",
       "physical": {
         "hair": "Hair / fur",
         "eyes": "Eyes",

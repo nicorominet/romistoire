@@ -1,5 +1,7 @@
 # Audit UI/UX : cycle de vie d'une histoire
 
+> **Document historique.** Cet audit décrit l'application avant la refonte du 9 au 12 octobre 2026 : l'onglet « Générer » de `/create`, `useStoryGeneration.ts`, `GenerationForm.tsx`, `StoryGenerationTab.tsx`, `storyParser.ts` et plusieurs autres fichiers cités ici n'existent plus (la génération passe par les tâches de la page `/generation`). L'état actuel du code est décrit dans [audit-code-mort-securite.md](./audit-code-mort-securite.md) et le README.
+
 *Audit du 7 octobre 2026 : relecture du code de la création (manuelle et IA), de la consultation, de l'édition, des illustrations, de l'audio, des versions et de la suppression.*
 
 ## Sommaire

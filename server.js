@@ -45,6 +45,3 @@ async function startServer() {
 }
 
 startServer();
-
-
-// server restart trigger 2

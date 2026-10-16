@@ -24,15 +24,6 @@ function getAgeGroupColor(ageGroup: string): string {
   }
 }
 
-function stripHtmlTags(html: string): string {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  let text = tmp.textContent || tmp.innerText || "";
-  return text.trim(); // Trim leading/trailing spaces
-}
-
-
-
 function formatDate(dateString: string | Date, locale: string = 'fr'): string {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat(locale, {
@@ -80,4 +71,4 @@ function readingStats(content: string | null | undefined): { words: number; minu
   return { words, minutes: words === 0 ? 0 : Math.max(1, Math.ceil(words / READ_ALOUD_WORDS_PER_MINUTE)) };
 }
 
-export { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, storyPlainText, storyPreview, readingStats };
+export { cn, getAgeGroupColor, formatDate, truncateText, storyPlainText, storyPreview, readingStats };

@@ -106,7 +106,7 @@ const STORY_ORDERS = {
   modified: 's.modified_at DESC',
   title: 's.title ASC'
 };
-export const STORY_SORTS = Object.keys(STORY_ORDERS);
+const STORY_SORTS = Object.keys(STORY_ORDERS);
 
 /** ORDER BY of a list sort; unknown values give the program order. */
 export const storyOrderBy = (sort) => STORY_ORDERS[sort] ?? STORY_ORDERS.program;
@@ -184,7 +184,7 @@ class StoryService {
    * @param {{beforeRequest?: () => Promise<void>}} [options] - beforeRequest: awaited before every AI request
    *   (the length retry included), e.g. the pacing of a mass generation.
    * @returns {Promise<{text: string, model: string, truncated: boolean, stories: Object[]|null}>}
-   *   `stories` holds the parsed JSON answer, or null when the client must fall back to the text parser.
+   *   `stories` holds the parsed JSON answer, or null when the answer is not usable JSON (the generation unit fails).
    */
   async generateFromAI(params, providerOverride = null, { beforeRequest } = {}) {
       const aiProvider = providerOverride || defaultProvider();
@@ -275,7 +275,7 @@ class StoryService {
           : await geminiService.generateStory(promptParams);
 
       let stories = parseStoryOutput(result.text);
-      if (!stories) console.warn('[StoryService] AI answer is not valid JSON, client will use the text parser.');
+      if (!stories) console.warn('[StoryService] AI answer is not valid JSON: no story can be read from it.');
 
       // A whole week: one story per day (a repeated or missing day is fixed by position)
       let daysFixed = 0;
@@ -731,7 +731,7 @@ class StoryService {
   async getVersions(id) { return storyVersionService.getVersions(id); }
   async restoreVersion(id, versionId) { return storyVersionService.restoreVersion(id, versionId); }
   
-  // --- Legacy/Small Helpers ---
+  // --- Illustrations of a story ---
 
   async getIllustrations(storyId) {
       return await query(

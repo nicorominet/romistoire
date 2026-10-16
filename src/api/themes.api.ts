@@ -37,6 +37,6 @@ export const weeklyThemeApi = {
   setWeek: (weekNumber: number, data: { name: string; description?: string }) =>
     client.put<WeeklyTheme>(`${API_ENDPOINTS.WEEKLY_THEMES}/${weekNumber}`, data),
   clearWeek: (weekNumber: number) => client.delete<{ success: boolean }>(`${API_ENDPOINTS.WEEKLY_THEMES}/${weekNumber}`),
-  /** Batch update (legacy). */
+  /** Batch update: the AI topic suggestions accepted together. */
   update: (weeks: Array<Partial<WeeklyTheme>>) => client.post(API_ENDPOINTS.WEEKLY_THEMES, weeks),
 };

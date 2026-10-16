@@ -182,9 +182,3 @@ export interface BackupFile {
 export type ExportType = 'json' | 'zip';
 
 export type ImportMode = 'skip' | 'overwrite';
-
-export interface UploadResponse {
-    filename: string;
-    path: string;
-    imagePath?: string; // For compatibility if backend varies
-}

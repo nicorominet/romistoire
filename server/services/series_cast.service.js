@@ -95,12 +95,6 @@ class SeriesCastService {
     return rows.map(toCast);
   }
 
-  /** Cast of a series for an age group (null: none). */
-  async forAgeGroup(seriesId, ageGroup) {
-    const rows = await query('SELECT * FROM series_casts WHERE series_id = ?', [seriesId]);
-    return rows.map(toCast).find(cast => cast.ageGroups.includes(ageGroup)) || null;
-  }
-
   /**
    * Names the heroes of a cast must not take: the other series and the characters of their casts.
    * @returns {Promise<string[]>}
@@ -112,13 +106,6 @@ class SeriesCastService {
       ...series.map(row => row.name),
       ...casts.flatMap(row => parseJson(row.characters, []).map(character => character.name))
     ].filter(Boolean);
-  }
-
-  /** Heroes of every framed series (kept out of the stories of the other series and of the free generation). */
-  async allCharacterNames() {
-    const rows = await query('SELECT series_id, characters FROM series_casts');
-    return rows.flatMap(row => parseJson(row.characters, []).map(character => ({ seriesId: row.series_id, name: character.name })))
-      .filter(entry => entry.name);
   }
 
   /**

@@ -1,11 +1,17 @@
 import { useSyncExternalStore } from "react";
 import en from "@/locales/en.json";
 import fr from "@/locales/fr.json";
-import obf from "@/locales/obf.json";
 import { STORAGE_KEYS } from "@/constants";
 
+/**
+ * Debug locale (Settings > Language, developer mode): every French text inside [[ ]], so a text
+ * written without t() stands out. Built from fr.json, it can never miss a key.
+ */
+const pseudoLocale = (texts) => Object.fromEntries(Object.entries(texts).map(([key, value]) =>
+  [key, typeof value === "string" ? `[[${value}]]` : pseudoLocale(value)]));
+
 // Bundled at build time: a runtime fetch of /src/locales only works with the Vite dev server
-const translations = { en, fr, obf };
+const translations = { en, fr, obf: pseudoLocale(fr) };
 const DEFAULT_LOCALE = "fr";
 
 const readStoredLocale = () => {

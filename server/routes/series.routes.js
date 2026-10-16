@@ -87,7 +87,6 @@ router.post('/:id/casts/validate', handle(req => seriesCastService.validate(req.
 /** POST /api/series/:id/casts - 400 with { errors, warnings } when the cast is not consistent. */
 router.post('/:id/casts', handle(req => seriesCastService.create(req.params.id, req.body || {}), 201));
 
-router.get('/casts/:castId', handle(req => seriesCastService.get(req.params.castId)));
 router.put('/casts/:castId', handle(req => seriesCastService.update(req.params.castId, req.body || {})));
 router.delete('/casts/:castId', handle(async req => ({ success: await seriesCastService.delete(req.params.castId) })));
 
