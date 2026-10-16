@@ -9,9 +9,8 @@ import { quotaDayStart } from './helpers/model_limits.helper.js';
 import { storyService } from './story.service.js';
 import { themeService } from './theme.service.js';
 import { weeklyThemeService } from './weeklyTheme.service.js';
-import { findSimilarThemes } from './helpers/theme_name.helper.js';
+import { findSimilarThemes, normalizeThemeName } from '../../shared/themeName.js';
 import { ALL_WEEK, VAGUE_TAGS } from './helpers/prompt.helper.js';
-import { normalizeThemeName } from './helpers/theme_name.helper.js';
 import {
   GENERATION_DAYS_FR, DAY_FR_TO_EN, WEEK_STORY_COUNT, buildDayParams, countWords, emptyWeekContext, isIterativeGeneration,
   isShortStory, pacingDelay, paragraphsToHtml, storyEnding, storyOpening

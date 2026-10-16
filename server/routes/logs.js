@@ -1,7 +1,7 @@
 
 import express from 'express';
 import fs from 'fs';
-import { logger, DEBUG_LOG_FILE } from '../config/logger.js';
+import { logger, debugLogFile } from '../config/logger.js';
 import { readLastLines } from '../lib/tail.js';
 import { systemService } from '../services/system.service.js';
 import { LIMITS } from '../middleware/rateLimit.middleware.js';
@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 500, 1), 5000);
     try {
         const logs = [];
-        for (const line of await readLastLines(DEBUG_LOG_FILE, limit)) {
+        for (const line of await readLastLines(debugLogFile(), limit)) {
             try { logs.push(JSON.parse(line)); } catch (e) { /* corrupt line */ }
         }
         res.json(logs.reverse());
@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
  * @returns {Object} Success status.
  */
 router.delete('/', (req, res) => {
-    fs.writeFile(DEBUG_LOG_FILE, '', (err) => {
+    fs.writeFile(debugLogFile(), '', (err) => {
         if (err) {
             return res.status(500).json({ error: 'Failed to clear logs' });
         }

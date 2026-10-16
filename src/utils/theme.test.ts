@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeThemeName, isSameThemeName, findSimilarThemes, matchesThemeSearch } from "./themeName";
+import { normalizeThemeName, isSameThemeName, findSimilarThemes, matchesThemeSearch } from "@shared/themeName";
 import { parseHexColor, safeThemeColor, readableTextColor, tint, themeBadgeStyle, FALLBACK_THEME_COLOR } from "./themeColors";
 
 describe("themeName (mirror of the server helper)", () => {

@@ -24,7 +24,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(import.meta.dirname, './src')
+      '@': path.resolve(import.meta.dirname, './src'),
+      // Modules shared with the server (shared/*.js, typed by shared/*.d.ts)
+      '@shared': path.resolve(import.meta.dirname, './shared')
     }
   },
   build: {

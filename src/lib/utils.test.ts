@@ -9,6 +9,8 @@ describe('utils', () => {
     });
 
     it('should handle conditional classes', () => {
+      // Conditional classes as written in JSX: the constants are the point of the test
+      // oxlint-disable-next-line no-constant-binary-expression
       expect(cn('c1', true && 'c2', false && 'c3')).toBe('c1 c2');
     });
 

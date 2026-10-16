@@ -1,7 +1,7 @@
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ConflictError, NotFoundError, ValidationError } from '../middleware/error.middleware.js';
-import { normalizeThemeName, groupSimilarThemes } from './helpers/theme_name.helper.js';
+import { normalizeThemeName, groupSimilarThemes } from '../../shared/themeName.js';
 import { mergeThemesOnConnection } from './helpers/theme_merge.helper.js';
 
 const NAME_MAX_LENGTH = 100;

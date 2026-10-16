@@ -1,4 +1,4 @@
-import { normalizeThemeName } from '../services/helpers/theme_name.helper.js';
+import { normalizeThemeName } from '../../shared/themeName.js';
 import { mergeThemesOnConnection } from '../services/helpers/theme_merge.helper.js';
 
 const columnExists = async (pool, table, column) =>

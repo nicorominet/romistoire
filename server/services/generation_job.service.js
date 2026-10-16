@@ -12,7 +12,9 @@ import { seriesCastService } from './series_cast.service.js';
 import { modelLimits } from './helpers/model_limits.helper.js';
 import { msUntilPacificMidnight } from './helpers/model_cooldown.helper.js';
 
-export const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
+import { AGE_GROUPS } from '../../shared/ageGroups.js';
+
+export { AGE_GROUPS };
 const MAX_WEEK = 53;
 /** A job is limited to 53 weeks x 6 ages. */
 const MAX_UNITS = MAX_WEEK * AGE_GROUPS.length;

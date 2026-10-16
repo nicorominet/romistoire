@@ -2,11 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import { once } from 'events';
+import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { query, getConnection } from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ENV_CONFIG } from '../config/env.config.js';
 import { IMAGE_EXTENSIONS } from '../config/upload.config.js';
-import { normalizeThemeName } from './helpers/theme_name.helper.js';
+import { normalizeThemeName } from '../../shared/themeName.js';
 import { themeService } from './theme.service.js';
 import { ValidationError } from '../middleware/error.middleware.js';
 
@@ -60,7 +62,11 @@ export const checkZipArchive = (zip, targetDir, limits = ZIP_LIMITS) => {
   if (total > limits.maxUncompressedBytes) throw new ValidationError('Archive refused: too large once extracted');
 };
 
-// Quota statistics: they describe the requests really sent from this installation
+/**
+ * Quota statistics: they describe the requests really sent from this installation.
+ * Read by the export coverage test.
+ * @internal
+ */
 export const NOT_EXPORTED_TABLES = ['ai_requests'];
 
 /** "2026-10-09T12:47:05.000Z" (dates of data.json) -> "2026-10-09 12:47:05" (UTC, as the app writes them). */
@@ -87,6 +93,28 @@ export const toImportValue = (column, value) => {
  */
 export const toStoredPath = (absolutePath) =>
   path.relative(ENV_CONFIG.PROJECT_ROOT, absolutePath).split(path.sep).join('/');
+
+/**
+ * Every file of a directory, recursively, sorted (missing directory: none).
+ * @param {string} dir
+ * @returns {Promise<string[]>} Absolute paths.
+ */
+export const listFiles = async (dir) => {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+  const files = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...await listFiles(entryPath));
+    else if (entry.isFile()) files.push(entryPath);
+  }
+  return files;
+};
 
 /**
  * Number of files and total size of a directory, recursively (missing directory: zeros).
@@ -125,10 +153,12 @@ class SystemService {
    * Import data from a JSON or ZIP file.
    * @param {Object} file - The uploaded file object from multer.
    * @param {'skip'|'overwrite'} [mode='skip'] - Import mode.
+   * @param {{keepSource?: boolean}} [options] - keepSource: the file is a backup of the server, not an upload
+   *   (an upload is deleted once read).
    * @returns {Promise<{success: boolean, inserted: number, skipped: number, failed: number}>} Result of import (row counts).
    * @throws {Error} If file format is invalid or import fails.
    */
-  async importData(file, mode = 'skip') {
+  async importData(file, mode = 'skip', { keepSource = false } = {}) {
       const { filename, path: filePath, mimetype } = file;
       const isZip = mimetype === 'application/zip' || filename.endsWith('.zip');
       
@@ -160,7 +190,9 @@ class SystemService {
               dataToImport = JSON.parse(fs.readFileSync(filePath, 'utf8'));
           }
       } finally {
-          try { fs.unlinkSync(filePath); } catch(e) {}
+          if (!keepSource) {
+              try { fs.unlinkSync(filePath); } catch(e) {}
+          }
       }
 
       if (!dataToImport) throw new Error('No data found to import.');
@@ -278,32 +310,68 @@ class SystemService {
       return { success: true, ...stats };
   }
 
-  /**
-   * Export all data.
-   * @param {boolean} [full=false] - If true, exports ZIP with images; otherwise JSON only.
-   * @returns {Promise<{buffer: Buffer, filename: string, type: string}>} Export file data.
-   */
-  async exportData(full = false) {
+  /** Rows of every exported table, as written in data.json. */
+  async collectExportData() {
     const exportData = {};
     for (const { key, table } of EXPORTED_TABLES) {
       exportData[key] = await query(`SELECT * FROM ${table}`);
     }
     exportData.exportDate = new Date().toISOString();
+    return exportData;
+  }
 
-    if (full) {
-        const zip = new AdmZip();
-        // Add data.json
-        zip.addFile("data.json", Buffer.from(JSON.stringify(exportData, null, 2)));
-        
-        // Add images
-        const uploadsDir = ENV_CONFIG.UPLOADS_DIR;
-        if (fs.existsSync(uploadsDir)) {
-           zip.addLocalFolder(uploadsDir, "images");
-        }
-        return { buffer: zip.toBuffer(), filename: `imagitales-full-export-${new Date().toISOString().slice(0, 10)}.zip`, type: 'application/zip' };
-    } else {
-        return { buffer: Buffer.from(JSON.stringify(exportData, null, 2)), filename: `imagitales-data-export-${new Date().toISOString().slice(0, 10)}.json`, type: 'application/json' };
+  /**
+   * Data export (JSON, without the files).
+   * @returns {Promise<{buffer: Buffer, filename: string, type: string}>}
+   */
+  async exportData() {
+    const exportData = await this.collectExportData();
+    return {
+      buffer: Buffer.from(JSON.stringify(exportData, null, 2)),
+      filename: `imagitales-data-export-${new Date().toISOString().slice(0, 10)}.json`,
+      type: 'application/json'
+    };
+  }
+
+  /**
+   * Full export (data.json + every file of uploads/ under images/), written as a stream to `filePath`:
+   * memory stays flat whatever the size of the library. Media files are stored as they are
+   * (already compressed), data.json is deflated.
+   * @param {string} filePath - ZIP to write.
+   * @returns {Promise<{filename: string, type: string}>} Download name and type.
+   */
+  async writeFullExport(filePath) {
+    const exportData = await this.collectExportData();
+    const out = fs.createWriteStream(filePath);
+    const finished = new Promise((resolve, reject) => {
+      out.on('finish', resolve);
+      out.on('error', reject);
+    });
+    const zip = new Zip((error, chunk, final) => {
+      if (error) return out.destroy(error);
+      out.write(chunk);
+      if (final) out.end();
+    });
+    // Waits when the disk is slower than the reads
+    const drained = () => (out.writableNeedDrain ? once(out, 'drain') : null);
+
+    const data = new ZipDeflate('data.json', { level: 6 });
+    zip.add(data);
+    data.push(Buffer.from(JSON.stringify(exportData, null, 2)), true);
+
+    for (const file of await listFiles(ENV_CONFIG.UPLOADS_DIR)) {
+      const entry = new ZipPassThrough(`images/${path.relative(ENV_CONFIG.UPLOADS_DIR, file).split(path.sep).join('/')}`);
+      entry.mtime = (await fs.promises.stat(file)).mtime;
+      zip.add(entry);
+      for await (const chunk of fs.createReadStream(file)) {
+        entry.push(chunk);
+        await drained();
+      }
+      entry.push(new Uint8Array(0), true);
     }
+    zip.end();
+    await finished;
+    return { filename: `imagitales-full-export-${new Date().toISOString().slice(0, 10)}.zip`, type: 'application/zip' };
   }
 
   /**
@@ -368,7 +436,7 @@ class SystemService {
       disk: {
         uploads: await dirUsage(ENV_CONFIG.UPLOADS_DIR),
         logs: await dirUsage(ENV_CONFIG.LOGS_DIR),
-        debugLog: await dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
+        debugLog: await dirUsage(ENV_CONFIG.DEBUG_LOG_DIR)
       }
     };
   }
@@ -432,7 +500,7 @@ class SystemService {
    * @returns {Promise<Array<{filename: string, date: string, size: number}>>} List of logs.
    */
   async getLogsList(type = 'all') {
-      const logsDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
+      const logsDir = ENV_CONFIG.LOGS_DIR;
       if (!fs.existsSync(logsDir)) return [];
       
       const files = await fs.promises.readdir(logsDir);
@@ -468,7 +536,7 @@ class SystemService {
    * @throws {Error} If file not found.
    */
   async getLogContent(filename) {
-      const logsDir = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
+      const logsDir = ENV_CONFIG.LOGS_DIR;
       // Security check: prevent directory traversal
       const safeFilename = path.basename(filename); 
       const filePath = path.join(logsDir, safeFilename);

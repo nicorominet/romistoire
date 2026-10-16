@@ -18,11 +18,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Archive, Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Archive, Download, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppSettings, useBackups } from "@/hooks/useAppSettings";
 import { settingsApi } from "@/api/settings.api";
 import { downloadBlob } from "@/utils/fileUtils";
+import { getApiError } from "@/lib/apiError";
 import { AppSettingsUpdate, BackupFrequency, DirUsage } from "@/types/system.types";
 
 /** "12.3 MB" style size. */
@@ -93,7 +94,7 @@ const NumberSetting = ({ id, label, value, min, max, onSave }: {
 export const StorageSettings = () => {
   const { t } = i18n;
   const { data, isLoading: settingsLoading, isError: settingsError, refetch: refetchSettings, update } = useAppSettings();
-  const { backups, stats, runBackup, deleteBackup, clearDebugLog } = useBackups();
+  const { backups, stats, runBackup, restoreBackup, deleteBackup, clearDebugLog } = useBackups();
 
   const save = (storage: AppSettingsUpdate["storage"]) =>
     update.mutate({ storage }, {
@@ -114,6 +115,14 @@ export const StorageSettings = () => {
       toast.error((error as Error).message);
     }
   };
+
+  const handleRestore = (filename: string) =>
+    restoreBackup.mutate(filename, {
+      onSuccess: (result) => toast.success(t("settings.storage.backupRestored", {
+        inserted: String(result.inserted), skipped: String(result.skipped), failed: String(result.failed),
+      })),
+      onError: (error) => toast.error(getApiError(error).message),
+    });
 
   const handleDelete = (filename: string) =>
     deleteBackup.mutate(filename, {
@@ -255,6 +264,27 @@ export const StorageSettings = () => {
                   <Button variant="ghost" size="icon" onClick={() => handleDownload(backup.filename)} aria-label={t("settings.storage.download")}>
                     <Download className="h-4 w-4" />
                   </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" disabled={restoreBackup.isPending} aria-label={t("settings.storage.restoreBackup")}>
+                        {restoreBackup.isPending && restoreBackup.variables === backup.filename
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <RotateCcw className="h-4 w-4" />}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t("settings.storage.restoreBackupTitle")}</AlertDialogTitle>
+                        <AlertDialogDescription>{t("settings.storage.restoreBackupDescription", { date: new Date(backup.createdAt).toLocaleString() })}</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleRestore(backup.filename)}>
+                          {t("settings.storage.restoreBackup")}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" disabled={deleteBackup.isPending} aria-label={t("settings.storage.deleteBackup")}>

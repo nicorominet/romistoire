@@ -22,12 +22,25 @@ const uploadSingleImage = (req, res, next) => {
 };
 
 /**
+ * Runs multer's import upload and turns its errors (size, type) into a readable 400.
+ */
+const uploadImportFile = (req, res, next) => {
+    dataUpload.single('file')(req, res, (err) => {
+        if (!err) return next();
+        if (err instanceof multer.MulterError || err instanceof InvalidFileTypeError) {
+            return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'File too large (MAX_IMPORT_MB in .env).' : err.message });
+        }
+        next(err);
+    });
+};
+
+/**
  * POST /api/import-data
  * Import database data from a JSON file.
  * @param {Object} req.file - The uploaded JSON file.
  * @returns {Object} Success status.
  */
-router.post('/import-data', dataUpload.single('file'), systemController.importData);
+router.post('/import-data', uploadImportFile, systemController.importData);
 
 /**
  * GET /api/export-data

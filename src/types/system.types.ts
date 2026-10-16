@@ -179,6 +179,14 @@ export interface BackupFile {
     createdAt: string;
 }
 
+/** Rows of an import or a restore: inserted, already present (kept), failed. */
+export interface ImportResult {
+    success: boolean;
+    inserted: number;
+    skipped: number;
+    failed: number;
+}
+
 export type ExportType = 'json' | 'zip';
 
 export type ImportMode = 'skip' | 'overwrite';

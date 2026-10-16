@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 
 import storyRoutes from './routes/story.routes.js';
 import themeRoutes from './routes/theme.routes.js';
@@ -25,6 +26,24 @@ import { errorHandler } from './middleware/error.middleware.js';
 
 const app = express();
 app.disable('x-powered-by');
+
+/**
+ * Pages of the production build: scripts and requests to this origin only. Inline styles are allowed
+ * (Radix and the charts set style attributes); images and audio may be data:/blob: (previews, generated audio).
+ */
+export const CONTENT_SECURITY_POLICY = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'"
+].join('; ');
 
 // Only the app may call the API from a browser (no login: any other website could reset the data)
 const origins = allowedOrigins();
@@ -84,6 +103,19 @@ app.use('/api', systemRoutes);
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
+
+// Production: the API serves the build itself (npm run build, then NODE_ENV=production npm start),
+// one origin for the pages and the API, no Vite
+const DIST_DIR = path.join(ENV_CONFIG.PROJECT_ROOT, 'dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
+    app.use((req, res, next) => {
+        if (!req.path.startsWith('/api/')) res.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+        next();
+    });
+    app.use(express.static(DIST_DIR));
+    // Client routes (/stories/12, /generation...): the app page, the router does the rest
+    app.get(/^\/(?!api\/|uploads\/|audio\/).*/, (req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+}
 
 // Errors thrown before or outside the route handlers (body too large, invalid JSON): JSON answer
 app.use(errorHandler);

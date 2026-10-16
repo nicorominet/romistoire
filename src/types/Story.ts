@@ -7,7 +7,9 @@
  * Age group for stories categorization
  * @type {AgeGroup}
  */
-export const AGE_GROUPS = ["2-3", "4-6", "7-9", "10-12", "13-15", "16-18"] as const;
+import { AGE_GROUPS } from "@shared/ageGroups";
+
+export { AGE_GROUPS };
 export type AgeGroup = typeof AGE_GROUPS[number];
 
 /**

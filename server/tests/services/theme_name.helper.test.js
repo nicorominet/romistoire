@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeThemeName, isSameThemeName, findSimilarThemes, groupSimilarThemes } from '../../services/helpers/theme_name.helper.js';
+import { normalizeThemeName, isSameThemeName, findSimilarThemes, groupSimilarThemes } from '../../../shared/themeName.js';
 
 describe('theme name helper', () => {
   it.each([

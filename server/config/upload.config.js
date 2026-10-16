@@ -1,20 +1,15 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import { ENV_CONFIG } from './env.config.js';
+import { IMAGE_EXTENSIONS, MAX_IMAGE_SIZE } from '../../shared/images.js';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = MAX_IMAGE_SIZE;
 
-// Accepted image types -> extension written on disk.
-// The extension never comes from the client file name, so an "image" can't be served as HTML.
-// Keep in sync with ACCEPTED_IMAGE_TYPES in src/constants.ts
-export const IMAGE_EXTENSIONS = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/gif': '.gif',
-  'image/webp': '.webp'
-};
+// Accepted image types and the extension written on disk (shared with the client)
+export { IMAGE_EXTENSIONS };
 
 function sanitizeFilename(filename) {
   return filename.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -74,12 +69,19 @@ const dataFileFilter = (req, file, cb) => {
   if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only .json and .zip are allowed.'), false);
+    cb(new InvalidFileTypeError('Invalid file type. Only .json and .zip are allowed.'), false);
   }
 };
 
+// Imports (JSON or full ZIP backups, images and audio included): written to the system temp folder,
+// never into uploads/ (served to the browser). MAX_IMPORT_MB in .env, 2 GB by default.
+const MAX_IMPORT_BYTES = (Number(process.env.MAX_IMPORT_MB) || 2048) * 1024 * 1024;
+
 export const dataUpload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // Increase limit for backups (50MB)
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) => cb(null, `romistoire-import-${uuidv4()}${sanitizeFilename(path.extname(file.originalname).toLowerCase())}`)
+  }),
+  limits: { fileSize: MAX_IMPORT_BYTES },
   fileFilter: dataFileFilter
 });
