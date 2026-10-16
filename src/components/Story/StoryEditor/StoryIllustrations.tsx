@@ -81,14 +81,6 @@ const StoryIllustrations = ({
     <div className="space-y-4">
       <IllustrationPromptCard prompt={illustrationPrompt} />
       <div className="flex flex-col gap-4">
-         {/* Canvas and Upload components - Reusing existing ones from EditStory for now as they are generic enough 
-             OR should I move them too? 
-             Refactoring plan said "Move StoryIllustrations.tsx here". 
-             It implies dependent components too? 
-             For now, I import them from their current location. 
-             Ideally I should move them to StoryEditor too.
-             I will update imports if I move them later.
-         */}
          <IllustrationCanvas
             disabled={disabled}
             onSave={async (dataURL: string) => {

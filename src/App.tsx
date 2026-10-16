@@ -74,8 +74,9 @@ const GlobalLogger = () => {
         });
     }, [location]);
 
-    // Track Global Clicks & Rage Clicks
+    // Track Global Clicks & Rage Clicks: development only (one request every 2 s while clicking otherwise)
     useEffect(() => {
+        if (!import.meta.env.DEV) return;
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const now = Date.now();
@@ -84,10 +85,10 @@ const GlobalLogger = () => {
             // getAttribute: on an SVG icon, className is not a string
             const classes = target.getAttribute?.('class') ?? '';
             const elementInfo = target.tagName + (target.id ? `#${target.id}` : '') + (classes ? `.${classes.split(' ').join('.')}` : '');
+            // Element only: the text clicked (story content, names) stays out of the logs
             logger.info('UI_INTERACTION', `Click on ${elementInfo}`, {
                 x: e.clientX,
-                y: e.clientY,
-                text: target.innerText?.substring(0, 20)
+                y: e.clientY
             });
 
             // Rage Click Detection (< 300ms between clicks on same target)

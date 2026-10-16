@@ -3,6 +3,7 @@ import path from 'path';
 import { ENV_CONFIG } from '../config/env.config.js';
 import { ValidationError } from '../middleware/error.middleware.js';
 import { PACES, STYLES, VOICE_NAMES } from './helpers/voice.helper.js';
+import { localUrlError } from './helpers/local_url.helper.js';
 
 // Settings > AI generation / Storage. Gitignored: it may hold local URLs.
 const SETTINGS_FILE = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'config', 'app-settings.json');
@@ -76,11 +77,11 @@ const modelName = (value) => {
   return name;
 };
 
-const httpUrl = (value) => {
-  let url;
-  try { url = new URL(String(value).trim()); } catch (e) { throw 'is not a valid URL'; }
-  if (!['http:', 'https:'].includes(url.protocol)) throw 'must start with http:// or https://';
-  return url.toString().replace(/\/+$/, '');
+// Ollama runs on this machine or the local network: any other host is refused (the API must not reach other servers)
+const localHttpUrl = (value) => {
+  const error = localUrlError(value);
+  if (error) throw error;
+  return new URL(String(value).trim()).toString().replace(/\/+$/, '');
 };
 
 const SCHEMA = {
@@ -88,7 +89,7 @@ const SCHEMA = {
     defaultProvider: nullable(oneOf(PROVIDERS)),
     geminiModels: nullable(modelList),
     geminiAudioModels: nullable(modelList),
-    ollamaBaseUrl: nullable(httpUrl),
+    ollamaBaseUrl: nullable(localHttpUrl),
     ollamaModel: nullable(modelName),
     creativity: nullable(number(0.2, 1.2)),
     geminiTimeoutMs: nullable(integer(10000, 900000)),

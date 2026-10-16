@@ -332,4 +332,15 @@ describe('toPlayableAudio', () => {
 
     expect(audio).toEqual({ audioBuffer: pcm, mimeType: 'audio/mpeg', extension: 'mp3' });
   });
+
+  it('sends the API key in a header, never in the URL', async () => {
+    global.fetch = vi.fn();
+    modelCooldowns.clear();
+    fetch.mockResolvedValue(jsonResponse(400, { error: { message: 'API key not valid.' } }));
+    await expect(geminiService.generateStory({ theme: 'Pluie', age: '4-6', day: 'Lundi' })).rejects.toBeInstanceOf(GeminiFatalError);
+
+    const [url, options] = fetch.mock.calls[0];
+    expect(url).not.toContain('key=');
+    expect(options.headers['x-goog-api-key']).toBe(geminiService.apiKey);
+  });
 });

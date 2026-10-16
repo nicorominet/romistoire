@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { query, getConnection } from '../config/database.js';
@@ -7,10 +8,77 @@ import { ENV_CONFIG } from '../config/env.config.js';
 import { IMAGE_EXTENSIONS } from '../config/upload.config.js';
 import { normalizeThemeName } from './helpers/theme_name.helper.js';
 import { themeService } from './theme.service.js';
+import { ValidationError } from '../middleware/error.middleware.js';
 
 // Files an imported archive may drop into uploads/: images and generated audio only (never .html, .js...)
 const IMPORTABLE_MEDIA_EXTENSIONS = new Set([...Object.values(IMAGE_EXTENSIONS), '.jpeg', '.wav', '.mp3', '.ogg', '.webm']);
 import { logger } from '../config/logger.js';
+
+/**
+ * Tables of an export / backup, in an order that keeps the foreign keys valid on import.
+ * key: property of data.json. primaryKey: columns identifying a row (an existing row is skipped or overwritten).
+ * Every table of the schema must be listed here or in NOT_EXPORTED_TABLES (checked by a test).
+ */
+export const EXPORTED_TABLES = [
+  { key: 'storySeries', table: 'story_series' },
+  { key: 'themes', table: 'themes' },
+  { key: 'weeklyThemes', table: 'weekly_themes', primaryKey: ['week_number'] },
+  { key: 'stories', table: 'stories' },
+  { key: 'storyThemes', table: 'story_themes' },
+  { key: 'versions', table: 'story_versions' },
+  { key: 'versionThemes', table: 'story_version_themes' },
+  { key: 'illustrations', table: 'illustrations' },
+  { key: 'generationJobs', table: 'generation_jobs' },
+  { key: 'generationUnits', table: 'generation_units' },
+  // Bible of the framed series and what its weeks established
+  { key: 'seriesCasts', table: 'series_casts' },
+  { key: 'seriesFacts', table: 'series_facts' },
+  { key: 'seriesWeekRecaps', table: 'series_week_recaps', primaryKey: ['cast_id', 'age_group', 'week_number'] }
+];
+
+// Limits of an imported ZIP, checked before extraction (zip bomb): a full backup holds the images and audio
+// of the library, already compressed (a ratio close to 1)
+export const ZIP_LIMITS = { maxEntries: 50000, maxUncompressedBytes: 4 * 1024 ** 3 };
+
+/**
+ * Refuses an archive too large once extracted, or holding a path outside the extraction folder.
+ * @param {AdmZip} zip
+ * @param {string} targetDir - Extraction folder.
+ * @throws {ValidationError}
+ */
+export const checkZipArchive = (zip, targetDir, limits = ZIP_LIMITS) => {
+  const entries = zip.getEntries();
+  if (entries.length > limits.maxEntries) throw new ValidationError(`Archive refused: more than ${limits.maxEntries} files`);
+  let total = 0;
+  for (const entry of entries) {
+    total += Number(entry.header?.size) || 0;
+    const target = path.resolve(targetDir, entry.entryName);
+    if (target !== targetDir && !target.startsWith(targetDir + path.sep)) {
+      throw new ValidationError(`Archive refused: invalid path ${entry.entryName}`);
+    }
+  }
+  if (total > limits.maxUncompressedBytes) throw new ValidationError('Archive refused: too large once extracted');
+};
+
+// Quota statistics: they describe the requests really sent from this installation
+export const NOT_EXPORTED_TABLES = ['ai_requests'];
+
+/** "2026-10-09T12:47:05.000Z" (dates of data.json) -> "2026-10-09 12:47:05" (UTC, as the app writes them). */
+const toSqlDateTime = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
+
+/**
+ * Value of data.json -> value for an INSERT: dates of the *_at columns in SQL form,
+ * JSON columns (read back by mysql2 as objects / arrays) as JSON text.
+ */
+export const toImportValue = (column, value) => {
+  if (value instanceof Date) return toSqlDateTime(value);
+  if (typeof value === 'string' && (column === 'at' || column.endsWith('_at'))) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : toSqlDateTime(date);
+  }
+  if (value !== null && typeof value === 'object') return JSON.stringify(value);
+  return value;
+};
 
 /**
  * Converts an absolute file path to the path stored in DB: relative to the project root, with "/" separators.
@@ -22,21 +90,28 @@ export const toStoredPath = (absolutePath) =>
 
 /**
  * Number of files and total size of a directory, recursively (missing directory: zeros).
+ * Asynchronous: a large uploads folder never blocks the server.
  * @param {string} dir
- * @returns {{files: number, bytes: number}}
+ * @returns {Promise<{files: number, bytes: number}>}
  */
-export const dirUsage = (dir) => {
+export const dirUsage = async (dir) => {
   const usage = { files: 0, bytes: 0 };
-  if (!fs.existsSync(dir)) return usage;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return usage;
+    throw error;
+  }
+  for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const sub = dirUsage(entryPath);
+      const sub = await dirUsage(entryPath);
       usage.files += sub.files;
       usage.bytes += sub.bytes;
     } else if (entry.isFile()) {
       usage.files++;
-      usage.bytes += fs.statSync(entryPath).size;
+      usage.bytes += (await fs.promises.stat(entryPath)).size;
     }
   }
   return usage;
@@ -64,7 +139,10 @@ class SystemService {
       try {
           if (isZip) {
               const zip = new AdmZip(filePath);
-              tempDir = path.join(process.cwd(), 'temp_import_' + Date.now());
+              // System temp folder: never inside the project (served or scanned folders)
+              const extractDir = path.join(os.tmpdir(), `romistoire-import-${Date.now()}`);
+              checkZipArchive(zip, extractDir);
+              tempDir = extractDir;
               zip.extractAllTo(tempDir, true);
 
               const dataPath = path.join(tempDir, 'data.json');
@@ -87,7 +165,7 @@ class SystemService {
 
       if (!dataToImport) throw new Error('No data found to import.');
 
-      const { stories, versions, illustrations, weeklyThemes: rawWeeklyThemes, themes: rawThemes, storyThemes: rawStoryThemes, versionThemes: rawVersionThemes, storySeries, generationJobs, generationUnits } = dataToImport;
+      const { themes: rawThemes, storyThemes: rawStoryThemes, versionThemes: rawVersionThemes } = dataToImport;
 
       // Themes are unique by normalized name: an imported "Nature" reuses the local "nature",
       // and the story / week links of the imported id are moved to the local theme.
@@ -110,8 +188,9 @@ class SystemService {
       const mapThemeId = (row) => (row.theme_id && themeIdMap.has(row.theme_id) ? { ...row, theme_id: themeIdMap.get(row.theme_id) } : row);
       const storyThemes = (rawStoryThemes || []).map(mapThemeId);
       const versionThemes = (rawVersionThemes || []).map(mapThemeId);
-      // Week topics are free text: unknown columns (theme_id from older exports) are ignored by insertData
-      const weeklyThemes = rawWeeklyThemes || [];
+      // Rows to insert per table. Week topics are free text: unknown columns (theme_id from older exports)
+      // are ignored by insertData, like every column the local schema does not have.
+      const rowsOf = { ...dataToImport, themes, storyThemes, versionThemes };
 
       // FOREIGN_KEY_CHECKS is a session variable: every statement must run on the same connection
       const connection = await getConnection();
@@ -121,42 +200,28 @@ class SystemService {
       };
       const stats = { inserted: 0, skipped: 0, failed: 0 };
 
-      const insertData = async (tableName, data) => {
-        if (!data || data.length === 0) return;
+      const insertData = async ({ table: tableName, primaryKey = ['id'] }, data) => {
+        if (!Array.isArray(data) || data.length === 0) return;
 
         let validColumns = [];
         try {
           const columnsResult = await run(`SHOW COLUMNS FROM ${tableName}`);
           validColumns = columnsResult.map(row => row.Field);
         } catch (err) { return; }
-        
+
         for (const item of data) {
           try {
             const columns = Object.keys(item).filter(key => validColumns.includes(key));
-            const values = columns.map(column => {
-              let value = item[column];
-              if (typeof value === 'string' && (column === 'created_at' || column === 'modified_at')) {
-                const parsedDate = new Date(value);
-                if (!isNaN(parsedDate.getTime())) {
-                  value = parsedDate.toISOString().slice(0, 19).replace('T', ' ');
-                }
-              } else if (value instanceof Date) {
-                value = value.toISOString().slice(0, 19).replace('T', ' ');
-              }
-              return value;
-            });
+            if (!primaryKey.every(column => columns.includes(column))) continue;
+            const values = columns.map(column => toImportValue(column, item[column]));
 
-            const idColumn = columns.find(col => col === 'id');
-            const pkColumn = tableName === 'weekly_themes' ? 'week_number' : (idColumn || 'id');
-            
-            if (!columns.includes(pkColumn)) continue;
-
-            const pkValue = item[pkColumn];
-            const existing = await run(`SELECT 1 FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+            const where = primaryKey.map(column => `${column} = ?`).join(' AND ');
+            const keyValues = primaryKey.map(column => item[column]);
+            const existing = await run(`SELECT 1 FROM ${tableName} WHERE ${where}`, keyValues);
 
             if (existing && existing.length > 0) {
               if (mode === 'overwrite') {
-                  await run(`DELETE FROM ${tableName} WHERE ${pkColumn} = ?`, [pkValue]);
+                  await run(`DELETE FROM ${tableName} WHERE ${where}`, keyValues);
               } else {
                   stats.skipped++;
                   continue;
@@ -176,16 +241,9 @@ class SystemService {
       try {
         try {
           await run('SET FOREIGN_KEY_CHECKS = 0');
-          await insertData('story_series', storySeries);
-          await insertData('themes', themes);
-          await insertData('weekly_themes', weeklyThemes);
-          await insertData('stories', stories);
-          await insertData('story_themes', storyThemes);
-          await insertData('story_versions', versions);
-          await insertData('story_version_themes', versionThemes);
-          await insertData('illustrations', illustrations);
-          await insertData('generation_jobs', generationJobs);
-          await insertData('generation_units', generationUnits);
+          for (const table of EXPORTED_TABLES) {
+            await insertData(table, rowsOf[table.key]);
+          }
         } finally {
           try { await run('SET FOREIGN_KEY_CHECKS = 1'); } finally { connection.release(); }
         }
@@ -195,22 +253,22 @@ class SystemService {
             const targetUploads = ENV_CONFIG.UPLOADS_DIR;
             if (!fs.existsSync(targetUploads)) fs.mkdirSync(targetUploads, { recursive: true });
 
-            const copyImages = (src, dest) => {
-                const entries = fs.readdirSync(src, { withFileTypes: true });
+            const copyImages = async (src, dest) => {
+                const entries = await fs.promises.readdir(src, { withFileTypes: true });
                 for (const entry of entries) {
                     const srcPath = path.join(src, entry.name);
                     const destPath = path.join(dest, entry.name);
                     if (entry.isDirectory()) {
-                        if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
-                        copyImages(srcPath, destPath);
+                        await fs.promises.mkdir(destPath, { recursive: true });
+                        await copyImages(srcPath, destPath);
                     } else if (IMPORTABLE_MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-                        fs.copyFileSync(srcPath, destPath);
+                        await fs.promises.copyFile(srcPath, destPath);
                     } else {
                         console.warn(`[Import] Skipped non-media file from archive: ${entry.name}`);
                     }
                 }
             };
-            copyImages(imagesDir, targetUploads);
+            await copyImages(imagesDir, targetUploads);
         }
       } finally {
          if (tempDir && fs.existsSync(tempDir)) {
@@ -226,30 +284,11 @@ class SystemService {
    * @returns {Promise<{buffer: Buffer, filename: string, type: string}>} Export file data.
    */
   async exportData(full = false) {
-    const stories = await query('SELECT * FROM stories');
-    const versions = await query('SELECT * FROM story_versions');
-    const illustrations = await query('SELECT * FROM illustrations');
-    const weeklyThemes = await query('SELECT * FROM weekly_themes');
-    const themes = await query('SELECT * FROM themes');
-    const storyThemes = await query('SELECT * FROM story_themes');
-    const versionThemes = await query('SELECT * FROM story_version_themes');
-    const storySeries = await query('SELECT * FROM story_series');
-    const generationJobs = await query('SELECT * FROM generation_jobs');
-    const generationUnits = await query('SELECT * FROM generation_units');
-
-    const exportData = {
-      stories,
-      versions,
-      illustrations,
-      weeklyThemes,
-      themes,
-      storyThemes,
-      versionThemes,
-      storySeries,
-      generationJobs,
-      generationUnits,
-      exportDate: new Date().toISOString()
-    };
+    const exportData = {};
+    for (const { key, table } of EXPORTED_TABLES) {
+      exportData[key] = await query(`SELECT * FROM ${table}`);
+    }
+    exportData.exportDate = new Date().toISOString();
 
     if (full) {
         const zip = new AdmZip();
@@ -288,28 +327,27 @@ class SystemService {
 
     if (!fs.existsSync(uploadsDir)) return { success: true, deletedCount: 0, reclaimedSpace: 0 };
 
-    function walkDir(dir) {
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
+    // Asynchronous walk: the hourly purge never blocks the requests
+    const walkDir = async (dir) => {
+      for (const file of await fs.promises.readdir(dir)) {
         const filePath = path.join(dir, file);
-        const stat = fs.statSync(filePath);
+        const stat = await fs.promises.stat(filePath);
         if (stat.isDirectory()) {
-          walkDir(filePath);
-          if (fs.readdirSync(filePath).length === 0) fs.rmdirSync(filePath);
+          await walkDir(filePath);
+          if ((await fs.promises.readdir(filePath)).length === 0) await fs.promises.rmdir(filePath);
         } else {
             const oldEnough = Date.now() - stat.mtimeMs >= minAgeMs;
             if (oldEnough && !usedPaths.has(toStoredPath(filePath))) {
                 try {
-                    const size = stat.size;
-                    fs.unlinkSync(filePath);
+                    await fs.promises.unlink(filePath);
                     deletedCount++;
-                    reclaimedSpace += size;
+                    reclaimedSpace += stat.size;
                 } catch (err) {}
             }
         }
       }
-    }
-    walkDir(uploadsDir);
+    };
+    await walkDir(uploadsDir);
     return { success: true, deletedCount, reclaimedSpace };
   }
 
@@ -328,9 +366,9 @@ class SystemService {
     return {
       counts,
       disk: {
-        uploads: dirUsage(ENV_CONFIG.UPLOADS_DIR),
-        logs: dirUsage(ENV_CONFIG.LOGS_DIR),
-        debugLog: dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
+        uploads: await dirUsage(ENV_CONFIG.UPLOADS_DIR),
+        logs: await dirUsage(ENV_CONFIG.LOGS_DIR),
+        debugLog: await dirUsage(path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'debug'))
       }
     };
   }

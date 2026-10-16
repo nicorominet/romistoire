@@ -13,23 +13,27 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 ## ✨ Features / Fonctionnalités
 
 ### 🇬🇧 English
-- **📖 AI Story Generation**: Generate creative stories based on themes, age groups, and characters using Google Gemini.
+- **📖 AI Story Generation**: Generate whole weeks of stories per age group in background jobs (Google Gemini or a local Ollama model), following the topic of each week, with a coverage grid of the year.
+- **🧭 Series with a bible**: Give a series its cast, universe and rules; each generated week is checked against it and remembers the facts it establishes.
 - **🎧 AI Audio Narrations**: Turn stories into audio using advanced Text-to-Speech (Google Gemini).
 - **🎨 AI Illustration Prompts**: Each generated story comes with a detailed illustration prompt (shown with a copy button until an illustration is added).
 - **🗂️ Series & Versions**: Group stories into series, keep every saved version and restore any of them.
-- **📂 Theme Management**: Organize stories into customizable weekly themes.
+- **📂 Tags & weekly topics**: Tag stories with reusable themes and plan the topic of each week of the year.
+- **🖼️ Illustrations workshop**: Ready-to-paste image prompts, then batch import of the images.
 - **🖨️ PDF Export**: Export single stories or entire collections (Theme Books) to PDF with cover pages and table of contents.
-- **⚙️ Advanced Settings**: Manage data, logs (System & Network), and developer modes with dynamic logging configuration.
+- **⚙️ Advanced Settings**: AI models and quota usage, automatic backups, data export / import, logs and developer mode.
 - **🌍 Bilingual**: Fully localized in English and French.
 
 ### 🇫🇷 Français
-- **📖 Génération d'Histoires par IA** : Générez des histoires créatives basées sur des thèmes, tranches d'âge et personnages via Google Gemini.
+- **📖 Génération d'Histoires par IA** : Générez des semaines entières d'histoires par tranche d'âge dans des tâches en arrière-plan (Google Gemini ou un modèle local Ollama), en suivant le sujet de chaque semaine, avec une grille de couverture de l'année.
+- **🧭 Séries avec bible** : Donnez à une série sa distribution, son univers et ses règles ; chaque semaine générée est vérifiée et retient les faits qu'elle établit.
 - **🎧 Narrations Audio par IA** : Transformez les histoires en audio grâce à la synthèse vocale avancée (Google Gemini).
 - **🎨 Prompts d'Illustration par IA** : Chaque histoire générée est accompagnée d'une description détaillée de l'illustration (affichée avec un bouton « Copier » tant qu'aucune image n'est ajoutée).
 - **🗂️ Séries & Versions** : Regroupez les histoires en séries, conservez chaque version enregistrée et restaurez-la à tout moment.
-- **📂 Gestion des Thèmes** : Organisez les histoires dans des thèmes hebdomadaires personnalisables.
+- **📂 Étiquettes et sujets de la semaine** : Étiquetez les histoires avec des thèmes réutilisables et planifiez le sujet de chaque semaine de l'année.
+- **🖼️ Atelier d'illustrations** : Prompts d'image prêts à coller, puis import des images par lot.
 - **🖨️ Export PDF** : Exportez des histoires individuelles ou des collections entières (Livres Thématiques) en PDF avec couvertures et table des matières.
-- **⚙️ Paramètres Avancés** : Gérez les données, les journaux (Système & Réseau) et configurez les logs dynamiquement sans redémarrage.
+- **⚙️ Paramètres Avancés** : Modèles d'IA et consommation du quota, sauvegardes automatiques, export / import des données, journaux et mode développeur.
 - **🌍 Bilingue** : Entièrement traduit en Anglais et Français.
 
 ## 📸 Screenshots / Captures d'écran
@@ -79,7 +83,7 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 
 3. **Database Setup / Configuration Base de Données**
    - Create a MySQL database (e.g., `imagitales`).
-   - Run the initialization script:
+   - Run the initialization script (or let the server do it at its first start). It only creates the missing tables and never drops anything:
      ```bash
      mysql -u root -p imagitales < scripts/init-db.sql
      ```
@@ -95,6 +99,9 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 
    # Server (the Vite dev server proxies /api to this port)
    API_PORT=3001
+   # The API has no login: it listens on this machine only and answers the app's own pages only.
+   # API_HOST=127.0.0.1            # 0.0.0.0 opens it to the network (not protected: trusted network only)
+   # ALLOWED_ORIGINS=http://localhost:8885,http://127.0.0.1:8885   # browser origins allowed to call it
 
    # AI (cloud)
    GEMINI_API_KEY=your_gemini_api_key
@@ -131,7 +138,7 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 | `npm run build` | Build frontend for production |
 | `npm start` | Start the backend (production) |
 | `npm run preview` | Preview the production build |
-| `npm run lint` | Run ESLint |
+| `npm run lint` | Run ESLint (no configuration yet: see `docs/audit-code-mort-securite.md`, phase 4) |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm test` | Run all tests (client + server) |
 | `npm run test:client` | Run client tests (Vitest, jsdom) |
@@ -149,12 +156,26 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
   - Ollama: `format` = JSON schema (Ollama ≥ 0.5).
   - A full week for **2-3, 4-6 and 7-9** is generated in **one request** (short stories, 7 times fewer requests, 240 s timeout). From **10-12**, and always with Ollama, it is generated **day by day** (7 requests): the first day writes the week plan and the character sheets, each next day receives them with the days already told and the previous ending, which keeps the length asked for long stories.
   - Cloud requests start at least 12 s apart (free tier: 5 requests/min on Flash models). A story (or the median story of a week) under 60 % of its age's minimum length is asked once more.
-  - If the answer is not valid JSON, the client falls back to the text parser (`src/utils/storyParser.ts`).
+  - An answer that is not valid JSON gives no story: the generation unit is marked failed and can be retried from the job.
 - Gemini errors: 400/401/403 stop immediately; 5xx get one more try then the next model; 429 waits the short delay suggested by the API, or moves on (daily quota: model skipped until the Pacific-time reset); 404/timeouts move to the next model. Failing models are skipped for a while (`server/services/helpers/model_cooldown.helper.js`), so a saturated model does not slow down every call.
 - Gemini thinking is kept low for storytelling (`thinkingLevel: low` for Gemini 3.x, no thinking budget for 2.5).
 - The AI log (`server/logs/ai-<date>.log`) records, for each answer, the model used, the models skipped and why, and a `Story-Parsed` entry with the word count of each story against the target of the age. Test runs do not write log files.
 
-*Les histoires sont générées en français, au format JSON ; en cas de réponse non structurée, l'application lit le texte en mode de secours.*
+*Les histoires sont générées en français, au format JSON ; une réponse non structurée fait échouer l'unité, qui peut être relancée depuis la tâche.*
+
+### Mass generation / Génération en masse
+Page **Génération** (`/generation`), served by `server/services/generation_job.service.js` and `generation_worker.js`:
+- a **job** covers weeks × age groups (one unit each); it runs in the background, survives a restart, and can be paused, resumed, cancelled, replayed or deleted (its stories stay in the library);
+- the **coverage grid** shows the days written per (week, age), for all stories, stories without series, or one series; selected cells pre-fill a new job;
+- an **estimate** gives the requests and the free-tier quota a job will use; the AI can **suggest topics** for weeks that have none.
+
+### Series with a bible / Séries avec bible
+A series can have **casts** (one per group of ages: characters, universe, rules), edited in the **Génération cadrée** (framed generation) tab of the generation page (`server/services/series_cast.service.js`):
+- a framed job writes its weeks in order, with the cast, the approved **facts** and the **recap** of the previous weeks; it waits for the next quota day instead of failing;
+- each week is **audited** (`series_audit.service.js`): drifts from the cast are reported and the facts it establishes are proposed for approval;
+- the names of the heroes are kept out of the other series and of the free generation.
+
+*Une série peut avoir une bible (distribution, univers, règles) ; chaque semaine générée en tient compte, est auditée et propose les faits qu'elle établit.*
 
 ### Series & aliases / Séries et alias
 A slot is (week, day, age group, language, series). When a story is saved into a slot that is already taken **in the same series**, it is moved to an alias series named `<series> (Alias n)` and the user is warned.
@@ -186,9 +207,9 @@ Two distinct notions:
   - The page offers search, sort, "to review" / "unused" filters, the stories of each tag (expand the card), duplicate merge, delete with reassignment and **bulk deletion of unused tags**.
   - AI generation reuses existing tags; a new AI tag is flagged "to review" until someone edits or merges it.
 - **Topic of the week** (`weekly_themes` table, page **Programme** `/weekly-themes`): free text (topic + optional description) per ISO week (1-53), saved when the field loses focus. It guides story writing in the AI prompt; it is **not** a tag.
-- Reusable UI lives in `src/components/Theme/` (`ThemeBadge`, `ThemeBadgeList`, `ThemeSelect`, `ThemeMultiSelect`, dialogs); rules live in `server/services/theme.service.js`.
+- Reusable UI lives in `src/components/Theme/` (`ThemeBadge`, `ThemeBadgeList`, `ThemeSelect`, `ThemeLibrary`, dialogs); rules live in `server/services/theme.service.js`.
 
-*Les noms de thèmes sont uniques ; chaque histoire a un thème principal ; la page « Thèmes » regroupe la bibliothèque et le calendrier hebdomadaire.*
+*Les noms de thèmes sont uniques ; chaque histoire a un thème principal ; les étiquettes (`/themes`) et le sujet de chaque semaine (`/weekly-themes`) ont chacun leur page.*
 
 ### Versions
 Every save creates a version. Restoring a version first snapshots the current state, so a restore can always be undone; version numbers only go forward.
@@ -197,6 +218,11 @@ Every save creates a version. Restoring a version first snapshots the current st
 
 ### Files / Fichiers
 Images and audio live in `uploads/`. Files are deleted when nothing references them anymore; images uploaded on the create page and never saved are purged automatically after 24 h.
+
+### Backups / Sauvegardes
+**Settings → Storage** writes full backups (data + `uploads/`) to `backups/`, by hand or automatically (daily or weekly, with a retention count). **Settings → Data** exports and imports the same content. Every table is included, the bible of the series too, except the quota statistics (`ai_requests`).
+
+*Les sauvegardes contiennent toutes les données (bible des séries comprise) et les fichiers de `uploads/`, sauf les statistiques de quota.*
 
 ---
 

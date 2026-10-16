@@ -20,13 +20,32 @@ import generationJobRoutes from './routes/generation_jobs.routes.js';
 import { ENV_CONFIG } from './config/env.config.js';
 
 import { requestLogger } from './middleware/requestLogger.js';
+import { allowedOrigins, originGuard } from './middleware/origin.middleware.js';
+import { errorHandler } from './middleware/error.middleware.js';
 
 const app = express();
+app.disable('x-powered-by');
 
-app.use(cors());
-app.use(requestLogger); // Register logger early
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Only the app may call the API from a browser (no login: any other website could reset the data)
+const origins = allowedOrigins();
+app.use(cors({ origin: origins }));
+app.use(requestLogger); // Register logger early (refused requests are logged too)
+app.use(originGuard(origins));
+// Request bodies: 1 MB is far above a story; a PDF export sends whole stories (a book of a year: a few MB).
+// The first parser that matches a route reads the body, the next ones skip it.
+app.use('/api/export/pdf', express.json({ limit: '25mb' }));
+app.use('/api/logs', express.json({ limit: '256kb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+
+// Security headers: no MIME sniffing, no framing, no referrer, resources readable by the app's site only
+app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Referrer-Policy', 'no-referrer');
+    res.set('Cross-Origin-Resource-Policy', 'same-site');
+    next();
+});
 
 // Cache Control Middleware: Disable caching for all API routes
 app.use((req, res, next) => {
@@ -65,5 +84,8 @@ app.use('/api', systemRoutes);
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
+
+// Errors thrown before or outside the route handlers (body too large, invalid JSON): JSON answer
+app.use(errorHandler);
 
 export default app;

@@ -18,8 +18,8 @@ async function fetchAllModels() {
   const models = [];
   let pageToken = '';
   do {
-    const url = `${baseUrl}?key=${apiKey}&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`;
-    const response = await fetch(url);
+    const url = `${baseUrl}?pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`;
+    const response = await fetch(url, { headers: { 'x-goog-api-key': apiKey } });
     if (!response.ok) {
         throw new Error(`Error ${response.status}: ${await response.text()}`);
     }

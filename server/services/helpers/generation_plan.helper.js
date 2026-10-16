@@ -41,14 +41,6 @@ export const isIterativeGeneration = (dayOfWeek, age, provider) =>
 export const requestsPerUnit = (dayOfWeek, age, provider) =>
   (isIterativeGeneration(dayOfWeek, age, provider) ? GENERATION_DAYS_FR.length : 1);
 
-/**
- * Stories missing from a week generated in one request (none for a single day).
- * @param {string} dayOfWeek - Requested day, or ALL_WEEK.
- * @param {number} received - Stories found in the answer (saved, failed or skipped).
- */
-export const missingWeekStories = (dayOfWeek, received) =>
-  (dayOfWeek === ALL_WEEK ? Math.max(0, WEEK_STORY_COUNT - received) : 0);
-
 /** Wait before the next request, given when the previous one started (null: no previous request). */
 export const pacingDelay = (previousStart, now, minInterval = GENERATION_MIN_INTERVAL_MS) =>
   (previousStart === null ? 0 : Math.max(0, minInterval - (now - previousStart)));

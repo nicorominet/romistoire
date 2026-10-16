@@ -1,74 +1,56 @@
 
 import express from 'express';
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import readline from 'readline';
-import { logger } from '../config/logger.js';
+import { logger, DEBUG_LOG_FILE } from '../config/logger.js';
+import { readLastLines } from '../lib/tail.js';
 import { systemService } from '../services/system.service.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const LOG_FILE = path.join(__dirname, '../debug/logs.jsonl');
+
+// What the client logger may write (src/lib/logger.ts sends batches of at most 50 entries)
+const CLIENT_LEVELS = { INFO: 'info', WARN: 'warn', ERROR: 'error' };
+const CATEGORY_RE = /^[A-Z][A-Z_]{0,63}$/;
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_BATCH = 100;
 
 /**
  * POST /api/logs
- * Ingest logs from the client.
+ * Ingest logs from the client: a known level, a category like "BATCH_LOGS", a short message.
+ * The body size is capped in app.js; the rate in LIMITS.clientLogs.
  * @param {Object} req.body - Log entry (category, message, data, level).
  * @returns {Object} Success status.
  */
-router.post('/', (req, res) => {
-    const { category, message, data, level } = req.body;
-    
-    // Basic validation
-    if (!category || !message) {
-        return res.status(400).json({ error: 'Missing category or message' });
+router.post('/', LIMITS.clientLogs, (req, res) => {
+    const { category, message, data, level = 'INFO' } = req.body || {};
+    const method = CLIENT_LEVELS[String(level).toUpperCase()];
+
+    if (typeof category !== 'string' || !CATEGORY_RE.test(category)
+        || typeof message !== 'string' || !message || message.length > MAX_MESSAGE_LENGTH || !method) {
+        return res.status(400).json({ error: 'Invalid log entry' });
+    }
+    if (Array.isArray(data?.logs) && data.logs.length > MAX_BATCH) {
+        return res.status(400).json({ error: `At most ${MAX_BATCH} entries per batch` });
     }
 
-    // Use our server logger to write to the file
-    // We add a specific category prefix or flag to know it came from Client
-    logger[level?.toLowerCase() || 'info'](category, message, data);
-
+    logger[method](category, message, data);
     res.status(200).json({ success: true });
 });
 
 /**
  * GET /api/logs
- * Retrieve recent server logs.
- * @param {number} [req.query.limit=500] - Number of logs to return.
- * @returns {Array} List of log entries.
+ * Retrieve recent server logs (the end of the file only: it can grow large with the SQL log on).
+ * @param {number} [req.query.limit=500] - Number of logs to return (5000 at most).
+ * @returns {Array} List of log entries, newest first.
  */
 router.get('/', async (req, res) => {
-    const limit = parseInt(req.query.limit) || 500; // Limit logs specifically for debug console
-    const logs = [];
-
-    if (!fs.existsSync(LOG_FILE)) {
-        return res.json([]);
-    }
-
-    // Efficiently read from end of file would be best, but for debug tool simply reading line by line is okay
-    const fileStream = fs.createReadStream(LOG_FILE);
-    const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity
-    });
-
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 500, 1), 5000);
     try {
-        for await (const line of rl) {
-            try {
-                if (line.trim()) {
-                    logs.push(JSON.parse(line));
-                }
-            } catch (e) {
-                // Ignore parse errors (corrupt lines)
-            }
+        const logs = [];
+        for (const line of await readLastLines(DEBUG_LOG_FILE, limit)) {
+            try { logs.push(JSON.parse(line)); } catch (e) { /* corrupt line */ }
         }
-        
-        // Return only the last N logs, reversed (newest first)
-        const recentLogs = logs.slice(-limit).reverse();
-        res.json(recentLogs);
-
+        res.json(logs.reverse());
     } catch (err) {
         console.error('Error reading log file:', err);
         res.status(500).json({ error: 'Failed to read logs' });
@@ -81,7 +63,7 @@ router.get('/', async (req, res) => {
  * @returns {Object} Success status.
  */
 router.delete('/', (req, res) => {
-    fs.writeFile(LOG_FILE, '', (err) => {
+    fs.writeFile(DEBUG_LOG_FILE, '', (err) => {
         if (err) {
             return res.status(500).json({ error: 'Failed to clear logs' });
         }

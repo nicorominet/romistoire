@@ -42,7 +42,7 @@ export const NetworkSettings = () => {
     // Config State
     // Default config, will be overwritten by API fetch
     const [config, setConfig] = useState<LogConfig>({
-        enableSqlLogging: true,
+        enableSqlLogging: false,
         enableAccessLogging: true,
         minLevel: 'INFO'
     });

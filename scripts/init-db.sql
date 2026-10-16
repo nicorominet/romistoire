@@ -1,10 +1,11 @@
--- Drop database and recreate it
-DROP DATABASE IF EXISTS imagitales;
-CREATE DATABASE imagitales;
-USE imagitales;
+-- Tables of a new installation, created in the current database (DB_NAME in .env).
+-- Run by the server at startup when the "stories" table is missing, or by hand:
+--   mysql -u root -p <database> < scripts/init-db.sql
+-- Never drops anything: every statement is "IF NOT EXISTS" (later columns and tables come from the migrations).
+-- Statements are split on semicolons by the server: never put one inside a string.
 
 -- Create themes table
-CREATE TABLE themes (
+CREATE TABLE IF NOT EXISTS themes (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   -- Comparison key: lowercase, no accents, no leading article (see server/services/helpers/theme_name.helper.js)
@@ -21,7 +22,7 @@ CREATE TABLE themes (
 );
 
 -- Create story_series table
-CREATE TABLE story_series (
+CREATE TABLE IF NOT EXISTS story_series (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
@@ -33,7 +34,7 @@ CREATE TABLE story_series (
 );
 
 -- Create stories table
-CREATE TABLE stories (
+CREATE TABLE IF NOT EXISTS stories (
   id VARCHAR(36) PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
@@ -49,11 +50,14 @@ CREATE TABLE stories (
   audio_path VARCHAR(255) NULL,
   illustration_prompt TEXT NULL,
   series_id VARCHAR(36) NULL,
-  CONSTRAINT fk_stories_series FOREIGN KEY (series_id) REFERENCES story_series(id) ON DELETE SET NULL
+  CONSTRAINT fk_stories_series FOREIGN KEY (series_id) REFERENCES story_series(id) ON DELETE SET NULL,
+  INDEX idx_stories_age_group (age_group),
+  INDEX idx_stories_week_number (week_number),
+  INDEX idx_stories_locale (locale)
 );
 
 -- Create story_themes junction table
-CREATE TABLE story_themes (
+CREATE TABLE IF NOT EXISTS story_themes (
   id VARCHAR(36) PRIMARY KEY,
   story_id VARCHAR(36) NOT NULL,
   theme_id VARCHAR(36) NOT NULL,
@@ -61,11 +65,13 @@ CREATE TABLE story_themes (
   created_at DATETIME NOT NULL,
   FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
   FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_story_theme (story_id, theme_id)
+  UNIQUE KEY unique_story_theme (story_id, theme_id),
+  INDEX idx_story_themes_story_id (story_id),
+  INDEX idx_story_themes_theme_id (theme_id)
 );
 
 -- Create story versions table
-CREATE TABLE story_versions (
+CREATE TABLE IF NOT EXISTS story_versions (
   id VARCHAR(36) PRIMARY KEY,
   story_id VARCHAR(36) NOT NULL,
   title VARCHAR(255) NOT NULL,
@@ -74,11 +80,12 @@ CREATE TABLE story_versions (
   created_at DATETIME NOT NULL,
   version INT NOT NULL,
   is_manually_edited BOOLEAN DEFAULT FALSE,
-  FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
+  FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+  INDEX idx_story_versions_story_id (story_id)
 );
 
 -- Create story_version_themes junction table
-CREATE TABLE story_version_themes (
+CREATE TABLE IF NOT EXISTS story_version_themes (
   id VARCHAR(36) PRIMARY KEY,
   story_version_id VARCHAR(36) NOT NULL,
   theme_id VARCHAR(36) NOT NULL,
@@ -86,11 +93,13 @@ CREATE TABLE story_version_themes (
   created_at DATETIME NOT NULL,
   FOREIGN KEY (story_version_id) REFERENCES story_versions(id) ON DELETE CASCADE,
   FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_version_theme (story_version_id, theme_id)
+  UNIQUE KEY unique_version_theme (story_version_id, theme_id),
+  INDEX idx_story_version_themes_version_id (story_version_id),
+  INDEX idx_story_version_themes_theme_id (theme_id)
 );
 
 -- Create illustrations table
-CREATE TABLE illustrations (
+CREATE TABLE IF NOT EXISTS illustrations (
   id VARCHAR(36) PRIMARY KEY,
   story_id VARCHAR(36) NOT NULL,
   position INT NOT NULL,
@@ -102,21 +111,10 @@ CREATE TABLE illustrations (
 );
 
 -- Create weekly_themes table
-CREATE TABLE weekly_themes (
+CREATE TABLE IF NOT EXISTS weekly_themes (
   week_number INT PRIMARY KEY,
   -- Topic of the week (free text, not a story theme/tag)
   theme_name VARCHAR(255) NOT NULL,
   theme_description TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Create indexes for performance
-CREATE INDEX idx_stories_age_group ON stories(age_group);
-CREATE INDEX idx_stories_week_number ON stories(week_number);
-CREATE INDEX idx_stories_locale ON stories(locale);
-CREATE INDEX idx_story_versions_story_id ON story_versions(story_id);
-CREATE INDEX idx_story_themes_story_id ON story_themes(story_id);
-CREATE INDEX idx_story_themes_theme_id ON story_themes(theme_id);
-CREATE INDEX idx_story_version_themes_version_id ON story_version_themes(story_version_id);
-CREATE INDEX idx_story_version_themes_theme_id ON story_version_themes(theme_id);
-CREATE INDEX idx_illustrations_story_id ON illustrations(story_id);

@@ -153,9 +153,6 @@ export const extractWeekContext = (text) => {
   };
 };
 
-/** Plan of the week only (see extractWeekContext). */
-export const extractWeekPlan = (text) => extractWeekContext(text).weekPlan;
-
 /** A copied opening shorter than this (in characters) is left alone. */
 const MIN_REPEATED_LENGTH = 20;
 
@@ -350,7 +347,7 @@ export const removeRepeatedOpening = (paragraphs, previousEnding) => {
  * Parses and normalizes a structured story answer.
  * @param {string} text - Raw model answer.
  * @returns {Array<{day: string|null, title: string, summary: string, themes: Object[], paragraphs: string[], illustrationPrompt: string}>|null}
- *   Normalized stories, or null when the answer is not usable JSON (caller falls back to the text parser).
+ *   Normalized stories, or null when the answer is not usable JSON (no story can be saved from it).
  */
 export const parseStoryOutput = (text) => {
   const json = extractJson(text);

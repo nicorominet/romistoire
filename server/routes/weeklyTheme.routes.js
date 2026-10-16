@@ -1,5 +1,6 @@
 import express from 'express';
 import * as weeklyThemeController from '../controllers/weeklyTheme.controller.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.get('/', weeklyThemeController.getWeeklyThemes);
 
 /**
  * POST /api/weekly-themes
- * Batch update: [{ week_number, theme_name, theme_description? }] (legacy).
+ * Batch update: [{ week_number, theme_name, theme_description? }] (topics accepted in the AI suggestion dialog).
  */
 router.post('/', weeklyThemeController.updateWeeklyThemes);
 
@@ -24,7 +25,7 @@ router.post('/', weeklyThemeController.updateWeeklyThemes);
  * AI topic suggestions for the given weeks (not saved).
  * @param {number[]} req.body.weeks
  */
-router.post('/suggest', weeklyThemeController.suggestWeekThemes);
+router.post('/suggest', LIMITS.aiText, weeklyThemeController.suggestWeekThemes);
 
 router.put('/:week', weeklyThemeController.setWeekTheme);
 

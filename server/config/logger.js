@@ -9,14 +9,18 @@ const __dirname = path.dirname(__filename);
 
 const LOG_DIR = path.join(__dirname, '../debug');
 const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
+export const DEBUG_LOG_FILE = LOG_FILE;
+// Beyond this size, the file is renamed logs.1.jsonl (replacing the previous one) by the hourly maintenance
+export const DEBUG_LOG_MAX_BYTES = 20 * 1024 * 1024;
 // Persisted settings (Settings > Network > Config): read at startup, rewritten on every update
 const CONFIG_FILE = path.join(__dirname, 'log-config.json');
 
 // From least to most severe: entries below config.minLevel are dropped
 const LEVELS = ['INFO', 'WARN', 'ERROR'];
 
+// SQL log off by default: one line per query, useful only while debugging
 const DEFAULT_CONFIG = {
-    enableSqlLogging: true,
+    enableSqlLogging: false,
     enableAccessLogging: true,
     minLevel: 'INFO'
 };
@@ -33,6 +37,11 @@ const pickConfig = (values = {}) => {
     if (LEVELS.includes(values.minLevel)) picked.minLevel = values.minLevel;
     return picked;
 };
+
+// Created at startup: fs.appendFile does not create it (a fresh clone has no server/debug/)
+if (ENV_CONFIG.FILE_LOGGING) {
+    try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (err) { console.error('Failed to create log directory:', err); }
+}
 
 const loadConfig = () => {
     try {
@@ -57,6 +66,22 @@ export function updateLoggerConfig(newConfig) {
         console.error('Failed to write log config:', err);
     }
     return config;
+}
+
+/**
+ * Keeps the debug log under DEBUG_LOG_MAX_BYTES: the current file becomes logs.1.jsonl, a new one starts.
+ * @returns {Promise<boolean>} true when the file was rotated.
+ */
+export async function rotateDebugLog(maxBytes = DEBUG_LOG_MAX_BYTES, file = LOG_FILE) {
+    try {
+        const { size } = await fs.promises.stat(file);
+        if (size <= maxBytes) return false;
+        await fs.promises.rename(file, file.replace(/\.jsonl$/, '.1.jsonl'));
+        return true;
+    } catch (err) {
+        if (err.code === 'ENOENT') return false;
+        throw err;
+    }
 }
 
 /**
@@ -94,9 +119,6 @@ export function log(category, message, data = {}, level = 'INFO') {
 
     const line = JSON.stringify(entry) + '\n';
 
-    // Ensure directory exists (sync check is fast enough for low freq logging, 
-    // but better to rely on startup creation. We added mkdir in previous step)
-    
     if (ENV_CONFIG.FILE_LOGGING) {
         fs.appendFile(LOG_FILE, line, (err) => {
             if (err) {

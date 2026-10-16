@@ -1,6 +1,7 @@
 import express from 'express';
 import { handleError } from '../middleware/error.middleware.js';
 import { backupService } from '../services/backup.service.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get('/', async (req, res) => {
  * POST /api/backups
  * Writes a backup now (then applies the retention of the settings).
  */
-router.post('/', async (req, res) => {
+router.post('/', LIMITS.backup, async (req, res) => {
   try {
     res.json(await backupService.runBackup());
   } catch (error) {

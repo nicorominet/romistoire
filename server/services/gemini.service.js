@@ -324,9 +324,10 @@ class GeminiService {
             let response;
             try {
                 console.log(`[Gemini] ${label}: model ${model} (attempt ${attempt + 1})`);
-                response = await fetch(`${this.baseUrl}/${model}:generateContent?key=${this.apiKey}`, {
+                // Key in a header, never in the URL (URLs end up in error messages and logs)
+                response = await fetch(`${this.baseUrl}/${model}:generateContent`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
                     body: JSON.stringify(typeof body === 'function' ? body(model, { thinking }) : body),
                     signal: AbortSignal.timeout(timeoutMs)
                 });

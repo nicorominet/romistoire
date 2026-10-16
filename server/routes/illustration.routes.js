@@ -1,5 +1,6 @@
 import express from 'express';
 import * as illustrationController from '../controllers/illustration.controller.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get('/export', illustrationController.exportPrompts);
  * POST /api/illustrations/:storyId/prompt
  * Writes the illustration description of a story with the AI and saves it.
  */
-router.post('/:storyId/prompt', illustrationController.generatePrompt);
+router.post('/:storyId/prompt', LIMITS.aiText, illustrationController.generatePrompt);
 
 /**
  * PUT /api/illustrations/:storyId/prompt { prompt }

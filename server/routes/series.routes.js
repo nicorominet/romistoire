@@ -4,6 +4,7 @@ import { handleError } from '../middleware/error.middleware.js';
 import { seriesCastService } from '../services/series_cast.service.js';
 import { seriesAuditService } from '../services/series_audit.service.js';
 import { defaultProvider } from '../services/settings.service.js';
+import { LIMITS } from '../middleware/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -87,7 +88,6 @@ router.post('/:id/casts/validate', handle(req => seriesCastService.validate(req.
 /** POST /api/series/:id/casts - 400 with { errors, warnings } when the cast is not consistent. */
 router.post('/:id/casts', handle(req => seriesCastService.create(req.params.id, req.body || {}), 201));
 
-router.get('/casts/:castId', handle(req => seriesCastService.get(req.params.castId)));
 router.put('/casts/:castId', handle(req => seriesCastService.update(req.params.castId, req.body || {})));
 router.delete('/casts/:castId', handle(async req => ({ success: await seriesCastService.delete(req.params.castId) })));
 
@@ -106,7 +106,7 @@ router.get('/casts/:castId/recaps', handle(req => seriesCastService.listRecaps(r
  * its audit and the facts it proposes.
  * @param {Object} req.body - { ageGroup, weekNumber, useAI? }
  */
-router.post('/casts/:castId/audit', handle(req => seriesAuditService.auditStoredWeek({
+router.post('/casts/:castId/audit', LIMITS.aiText, handle(req => seriesAuditService.auditStoredWeek({
   castId: req.params.castId,
   ageGroup: String(req.body?.ageGroup || ''),
   weekNumber: Number(req.body?.weekNumber),

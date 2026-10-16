@@ -1,17 +1,12 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 import { migrateThemes } from './theme.migration.js';
 import { migrateGeneration } from './generation.migration.js';
 import { migrateSeriesCasts } from './series_cast.migration.js';
+import { INIT_SCRIPT_PATH, readInitStatements } from './init_script.js';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -22,7 +17,8 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true, // Ensure this is enabled for init scripts
+  // One statement per query (the init script is split by init_script.js): an injected "; DROP ..." cannot run
+  multipleStatements: false,
   // The app writes every DATETIME as a UTC string ("2026-10-09 12:47:05"): read them back as UTC too
   // (the default, local time, shifted every displayed time by the server offset)
   timezone: 'Z'
@@ -67,19 +63,28 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 
+/**
+ * Query parameters as written in the logs: long texts (a whole story) are cut, so the logs hold
+ * neither the library content nor megabytes per query.
+ */
+export const summarizeParams = (params = []) => params.map((value) =>
+  (typeof value === 'string' && value.length > 80 ? `${value.slice(0, 80)}… (${value.length} chars)` : value));
+
 export async function query(sql, params = []) {
   const start = Date.now();
   try {
     const [results] = await pool.execute(sql, params);
     const duration = Date.now() - start;
     
-    // Log successful query
-    logger.info('DB', 'Query Executed', {
-        sql: sql.substring(0, 1000), // Truncate very long queries
-        params: JSON.stringify(params), 
-        duration: `${duration}ms`,
-        rows: Array.isArray(results) ? results.length : 0
-    });
+    // Log successful query (SQL log off by default: Settings > Network > Config)
+    if (logger.getConfig().enableSqlLogging) {
+      logger.info('DB', 'Query Executed', {
+          sql: sql.substring(0, 1000), // Truncate very long queries
+          params: JSON.stringify(summarizeParams(params)),
+          duration: `${duration}ms`,
+          rows: Array.isArray(results) ? results.length : 0
+      });
+    }
 
     return results;
   } catch (error) {
@@ -87,16 +92,16 @@ export async function query(sql, params = []) {
     
     // Log error
     logger.error('DB', 'Query Failed', {
-        sql,
-        params,
+        sql: sql.substring(0, 1000),
+        params: summarizeParams(params),
         error: error.message,
         duration: `${duration}ms`
     });
 
     console.error('Database query error:', {
       message: error.message,
-      sql: error.sql,
-      parameters: params
+      sql: sql.substring(0, 1000),
+      parameters: summarizeParams(params)
     });
     throw error;
   }
@@ -126,26 +131,21 @@ export async function initializeDatabase() {
     const tableList = tables.map((row) => Object.values(row)[0]);
     if (!tableList.includes('stories')) {
       console.log('Initializing database tables...');
-      
-      // Adjust path to point to root/scripts
-      const scriptPath = path.join(__dirname, '../../scripts/init-db.sql');
-      
-      if (fs.existsSync(scriptPath)) {
-        const initScript = fs.readFileSync(scriptPath, 'utf8');
-        const statements = initScript.split(';').filter((stmt) => stmt.trim().length > 0);
+      const statements = readInitStatements();
+      if (statements) {
         for (const stmt of statements) {
             await pool.query(stmt);
         }
         console.log('Database initialization complete');
       } else {
-        console.warn('Init script not found at:', scriptPath);
+        console.warn('Init script not found at:', INIT_SCRIPT_PATH);
       }
     }
 
-    // Migrations
+    // Migrations (tableList is read before the init script: a new database already has these tables)
     if (!tableList.includes('story_series')) {
       await pool.query(`
-        CREATE TABLE story_series (
+        CREATE TABLE IF NOT EXISTS story_series (
           id VARCHAR(36) PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           description TEXT,
@@ -247,12 +247,13 @@ export async function initializeDatabase() {
       await migrateThemes(pool);
       await migrateSeriesCasts(pool);
     } catch (migError) {
+       // The server must not run on a half-migrated schema: startup stops here
        console.error("Migration Failed:", migError);
-       fs.writeFileSync(path.join(__dirname, '../../migration_debug.log'), `Migration Error: ${migError.message}\n${migError.stack}`);
+       throw migError;
     }
 
   } catch (error) {
     console.error('Database initialization error:', error);
-    throw new Error('Failed to initialize database');
+    throw new Error(`Failed to initialize database: ${error.message}`);
   }
 }

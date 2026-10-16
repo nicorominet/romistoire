@@ -2,7 +2,6 @@
 TITLE Imagitales Launcher
 CLS
 
-t
 ECHO ===================================================
 ECHO      IMAGITALES - AUTOMATED LAUNCHER
 ECHO ===================================================
@@ -31,14 +30,8 @@ timeout /t 5 /nobreak >NUL
 
 :: 4. Open Browser
 ECHO [4/4] Opening Web Application...
-:: Using timeout to ensure Vite has time to bind port. 
-:: Standard Vite port is usually 5173 or 8080 depending on config.
-:: The previous log showed http://localhost:8885/ but let's assume one.
-:: We will try to open the one from console output usually, but hardcoding localhost based on assumption.
-:: Let's assume standard Vite dynamic port or the one seen in logs previously (localhost:8885).
-:: If dynamic, just opening 'http://localhost:5173' might fail if it picked another.
-:: Best guess is to let the user click or try standard.
-start http://localhost:8080
+:: Vite dev server port (vite.config.ts)
+start http://localhost:8885
 
 ECHO.
 ECHO ===================================================

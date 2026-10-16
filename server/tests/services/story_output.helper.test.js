@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assignWeekDays, cleanStoryParagraphs, isPlaceholderStory, splitParagraphsForAge, countRepetitiveOpenings, openingPattern, removeStutter, extractJson, extractWeekContext, extractWeekPlan, parseStoryOutput, removeRepeatedOpening, splitLongParagraph } from '../../services/helpers/story_output.helper.js';
+import { assignWeekDays, cleanStoryParagraphs, isPlaceholderStory, splitParagraphsForAge, countRepetitiveOpenings, openingPattern, removeStutter, extractJson, extractWeekContext, parseStoryOutput, removeRepeatedOpening, splitLongParagraph } from '../../services/helpers/story_output.helper.js';
 
 const story = (overrides = {}) => ({
   day: 'Lundi',
@@ -70,19 +70,19 @@ describe('parseStoryOutput', () => {
   });
 });
 
-describe('extractWeekPlan', () => {
+describe('extractWeekContext: week plan', () => {
   const days = ['Lundi : Léo trouve une carte', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((d, i) => (i === 0 ? d : `Étape ${i + 1}`));
 
   it('should read the 7 lines of the plan, without a leading day name', () => {
-    const plan = extractWeekPlan(JSON.stringify({ week_plan: days, stories: [] }));
+    const plan = extractWeekContext(JSON.stringify({ week_plan: days, stories: [] })).weekPlan;
     expect(plan).toHaveLength(7);
     expect(plan[0]).toBe('Léo trouve une carte');
   });
 
   it('should ignore a missing or incomplete plan', () => {
-    expect(extractWeekPlan(JSON.stringify({ stories: [] }))).toBeNull();
-    expect(extractWeekPlan(JSON.stringify({ week_plan: days.slice(0, 5), stories: [] }))).toBeNull();
-    expect(extractWeekPlan('pas de JSON')).toBeNull();
+    expect(extractWeekContext(JSON.stringify({ stories: [] })).weekPlan).toBeNull();
+    expect(extractWeekContext(JSON.stringify({ week_plan: days.slice(0, 5), stories: [] })).weekPlan).toBeNull();
+    expect(extractWeekContext('pas de JSON').weekPlan).toBeNull();
   });
 });
 

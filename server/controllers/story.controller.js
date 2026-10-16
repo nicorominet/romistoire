@@ -94,15 +94,6 @@ export const restoreStoryVersion = async (req, res) => {
   }
 };
 
-export const generateAIStory = async (req, res) => {
-  try {
-    const result = await storyService.generateFromAI(req.body, req.body.aiProvider);
-    res.json(result);
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
 export const getOllamaModels = async (req, res) => {
     try {
         const models = await storyService.getOllamaModels();

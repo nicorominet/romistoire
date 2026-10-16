@@ -35,19 +35,8 @@ class StorySeriesHelper {
     }
 
     /**
-     * Detects collisions and handles branching/aliasing logic.
-     * @param {Object} connection - DB connection.
-     * @param {Object} storySlot - { weekNumber, dayOrder, ageGroup, locale, seriesId, excludeStoryId }
-     *   excludeStoryId: story being updated, so it never collides with itself.
-     * @param {string} seriesName - Current series name for alias naming.
-     * @returns {Promise<string|null>} Output series ID (branched if necessary).
-     */
-    async handleCollisions(connection, slot, seriesName) {
-        return (await this.resolveSlot(connection, slot, seriesName)).seriesId;
-    }
-
-    /**
-     * Same as handleCollisions, but also tells whether the story was moved to an alias series,
+     * Series of a story saved into a slot: an alias series when the slot is already taken in its series.
+     * Also tells whether the story was moved to an alias series,
      * so the client can warn the user.
      * A story collides only with stories of the same series (no series = only stories without series).
      * @returns {Promise<{seriesId: string|null, alias: {id: string, name: string}|null}>}

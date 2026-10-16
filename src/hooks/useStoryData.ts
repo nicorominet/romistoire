@@ -46,11 +46,8 @@ const useStoryData = ({ id }: UseStoryDataProps): UseStoryDataResult => {
     refetchStory();
   }, [refetchStory]);
 
-  const addIllustrationToBackend = async (
-    file: File,
-    filename?: string,
-    fileType?: string
-  ) => {
+  // File name and type come with the file itself (the create page keeps them for its local list)
+  const addIllustrationToBackend = async (file: File) => {
     if (!id) {
       toast.error(i18n.t("create.illustrate.error.missingStory"));
       return;

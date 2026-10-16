@@ -22,7 +22,6 @@ import { SelectedTheme } from "@/components/Theme/ThemeSelect";
 // Shared Components
 import StoryContent from "@/components/Story/StoryEditor/StoryContent";
 import StoryIllustrations from "@/components/Story/StoryEditor/StoryIllustrations";
-// Preview Tab remains from CreateStory for now as it's simple display
 import StoryPreviewTab from "@/components/Story/CreateStory/StoryPreviewTab";
 
 import { storyApi } from "@/api/stories.api";

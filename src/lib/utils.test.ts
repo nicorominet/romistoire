@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { cn, getAgeGroupColor, stripHtmlTags, formatDate, truncateText, readingStats } from './utils';
+import { cn, getAgeGroupColor, formatDate, truncateText, readingStats } from './utils';
 
 describe('utils', () => {
   describe('cn', () => {
@@ -26,24 +26,6 @@ describe('utils', () => {
 
     it('should return default color for unknown age group', () => {
       expect(getAgeGroupColor('unknown')).toContain('bg-gray-100');
-    });
-  });
-
-  describe('stripHtmlTags', () => {
-    it('should remove simple tags', () => {
-      expect(stripHtmlTags('<p>Hello</p>')).toBe('Hello');
-    });
-
-    it('should remove nested tags', () => {
-      expect(stripHtmlTags('<div><p>Hello <b>World</b></p></div>')).toBe('Hello World');
-    });
-
-    it('should handle empty string', () => {
-      expect(stripHtmlTags('')).toBe('');
-    });
-
-    it('should handle strings without tags', () => {
-      expect(stripHtmlTags('Hello World')).toBe('Hello World');
     });
   });
 

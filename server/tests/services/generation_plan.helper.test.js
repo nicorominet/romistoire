@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { ALL_WEEK } from '../../services/helpers/prompt.helper.js';
 import {
   buildDayParams, countWords, emptyWeekContext, GENERATION_MIN_INTERVAL_MS, isIterativeGeneration, isShortStory,
-  missingWeekStories, pacingDelay, paragraphsToHtml, requestsPerUnit, storyEnding, storyOpening
+  pacingDelay, paragraphsToHtml, requestsPerUnit, storyEnding, storyOpening
 } from '../../services/helpers/generation_plan.helper.js';
 import { monthOfWeek, parseTopicSuggestions, buildTopicSuggestionPrompt } from '../../services/helpers/topic_suggestion.helper.js';
 
@@ -31,12 +31,6 @@ describe('generation plan', () => {
     expect(isShortStory(630, { min: 900, max: 1100 })).toBe(true); // 70 %: the usual shortfall
     expect(isShortStory(700, { min: 900, max: 1100 })).toBe(false);
     expect(isShortStory(10, undefined)).toBe(false);
-  });
-
-  it('counts the stories missing from a week generated in one request', () => {
-    expect(missingWeekStories(ALL_WEEK, 1)).toBe(6);
-    expect(missingWeekStories(ALL_WEEK, 7)).toBe(0);
-    expect(missingWeekStories('Lundi', 1)).toBe(0);
   });
 
   it('turns paragraphs into escaped editor HTML', () => {

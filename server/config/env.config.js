@@ -7,16 +7,13 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Root of the server directory (d:\appli-coding\lovable\imagitales\server)
+// <project>/server
 const SERVER_ROOT = path.resolve(__dirname, '..');
 
-// Root of the project (d:\appli-coding\lovable\imagitales)
+// Root of the project (uploads, backups and logs are relative to it)
 export const PROJECT_ROOT = path.resolve(SERVER_ROOT, '..');
 
 export const ENV_CONFIG = {
-  PORT: process.env.API_PORT || process.env.PORT || 3001,
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  
   // Absolute path to uploads directory
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),
   // Automatic and manual backups (Settings > Storage)
