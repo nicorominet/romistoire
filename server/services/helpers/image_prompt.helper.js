@@ -7,7 +7,6 @@
 import { castLookBlock, characterLook } from './cast_look.helper.js';
 
 const CODE_LENGTH = 8;
-const CODE_PATTERN = /IMG-([0-9a-f]{8})/i;
 
 export const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 

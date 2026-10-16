@@ -35,15 +35,20 @@ class BackupService {
    * @returns {Promise<{filename: string, size: number, createdAt: string, removed: string[]}>}
    */
   async runBackup({ keep = settingsService.storage.autoBackup.keep } = {}) {
-    const { buffer } = await systemService.exportData(true);
     await fs.promises.mkdir(ENV_CONFIG.BACKUPS_DIR, { recursive: true });
     const filename = backupName();
     const filePath = path.join(ENV_CONFIG.BACKUPS_DIR, filename);
     // Written next to the target first: an interrupted write never looks like a valid backup
-    await fs.promises.writeFile(`${filePath}.tmp`, buffer);
-    await fs.promises.rename(`${filePath}.tmp`, filePath);
+    try {
+      await systemService.writeFullExport(`${filePath}.tmp`);
+      await fs.promises.rename(`${filePath}.tmp`, filePath);
+    } catch (error) {
+      await fs.promises.unlink(`${filePath}.tmp`).catch(() => {});
+      throw error;
+    }
+    const { size } = await fs.promises.stat(filePath);
     const removed = await this.applyRetention(keep);
-    return { filename, size: buffer.length, createdAt: new Date().toISOString(), removed };
+    return { filename, size, createdAt: new Date().toISOString(), removed };
   }
 
   /**
@@ -68,6 +73,17 @@ class BackupService {
     const filePath = path.join(ENV_CONFIG.BACKUPS_DIR, filename);
     if (!fs.existsSync(filePath)) throw new NotFoundError('Backup not found');
     return filePath;
+  }
+
+  /**
+   * Imports a backup of the server into the library (no upload: the file stays in backups/).
+   * @param {'skip'|'overwrite'} [mode='skip'] - skip: rows already present are kept.
+   * @returns {Promise<{success: boolean, inserted: number, skipped: number, failed: number}>}
+   */
+  async restoreBackup(filename, mode = 'skip') {
+    if (!['skip', 'overwrite'].includes(mode)) throw new ValidationError('mode must be skip or overwrite');
+    const filePath = this.resolve(filename);
+    return systemService.importData({ path: filePath, filename, mimetype: 'application/zip' }, mode, { keepSource: true });
   }
 
   async deleteBackup(filename) {

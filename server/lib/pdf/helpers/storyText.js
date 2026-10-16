@@ -12,10 +12,12 @@ const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", 
  * @returns {string}
  */
 export const pdfSafe = (text) => String(text || '')
-  .replace(/[   ]/g, ' ')
-  .replace(/[​-‍⁠️]/g, '')
+  .replace(/[\u202F\u2007\u2009\u00A0]/g, ' ')
+  // Zero-width characters and the emoji variation selector (U+FE0F), removed one by one
+  // oxlint-disable-next-line no-misleading-character-class
+  .replace(/[\u200B-\u200D\u2060\uFE0F]/g, '')
   .replace(/[\u{10000}-\u{10FFFF}]/gu, '')
-  .replace(/[←-⯿]/g, '')
+  .replace(/[\u2190-\u2BFF]/g, '')
   .replace(/[ \t]+/g, ' ')
   // A removed emoji must not leave "riant ." behind
   .replace(/ +([.,)])/g, '$1')

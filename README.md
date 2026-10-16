@@ -126,6 +126,14 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
    This command starts both the backend API and the Vite frontend concurrently.
    *Cette commande lance simultanément l'API backend et le frontend Vite.*
 
+6. **Production (optional) / Production (facultatif)**
+   ```bash
+   npm run build
+   NODE_ENV=production npm start
+   ```
+   The API then serves the built app itself on `http://127.0.0.1:3001` (one origin, Content-Security-Policy on the pages, no Vite).
+   *L'API sert alors elle-même l'application compilée, avec une politique de sécurité du contenu.*
+
 ---
 
 ## 📜 Scripts
@@ -136,13 +144,16 @@ imagitales est une plateforme éducative interactive conçue pour aider les enfa
 | `npm run dev:api` | Start only backend with watch mode |
 | `npm run dev:vite` | Start only frontend |
 | `npm run build` | Build frontend for production |
-| `npm start` | Start the backend (production) |
+| `npm start` | Start the backend (with `NODE_ENV=production`, it also serves `dist/`) |
 | `npm run preview` | Preview the production build |
-| `npm run lint` | Run ESLint (no configuration yet: see `docs/audit-code-mort-securite.md`, phase 4) |
+| `npm run lint` | Lint with oxlint (`.oxlintrc.json`: errors fail, React advice stays as warnings) |
+| `npm run deadcode` | Unused files, exports and dependencies (knip, `knip.json`) |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm test` | Run all tests (client + server) |
 | `npm run test:client` | Run client tests (Vitest, jsdom) |
 | `npm run test:server` | Run server tests (Vitest, node) |
+
+The same checks run on every pull request (`.github/workflows/ci.yml`). Code shared by the client and the server (age groups, theme name rules, accepted images) lives in `shared/`.
 
 ---
 
@@ -220,7 +231,7 @@ Every save creates a version. Restoring a version first snapshots the current st
 Images and audio live in `uploads/`. Files are deleted when nothing references them anymore; images uploaded on the create page and never saved are purged automatically after 24 h.
 
 ### Backups / Sauvegardes
-**Settings → Storage** writes full backups (data + `uploads/`) to `backups/`, by hand or automatically (daily or weekly, with a retention count). **Settings → Data** exports and imports the same content. Every table is included, the bible of the series too, except the quota statistics (`ai_requests`).
+**Settings → Storage** writes full backups (data + `uploads/`) to `backups/`, by hand or automatically (daily or weekly, with a retention count), as a stream (memory stays flat whatever the library size). **Restore** adds back what a backup holds and the library misses, without downloading it. **Settings → Data** exports and imports the same content (imports up to `MAX_IMPORT_MB`, 2 GB by default). Every table is included, the bible of the series too, except the quota statistics (`ai_requests`).
 
 *Les sauvegardes contiennent toutes les données (bible des séries comprise) et les fichiers de `uploads/`, sauf les statistiques de quota.*
 

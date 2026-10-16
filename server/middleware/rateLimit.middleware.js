@@ -47,5 +47,7 @@ export const LIMITS = {
   clientLogs: rateLimit('client-logs', 120) // the client sends a batch every 2 s at most
 };
 
-/** Test helper: forgets every window. */
+/** Test helper: forgets every window.
+ * @internal
+ */
 export const resetRateLimits = () => windows.clear();

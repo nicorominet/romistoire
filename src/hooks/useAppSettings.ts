@@ -41,8 +41,13 @@ export const useBackups = () => {
     const stats = useQuery({ queryKey: STORAGE_STATS_QUERY_KEY, queryFn: () => settingsApi.getStorageStats() });
 
     const runBackup = useMutation({ mutationFn: () => settingsApi.runBackup(), onSuccess: refresh });
+    // A restore changes the whole library: every query is read again
+    const restoreBackup = useMutation({
+        mutationFn: (filename: string) => settingsApi.restoreBackup(filename),
+        onSuccess: () => queryClient.invalidateQueries(),
+    });
     const deleteBackup = useMutation({ mutationFn: (filename: string) => settingsApi.deleteBackup(filename), onSuccess: refresh });
     const clearDebugLog = useMutation({ mutationFn: () => settingsApi.clearDebugLog(), onSuccess: refresh });
 
-    return { backups, stats, runBackup, deleteBackup, clearDebugLog };
+    return { backups, stats, runBackup, restoreBackup, deleteBackup, clearDebugLog };
 };

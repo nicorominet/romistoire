@@ -90,10 +90,10 @@ class LocalLLMService {
 
         return { text: data.response, model: targetModel, finishReason, truncated };
 
-    } catch (error) {
-        if (error.name === 'TimeoutError') {
-            error = new Error(`Ollama did not answer within ${Math.round(this.timeoutMs / 1000)}s (model ${targetModel}).`);
-        }
+    } catch (caught) {
+        const error = caught.name === 'TimeoutError'
+            ? new Error(`Ollama did not answer within ${Math.round(this.timeoutMs / 1000)}s (model ${targetModel}).`)
+            : caught;
         console.error('[LocalLLM] Error:', error);
         const duration = Date.now() - startTime;
         logger.ai('Ollama', 'Story-Error', { theme, age, day, model: targetModel }, { error: error.message }, { duration, success: false });

@@ -46,7 +46,6 @@ export const THEMES = {
   }
 };
 
-const PDF_STYLES = ['auto', ...Object.keys(THEMES)];
 
 /**
  * Theme of an export: the forced style, or in "auto" the youngest age group of the stories
@@ -230,7 +229,7 @@ export const drawStoryHeader = (doc, ctx, title, meta, y) => {
  * Frame, running header and page number of a page, drawn once all pages exist.
  * @param {{type: 'cover'|'toc'|'story'|'illustration', storyTitle?: string}} info
  */
-export const decoratePage = (doc, ctx, info, pageNumber, total) => {
+export const decoratePage = (doc, ctx, info, pageNumber, _total) => {
   const { theme, family } = ctx;
   const { width, height } = page(doc);
   const { colors } = theme;

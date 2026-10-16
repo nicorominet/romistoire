@@ -44,7 +44,7 @@ L'audit a en revanche trouvé **4 problèmes sérieux**, à traiter avant tout n
 | 1 : nettoyage du code mort | ✅ Fait. Gardés volontairement : migration `story_series` (vieilles bases), `/audio` statique (à vérifier en base), redirection `/theme`, composants shadcn | `0ede1d3` |
 | 2 : durcissement | ✅ Fait (2.7 : en-têtes de base ; la CSP viendra avec 4.7, quand Express servira le build) | voir l'historique git |
 | 3 : performances | ✅ Fait : 3.4, 3.6, 3.9 (3.1 en phase 1, 3.5 en phase 2). 3.7 passe en phase 4 avec 0.6. 3.2, 3.3 et 3.8 abandonnés, voir la note de la phase 3 | voir l'historique git |
-| 4 : qualité et outillage | À faire | |
+| 4 : qualité et outillage | ✅ Fait, avec 0.6 et 3.7 (sauvegardes en flux, restauration depuis le serveur, import jusqu'à 2 Go). Écarts : voir la note de la phase 4 | voir l'historique git |
 
 ## Méthode
 
@@ -286,6 +286,13 @@ Une seule PR, qui supprime uniquement du code non référencé et doit garder le
 > **Note après réalisation.** Les points 3.2 et 3.3 reposaient sur une lecture erronée des noms de chunks : Rollup nomme un chunk partagé d'après son premier module. Le chunk « i18n » (307 Ko) contient surtout react-router et axios ; les traductions ne pèsent que 120 Ko non compressés, et charger seulement la langue active ferait gagner environ 15 Ko compressés en rendant le changement de langue asynchrone. Le chunk « StoryIllustrations » (542 Ko) regroupe zod, TipTap, ProseMirror et react-hook-form, et n'est chargé qu'à l'ouverture des pages de création et d'édition, ce qui est déjà le comportement voulu. Le point 3.8 est abandonné aussi : le texte brut est lu à cinq endroits (lecture, éditeur, aperçu, PDF, résumés) et l'import d'un ancien export en réintroduit. Ces branches doivent donc rester, et une migration du contenu ne permettrait de rien supprimer.
 >
 > Mesures du point 3.9 sur 26 000 histoires (MariaDB 10.11) : l'index `idx_stories_coverage (locale, series_id, week_number, age_group, day_order)` fait passer la couverture d'une série de 33 à 11 ms, et la détection de collision de 196 à 3 lignes lues. Un second index dédié à la collision était redondant.
+
+> **Note après réalisation (phase 4).**
+> - 4.1 : ESLint ne peut pas analyser ce projet, car TypeScript 7 n'expose plus d'API JavaScript (typescript-eslint exige TypeScript < 6.1). Le lint passe donc par **oxlint**, qui analyse TS et JSX lui-même. Les règles de justesse sont des erreurs ; les conseils du « React Compiler » (setState dans un effet, composants créés pendant le rendu…) restent des avertissements (une cinquantaine), à corriger au fil des modifications des composants concernés.
+> - 4.3 : `noUnusedLocals`, `noUnusedParameters` et `noFallthroughCasesInSwitch` sont actifs. `strict` reste à activer dossier par dossier.
+> - 4.5 : le serveur écrit ses journaux en un seul point (`server/lib/logFiles.js`). Les messages applicatifs vont dans le journal applicatif (`logs.jsonl`, catégorie SYSTEM) ; `access-*.log` ne contient plus que les requêtes HTTP (l'onglet Accès affichait des lignes vides pour les messages applicatifs).
+> - 0.2 (jeton d'accès) n'est pas fait : l'API n'écoute que sur 127.0.0.1 par défaut et refuse les autres sites. Un jeton ne devient utile que si `API_HOST` l'ouvre au réseau ; il faudrait alors aussi un écran de connexion côté client.
+> - L'import lit encore le ZIP en mémoire (AdmZip) : une sauvegarde de plusieurs gigaoctets demande autant de mémoire pendant la restauration.
 
 ### Ordre conseillé
 

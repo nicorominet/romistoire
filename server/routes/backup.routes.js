@@ -42,6 +42,18 @@ router.get('/:filename', (req, res) => {
 });
 
 /**
+ * POST /api/backups/:filename/restore
+ * Imports the backup into the library. Body: { mode: 'skip' (default, rows already present are kept) | 'overwrite' }.
+ */
+router.post('/:filename/restore', LIMITS.backup, async (req, res) => {
+  try {
+    res.json(await backupService.restoreBackup(req.params.filename, req.body?.mode || 'skip'));
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+/**
  * DELETE /api/backups/:filename
  */
 router.delete('/:filename', async (req, res) => {

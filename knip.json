@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/*.js!",
+    "src/**/*.test.{ts,tsx}",
+    "server/tests/**/*.test.js",
+    "src/setupTests.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,js}!",
+    "server/**/*.js!",
+    "scripts/*.js!",
+    "shared/**/*.js!"
+  ],
+  "ignore": [
+    "src/components/ui/**"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": [
+    "tailwindcss-animate"
+  ]
+}

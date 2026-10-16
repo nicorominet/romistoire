@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Tests (client and server, the database is mocked)
+        run: npm test
+      - name: Dead code (unused files, exports, dependencies)
+        run: npm run deadcode
+      - name: Audit of the production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build
+        run: npm run build

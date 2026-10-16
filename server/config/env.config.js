@@ -19,6 +19,8 @@ export const ENV_CONFIG = {
   // Automatic and manual backups (Settings > Storage)
   BACKUPS_DIR: path.join(PROJECT_ROOT, 'backups'),
   LOGS_DIR: path.join(PROJECT_ROOT, 'server', 'logs'),
+  // Application log (logs.jsonl: server messages, SQL, client logs), shown in the debug console
+  DEBUG_LOG_DIR: path.join(PROJECT_ROOT, 'server', 'debug'),
   PROJECT_ROOT, // Exporting for use where paths are relative to root
 
   // Test runs (Vitest) must not write into the real log files

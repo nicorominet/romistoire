@@ -1,44 +1,21 @@
-import fs from 'fs';
-import path from 'path';
-import { ENV_CONFIG } from '../config/env.config.js';
 import { logger } from '../config/logger.js';
+import { appendLogLine, datedLogFile } from '../lib/logFiles.js';
 
-const LOGS_DIR = path.join(ENV_CONFIG.PROJECT_ROOT, 'server', 'logs');
-
-// Ensure logs directory exists
-if (ENV_CONFIG.FILE_LOGGING && !fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
-}
-
+/** One line per HTTP request in server/logs/access-<date>.log (Settings > Network > Access). */
 export const requestLogger = (req, res, next) => {
-  if (!ENV_CONFIG.FILE_LOGGING) return next();
-  const start = Date.now();
-  const date = new Date();
-  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-  const logFile = path.join(LOGS_DIR, `access-${dateStr}.log`);
-
   // Settings > Network > Config (kept in memory by the logger, persisted in log-config.json)
   if (logger.getConfig().enableAccessLogging === false) return next();
+  const start = Date.now();
 
-  // Hook into response finish to calculate duration and status
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    
-    const logEntry = {
+    appendLogLine(datedLogFile('access'), {
       timestamp: new Date().toISOString(),
       method: req.method,
       url: req.originalUrl || req.url,
       status: res.statusCode,
-      duration,
+      duration: Date.now() - start,
       ip: req.ip,
-      userAgent: req.get('user-agent'),
-      // query: req.query, // Optional: might be noisy
-    };
-
-    const logLine = JSON.stringify(logEntry) + '\n';
-
-    fs.appendFile(logFile, logLine, (err) => {
-      if (err) console.error('Error writing to log file:', err);
+      userAgent: req.get('user-agent')
     });
   });
 

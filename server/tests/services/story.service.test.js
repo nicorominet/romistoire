@@ -30,7 +30,7 @@ describe('StoryService Unit Tests', () => {
             // So db.query will be called multiple times.
             
             // Mock implementation to return different results based on query content
-            db.query.mockImplementation(async (sql, params) => {
+            db.query.mockImplementation(async (sql) => {
                 if (sql.includes('COUNT(*)')) return [{ total: 1 }];
                 if (sql.includes('FROM stories')) return mockStories;
                 if (sql.includes('FROM illustrations')) return [];
@@ -48,7 +48,7 @@ describe('StoryService Unit Tests', () => {
         });
 
         it('should filter by age group', async () => {
-             db.query.mockImplementation(async (sql, params) => {
+             db.query.mockImplementation(async (sql) => {
                 if (sql.includes('COUNT(*)')) return [{ total: 0 }];
                 if (sql.includes('FROM stories')) return [];
                 return [];
@@ -59,7 +59,7 @@ describe('StoryService Unit Tests', () => {
         });
 
         it('should filter by search term', async () => {
-            db.query.mockImplementation(async (sql, params) => {
+            db.query.mockImplementation(async (sql) => {
                if (sql.includes('COUNT(*)')) return [{ total: 0 }];
                if (sql.includes('FROM stories')) return [];
                return [];
@@ -225,7 +225,7 @@ describe('StoryService Unit Tests', () => {
 
             await storyService.update('story-1', { title: 'T', content: 'C', age_group: '4-6', week_number: 1, day_order: 1, locale: 'fr', series_name: 'Série A', themes: [] });
 
-            const [sql, params] = updateCall(connection);
+            const [sql] = updateCall(connection);
             expect(sql).toContain('series_id = ?');
             expect(updatedValue(connection, 'series_id')).toBe('series-a');
         });
@@ -257,7 +257,7 @@ describe('StoryService Unit Tests', () => {
 
             await storyService.update('story-1', { title: 'T2', content: 'C', themes: [] });
 
-            const [sql, params] = updateCall(connection);
+            const [sql] = updateCall(connection);
             expect(sql).toContain('illustration_prompt = ?');
             expect(updatedValue(connection, 'illustration_prompt')).toBe('Un escargot sur une feuille');
             delete oldStory.illustration_prompt;

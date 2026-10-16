@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { i18n } from "@/lib/i18n";
 import { safeThemeColor } from "@/utils/themeColors";
-import { findSimilarThemes, matchesThemeSearch } from "@/utils/themeName";
+import { findSimilarThemes, matchesThemeSearch } from "@shared/themeName";
 import { Theme } from "@/types/Theme";
 import { ThemeBadge } from "./ThemeBadge";
 

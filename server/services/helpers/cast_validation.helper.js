@@ -1,5 +1,6 @@
 import { PromptHelper } from './prompt.helper.js';
 import { CALENDAR_WORDS } from './cast_check.helper.js';
+import { AGE_GROUPS } from '../../../shared/ageGroups.js';
 
 /** Name compared without case, accents or punctuation ("Léo" = "leo"). */
 export const nameKey = (name) => String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -9,7 +10,7 @@ export const nameKey = (name) => String(name || '').normalize('NFD').replace(/[�
  * so the stories follow a sheet that holds together (ages of a family, ties both ways, heroes of the right age).
  */
 
-export const CAST_AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
+export const CAST_AGE_GROUPS = AGE_GROUPS;
 /** Ages of the readers of each group: a human hero is about their age. */
 const READER_AGES = { '2-3': [2, 3], '4-6': [4, 6], '7-9': [7, 9], '10-12': [10, 12], '13-15': [13, 15], '16-18': [16, 18] };
 /** A hero may be a little younger or older than the readers (they like heroes slightly older). */

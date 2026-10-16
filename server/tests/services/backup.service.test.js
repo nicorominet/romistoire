@@ -32,7 +32,10 @@ describe('Backups and maintenance', () => {
     ENV_CONFIG.BACKUPS_DIR = path.join(tmpDir, 'backups');
     ENV_CONFIG.LOGS_DIR = path.join(tmpDir, 'logs');
     settingsService.reset();
-    vi.spyOn(systemService, 'exportData').mockResolvedValue({ buffer: Buffer.from('zip-content') });
+    vi.spyOn(systemService, 'writeFullExport').mockImplementation(async (filePath) => {
+      fs.writeFileSync(filePath, 'zip-content');
+      return { filename: 'export.zip', type: 'application/zip' };
+    });
     vi.spyOn(systemService, 'cleanupImages').mockResolvedValue({ success: true, deletedCount: 0, reclaimedSpace: 0 });
   });
 
@@ -50,7 +53,7 @@ describe('Backups and maintenance', () => {
 
     const result = await backupService.runBackup({ keep: 2 });
 
-    expect(systemService.exportData).toHaveBeenCalledWith(true);
+    expect(systemService.writeFullExport).toHaveBeenCalledWith(expect.stringMatching(/\.zip\.tmp$/));
     expect(result.removed).toEqual([oldest]);
     const names = (await backupService.listBackups()).map((b) => b.filename);
     expect(names).toEqual([result.filename, older]);
@@ -96,5 +99,30 @@ describe('Backups and maintenance', () => {
 
     expect(deletedLogs.sort()).toEqual(['access-2026-09-01.log', 'ai-2026-09-01.log']);
     expect(fs.readdirSync(ENV_CONFIG.LOGS_DIR).sort()).toEqual(['access-2026-10-08.log', 'notes.log']);
+  });
+
+  it('restoreBackup imports a backup of the server and keeps the file', async () => {
+    const filename = fakeBackup(new Date('2026-10-10T10:00:00Z'));
+    const importData = vi.spyOn(systemService, 'importData').mockResolvedValue({ success: true, inserted: 3, skipped: 0, failed: 0 });
+
+    expect(await backupService.restoreBackup(filename)).toMatchObject({ inserted: 3 });
+    expect(importData).toHaveBeenCalledWith(
+      { path: path.join(ENV_CONFIG.BACKUPS_DIR, filename), filename, mimetype: 'application/zip' }, 'skip', { keepSource: true });
+    expect(fs.existsSync(path.join(ENV_CONFIG.BACKUPS_DIR, filename))).toBe(true);
+  });
+
+  it('restoreBackup refuses an unknown mode or a name that is not a backup', async () => {
+    const filename = fakeBackup(new Date('2026-10-10T10:00:00Z'));
+    await expect(backupService.restoreBackup(filename, 'drop')).rejects.toBeInstanceOf(ValidationError);
+    await expect(backupService.restoreBackup('../../.env')).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('a failed backup leaves no file behind', async () => {
+    systemService.writeFullExport.mockImplementation(async (filePath) => {
+      fs.writeFileSync(filePath, 'partial');
+      throw new Error('disk full');
+    });
+    await expect(backupService.runBackup({ keep: 2 })).rejects.toThrow('disk full');
+    expect(fs.readdirSync(ENV_CONFIG.BACKUPS_DIR)).toEqual([]);
   });
 });

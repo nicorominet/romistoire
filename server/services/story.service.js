@@ -18,13 +18,13 @@ import { LONG_RATIO, blockingCount, detectDefects, normalizeTypography } from '.
 import { logger } from './logger.service.js';
 import { resolveAudioOptions, validateAudioOptions } from './helpers/voice.helper.js';
 import { NotFoundError, ValidationError } from '../middleware/error.middleware.js';
+import { AGE_GROUPS } from '../../shared/ageGroups.js';
 
 // A single story (or a week whose median story) under SHORT_STORY_RATIO of the minimum length of its age,
 // or an answer with a blocking defect, is asked once more (one more request at most).
 /** Defect instructions added to the second request (the most useful first, a short prompt stays readable). */
 const MAX_DEFECT_HINTS = 6;
 
-const AGE_GROUPS = ['2-3', '4-6', '7-9', '10-12', '13-15', '16-18'];
 const LOCALES = ['fr', 'en'];
 const TITLE_MAX = 255;
 const DAY_ORDERS = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
@@ -106,7 +106,6 @@ const STORY_ORDERS = {
   modified: 's.modified_at DESC',
   title: 's.title ASC'
 };
-const STORY_SORTS = Object.keys(STORY_ORDERS);
 
 /** ORDER BY of a list sort; unknown values give the program order. */
 export const storyOrderBy = (sort) => STORY_ORDERS[sort] ?? STORY_ORDERS.program;

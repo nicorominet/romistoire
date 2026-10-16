@@ -8,7 +8,7 @@
 CREATE TABLE IF NOT EXISTS themes (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  -- Comparison key: lowercase, no accents, no leading article (see server/services/helpers/theme_name.helper.js)
+  -- Comparison key: lowercase, no accents, no leading article (see shared/themeName.js)
   normalized_name VARCHAR(100) NOT NULL,
   description TEXT,
   icon VARCHAR(16),

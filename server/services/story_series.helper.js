@@ -42,10 +42,10 @@ class StorySeriesHelper {
      * @returns {Promise<{seriesId: string|null, alias: {id: string, name: string}|null}>}
      */
     async resolveSlot(connection, { weekNumber, dayOrder, ageGroup, locale, seriesId, excludeStoryId = null }, seriesName) {
-        let finalSeriesId = seriesId;
+        const finalSeriesId = seriesId;
         
         let collisionQuery = 'SELECT id, series_id FROM stories WHERE week_number = ? AND day_order = ? AND age_group = ? AND locale = ?';
-        let collisionParams = [weekNumber, dayOrder, ageGroup, locale];
+        const collisionParams = [weekNumber, dayOrder, ageGroup, locale];
 
         if (excludeStoryId) {
             collisionQuery += ' AND id <> ?';
@@ -64,8 +64,8 @@ class StorySeriesHelper {
         if (collision.length > 0) {
             console.log(`Collision detected for Week ${weekNumber}, Day ${dayOrder}, Age ${ageGroup}. Creating Branch/Alias.`);
             
-            let baseSeriesName = seriesName || "Série Principale";
-            let rootSeriesId = finalSeriesId || null;
+            const baseSeriesName = seriesName || "Série Principale";
+            const rootSeriesId = finalSeriesId || null;
             
             let aliasCounter = 1;
             let resolvedSeriesId = null;

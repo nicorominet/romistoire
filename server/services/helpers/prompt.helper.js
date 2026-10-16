@@ -1,5 +1,5 @@
 import { STORY_DAYS } from './story_schema.js';
-import { normalizeThemeName } from './theme_name.helper.js';
+import { normalizeThemeName } from '../../../shared/themeName.js';
 import { characterLook } from './cast_look.helper.js';
 
 export const ALL_WEEK = "Toute la semaine";

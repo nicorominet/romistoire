@@ -145,12 +145,18 @@ describe('SystemService (settings > data)', () => {
     fs.mkdirSync(uploadsDir);
     fs.writeFileSync(path.join(uploadsDir, 'story.png'), 'image');
     fs.writeFileSync(path.join(uploadsDir, 'story.mp3'), 'audio');
+    fs.mkdirSync(path.join(uploadsDir, '2026-10'));
+    const big = Buffer.alloc(300 * 1024, 7); // several read chunks
+    fs.writeFileSync(path.join(uploadsDir, '2026-10', 'big.webp'), big);
     ENV_CONFIG.PROJECT_ROOT = tmpDir;
     ENV_CONFIG.UPLOADS_DIR = uploadsDir;
 
     try {
-      const result = await systemService.exportData(true);
-      const archive = new AdmZip(result.buffer);
+      const zipPath = path.join(tmpDir, 'export.zip');
+      const result = await systemService.writeFullExport(zipPath);
+      // Written as a stream by fflate, read back by AdmZip (the import)
+      const archive = new AdmZip(zipPath);
+      expect(result).toMatchObject({ type: 'application/zip', filename: expect.stringMatching(/\.zip$/) });
       const data = JSON.parse(archive.readAsText('data.json'));
 
       expect(data).toHaveProperty('weeklyThemes');
@@ -158,6 +164,8 @@ describe('SystemService (settings > data)', () => {
       expect(data).not.toHaveProperty('settings');
       expect(archive.getEntry('images/story.png')).not.toBeNull();
       expect(archive.getEntry('images/story.mp3')).not.toBeNull();
+      expect(archive.readFile('images/2026-10/big.webp').equals(big)).toBe(true);
+      expect(archive.readAsText('images/story.png')).toBe('image');
     } finally {
       ENV_CONFIG.PROJECT_ROOT = originalRoot;
       ENV_CONFIG.UPLOADS_DIR = originalDir;

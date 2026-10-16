@@ -1,3 +1,6 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { systemService } from '../services/system.service.js';
 import { handleError } from '../middleware/error.middleware.js';
 import { settingsService } from '../services/settings.service.js';
@@ -14,7 +17,7 @@ export const importData = async (req, res) => {
 
 export const exportData = async (req, res) => {
   try {
-    const result = await systemService.exportData(false);
+    const result = await systemService.exportData();
     res.setHeader('Content-Type', result.type);
     res.setHeader('Content-Disposition', `attachment; filename=${result.filename}`);
     res.send(result.buffer);
@@ -25,10 +28,11 @@ export const exportData = async (req, res) => {
 
 export const exportFull = async (req, res) => {
   try {
-    const result = await systemService.exportData(true);
-    res.setHeader('Content-Type', result.type);
-    res.setHeader('Content-Disposition', `attachment; filename=${result.filename}`);
-    res.send(result.buffer);
+    // Written to a temporary file as a stream, then sent and removed: memory stays flat
+    const tmpFile = path.join(os.tmpdir(), `romistoire-export-${Date.now()}.zip`);
+    const { filename, type } = await systemService.writeFullExport(tmpFile);
+    res.type(type);
+    res.download(tmpFile, filename, () => fs.promises.unlink(tmpFile).catch(() => {}));
   } catch (error) {
     handleError(res, error);
   }

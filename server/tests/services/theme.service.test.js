@@ -213,7 +213,7 @@ describe('ThemeService', () => {
 
 describe('mergeThemesOnConnection', () => {
   it('should drop duplicate links and keep the primary flag', async () => {
-    const connection = mockConnection((sql, params) => {
+    const connection = mockConnection((sql) => {
       // Story s1 has both themes, the source being its primary theme
       if (sql.includes('FROM story_themes s')) return [{ owner: 's1', is_primary: 1 }];
       return [];

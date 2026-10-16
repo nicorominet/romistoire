@@ -2,14 +2,14 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { appendLogLine } from '../lib/logFiles.js';
 import { ENV_CONFIG } from './env.config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const LOG_DIR = path.join(__dirname, '../debug');
-const LOG_FILE = path.join(LOG_DIR, 'logs.jsonl');
-export const DEBUG_LOG_FILE = LOG_FILE;
+/** Application log file, read at every write (tests point ENV_CONFIG.DEBUG_LOG_DIR elsewhere). */
+export const debugLogFile = () => path.join(ENV_CONFIG.DEBUG_LOG_DIR, 'logs.jsonl');
 // Beyond this size, the file is renamed logs.1.jsonl (replacing the previous one) by the hourly maintenance
 export const DEBUG_LOG_MAX_BYTES = 20 * 1024 * 1024;
 // Persisted settings (Settings > Network > Config): read at startup, rewritten on every update
@@ -37,11 +37,6 @@ const pickConfig = (values = {}) => {
     if (LEVELS.includes(values.minLevel)) picked.minLevel = values.minLevel;
     return picked;
 };
-
-// Created at startup: fs.appendFile does not create it (a fresh clone has no server/debug/)
-if (ENV_CONFIG.FILE_LOGGING) {
-    try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (err) { console.error('Failed to create log directory:', err); }
-}
 
 const loadConfig = () => {
     try {
@@ -72,7 +67,7 @@ export function updateLoggerConfig(newConfig) {
  * Keeps the debug log under DEBUG_LOG_MAX_BYTES: the current file becomes logs.1.jsonl, a new one starts.
  * @returns {Promise<boolean>} true when the file was rotated.
  */
-export async function rotateDebugLog(maxBytes = DEBUG_LOG_MAX_BYTES, file = LOG_FILE) {
+export async function rotateDebugLog(maxBytes = DEBUG_LOG_MAX_BYTES, file = debugLogFile()) {
     try {
         const { size } = await fs.promises.stat(file);
         if (size <= maxBytes) return false;
@@ -96,40 +91,24 @@ export function getLoggerConfig() {
 const QUIET_CONSOLE = new Set(['DB', 'BATCH_LOGS']);
 
 /**
- * Appends a log entry to the JSONL file.
+ * Appends a log entry to the application log (server/debug/logs.jsonl).
  * @param {string} category - Category of log (DB, API, SYSTEM, etc.)
  * @param {string} message - Human readable message
  * @param {object} data - Structured data payload
  * @param {string} level - Log level (INFO, WARN, ERROR)
+ * @param {{console?: boolean}} [options] - console: false when the caller prints its own line.
  */
-export function log(category, message, data = {}, level = 'INFO') {
+export function log(category, message, data = {}, level = 'INFO', { console: toConsole = true } = {}) {
     // Filter based on configuration
     if (category === 'DB' && !config.enableSqlLogging) return;
     if ((category === 'API' || category === 'ACCESS') && !config.enableAccessLogging) return;
     if (LEVELS.indexOf(level) < LEVELS.indexOf(config.minLevel)) return;
 
-    const timestamp = new Date().toISOString();
-    const entry = {
-        timestamp,
-        level,
-        category,
-        message,
-        data
-    };
-
-    const line = JSON.stringify(entry) + '\n';
-
-    if (ENV_CONFIG.FILE_LOGGING) {
-        fs.appendFile(LOG_FILE, line, (err) => {
-            if (err) {
-                console.error('Failed to write to log file:', err);
-            }
-        });
-    }
+    appendLogLine(debugLogFile(), { timestamp: new Date().toISOString(), level, category, message, data });
 
     // Also log to console in dev, except the routine of the chatty categories (one line per SQL query,
     // per batch of browser logs): they stay in the file, the console keeps their warnings and errors
-    if (process.env.NODE_ENV !== 'production' && !(level === 'INFO' && QUIET_CONSOLE.has(category))) {
+    if (toConsole && process.env.NODE_ENV !== 'production' && !(level === 'INFO' && QUIET_CONSOLE.has(category))) {
         const color = level === 'ERROR' ? '\x1b[31m' : level === 'WARN' ? '\x1b[33m' : '\x1b[36m';
         console.log(`${color}[${category}] ${message}\x1b[0m`);
     }

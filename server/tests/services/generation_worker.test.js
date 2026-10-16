@@ -282,6 +282,7 @@ describe('generation worker', () => {
 
   it('stops between two days when paused, then resumes at the next missing day', async () => {
     let calls = 0;
+    // oxlint-disable-next-line prefer-const -- read by the mock below, assigned once the job exists
     let jobId;
     storyService.generateFromAI.mockImplementation(async (req) => {
       calls++;
@@ -338,6 +339,7 @@ describe('generation worker', () => {
   });
 
   it('keeps going after an AI error and cancels between units', async () => {
+    // oxlint-disable-next-line prefer-const -- read by the mock below, assigned once the job exists
     let jobId;
     storyService.generateFromAI
       .mockRejectedValueOnce(new Error('All Gemini/Gemma models failed'))
@@ -386,7 +388,7 @@ describe('generation worker', () => {
   });
 
   it('uses only earlier days as context when filling a gap in an existing week', async () => {
-    mem.state.stories = DAYS.filter(day => day !== 'Jeudi').map((day, i) => ({
+    mem.state.stories = DAYS.filter(day => day !== 'Jeudi').map((day) => ({
       id: `old-${day}`,
       week_number: 1,
       age_group: '4-6',

@@ -70,9 +70,8 @@ export const APP_ROUTES = {
     ILLUSTRATIONS: '/illustrations',
 } as const;
 
-// Must match the server whitelist (server/config/upload.config.js)
-export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+// Images accepted as illustrations: the same list as the server upload filter
+export { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE } from "@shared/images";
 
 // AI generation (stories are generated in French only: prompt and output format are French)
 // "Whole week" day value: understood by the server prompt helper (server/services/helpers/prompt.helper.js)

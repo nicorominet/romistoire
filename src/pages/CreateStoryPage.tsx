@@ -80,6 +80,8 @@ const CreateStoryPage = () => {
 
     const truncatedTitle = truncateText(data.title, 255);
     // Sanitize content
+    // Control characters a paste can bring (tab and line breaks kept)
+    // oxlint-disable-next-line no-control-regex
     const sanitizedContent = data.content.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
     const payload: Partial<Story> = {

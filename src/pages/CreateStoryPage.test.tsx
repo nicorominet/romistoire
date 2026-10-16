@@ -55,7 +55,7 @@ vi.mock('@/components/ui/sonner', () => ({
 // But we need inputs to be accessible
 vi.mock('@/components/Story/StoryEditor/StoryContent', () => ({
     default: () => <div data-testid="story-content-editor">
-        <input name="title" placeholder="Title" onChange={(e) => {}} /> 
+        <input name="title" placeholder="Title" onChange={() => {}} /> 
         <textarea name="content" placeholder="Content"></textarea>
     </div>
 }));

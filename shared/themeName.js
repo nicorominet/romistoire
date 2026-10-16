@@ -1,6 +1,6 @@
 /**
- * Theme name rules shared by the theme service, the AI generation and the weekly themes.
- * Mirrored on the client in src/utils/themeName.ts: keep both in sync.
+ * Theme name rules, shared by the client (theme picker, search) and the server
+ * (theme service, AI generation, imports): one copy, so both always agree.
  */
 
 const LEADING_ARTICLES = /^(?:(?:le|la|les|un|une|des|du|de la|the|a|an)\s+|l')/;
@@ -69,4 +69,15 @@ export const groupSimilarThemes = (themes) => {
     groups.get(key).push(theme);
   }
   return [...groups.values()].filter(group => group.length > 1);
+};
+
+/**
+ * Whether `name` matches the search `term` (accents, case and articles ignored).
+ * @param {string} name
+ * @param {string} term
+ * @returns {boolean}
+ */
+export const matchesThemeSearch = (name, term) => {
+  const key = normalizeThemeName(term);
+  return !key || normalizeThemeName(name).includes(key);
 };

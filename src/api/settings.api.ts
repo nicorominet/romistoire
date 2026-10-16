@@ -5,6 +5,7 @@ import {
     AppSettingsUpdate,
     AudioSettings,
     BackupFile,
+    ImportResult,
     OllamaTestResult,
     PausedModel,
     QuotaUsage,
@@ -44,6 +45,10 @@ export const settingsApi = {
 
     downloadBackup: (filename: string) =>
         client.get<Blob>(`${API_ENDPOINTS.BACKUPS}/${encodeURIComponent(filename)}`, { responseType: 'blob' }),
+
+    /** Imports a backup of the server into the library; rows already present are kept. */
+    restoreBackup: (filename: string) =>
+        client.post<ImportResult>(`${API_ENDPOINTS.BACKUPS}/${encodeURIComponent(filename)}/restore`, { mode: 'skip' }),
 
     deleteBackup: (filename: string) => client.delete(`${API_ENDPOINTS.BACKUPS}/${encodeURIComponent(filename)}`),
 
